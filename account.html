@@ -581,59 +581,113 @@
 
         // ---- data ----------------------------------------------------
 
-        // Group key waterfall:
-        //   1. linkedin_id  — extension's stable identifier
-        //   2. profile_url  — /in/ URL for non-extension rows
-        //   3. sales_nav_url — /sales/lead/ URL for Sales Navigator
-        //   4. email        — once enrichment lands, externally-booked
-        //                     meetings often only carry an email address
-        //                     (the meeting link is outside LinkedIn and we
-        //                     never see an ID/URL for the prospect).
-        //   5. name         — last-ditch; imperfect but covers the rare
-        //                     historical row with no URL and no email.
-        function prospectKey(r) {
-          if (r.linkedin_id)   return `id:${r.linkedin_id}`;
-          if (r.profile_url)   return `url:${r.profile_url.toLowerCase()}`;
-          if (r.sales_nav_url) return `sn:${r.sales_nav_url.toLowerCase()}`;
-          if (r.email)         return `email:${r.email.toLowerCase()}`;
-          return `name:${(r.prospect_name || "").trim().toLowerCase()}`;
-        }
-
+        // Group rows into prospects by union-find over every identifier a
+        // row carries — NOT a first-match waterfall. Two rows belong to
+        // the same prospect if they share ANY identifier:
+        //   linkedin_id, profile_url, sales_nav_url, email, or name
+        //   (trimmed + lowercased).
+        //
+        // This bridges the common case where different import sources
+        // record different subsets of fields. Example: Exports tab has
+        // profile_url + name; Meetings tab has email + name; Responses
+        // tab has name only. A strict waterfall puts each in its own
+        // bucket (no shared primary ID). Union-find pulls them together
+        // through the shared name.
+        //
+        // Tradeoff: two genuinely different "John Smith"s at the same
+        // client whose rows carry no other identifier will false-merge.
+        // Acceptable for a pilot — you can eyeball company/title/URLs in
+        // the expanded timeline to spot it. The alternative (splitting)
+        // hides real data (Bill Hennessy example: one prospect showing
+        // as 3 rows in the CSV with meetings and responses disconnected).
         function buildProspects(rows) {
-          const byKey = new Map();
-          for (const r of rows) {
-            const k = prospectKey(r);
-            let p = byKey.get(k);
-            if (!p) {
-              p = {
-                key:           k,
-                name:          r.prospect_name || "",
-                email:         r.email         || "",
-                company:       r.company       || "",
-                title:         r.title         || "",
-                profile_url:   r.profile_url   || null,
-                sales_nav_url: r.sales_nav_url || null,
-                linkedin_id:   r.linkedin_id   || null,
-                events:        [],
-              };
-              byKey.set(k, p);
-            }
-            // Fill in any blanks from this later row (historical rows are
-            // sparse; extension rows are complete — we want the fullest
-            // profile by the end of the loop).
-            if (!p.name          && r.prospect_name)  p.name          = r.prospect_name;
-            if (!p.email         && r.email)          p.email         = r.email;
-            if (!p.company       && r.company)        p.company       = r.company;
-            if (!p.title         && r.title)          p.title         = r.title;
-            if (!p.profile_url   && r.profile_url)    p.profile_url   = r.profile_url;
-            if (!p.sales_nav_url && r.sales_nav_url)  p.sales_nav_url = r.sales_nav_url;
-            if (!p.linkedin_id   && r.linkedin_id)    p.linkedin_id   = r.linkedin_id;
+          // Disjoint-set over row indexes + one synthetic node per
+          // distinct identifier string. Union each row with each of its
+          // identifier nodes; rows sharing an identifier end up under the
+          // same root.
+          const parent = new Array(rows.length);
+          for (let i = 0; i < rows.length; i++) parent[i] = i;
 
-            p.events.push(r);
+          const addNode = () => {
+            const n = parent.length;
+            parent.push(n);
+            return n;
+          };
+          const find = (i) => {
+            while (parent[i] !== i) {
+              parent[i] = parent[parent[i]]; // path compression
+              i = parent[i];
+            }
+            return i;
+          };
+          const union = (a, b) => {
+            const ra = find(a), rb = find(b);
+            if (ra !== rb) parent[rb] = ra;
+          };
+
+          const idNode = new Map();
+          const nodeFor = (id) => {
+            let n = idNode.get(id);
+            if (n == null) { n = addNode(); idNode.set(id, n); }
+            return n;
+          };
+
+          for (let i = 0; i < rows.length; i++) {
+            const r = rows[i];
+            if (r.linkedin_id)   union(i, nodeFor(`id:${r.linkedin_id}`));
+            if (r.profile_url)   union(i, nodeFor(`url:${r.profile_url.toLowerCase()}`));
+            if (r.sales_nav_url) union(i, nodeFor(`sn:${r.sales_nav_url.toLowerCase()}`));
+            if (r.email)         union(i, nodeFor(`email:${r.email.toLowerCase()}`));
+            const nm = (r.prospect_name || "").trim().toLowerCase();
+            if (nm)              union(i, nodeFor(`name:${nm}`));
           }
-          // Initial rollup — will be re-computed inside scopeToTimeframe
-          // when a timeframe filter is applied.
-          return Array.from(byKey.values()).map(p => ({ ...p, ...rollup(p.events) }));
+
+          // Bucket each row by its cluster root.
+          const clusters = new Map();
+          for (let i = 0; i < rows.length; i++) {
+            const root = find(i);
+            let arr = clusters.get(root);
+            if (!arr) { arr = []; clusters.set(root, arr); }
+            arr.push(rows[i]);
+          }
+
+          // Fold each cluster down into a single prospect. Rows arrive in
+          // occurred_at ASC order so first non-empty wins — historical
+          // rows set the baseline, later extension rows fill any gaps.
+          const out = [];
+          for (const clusterRows of clusters.values()) {
+            const p = {
+              key:           "",
+              name:          "",
+              email:         "",
+              company:       "",
+              title:         "",
+              profile_url:   null,
+              sales_nav_url: null,
+              linkedin_id:   null,
+              events:        [],
+            };
+            for (const r of clusterRows) {
+              if (!p.name          && r.prospect_name)  p.name          = r.prospect_name;
+              if (!p.email         && r.email)          p.email         = r.email;
+              if (!p.company       && r.company)        p.company       = r.company;
+              if (!p.title         && r.title)          p.title         = r.title;
+              if (!p.profile_url   && r.profile_url)    p.profile_url   = r.profile_url;
+              if (!p.sales_nav_url && r.sales_nav_url)  p.sales_nav_url = r.sales_nav_url;
+              if (!p.linkedin_id   && r.linkedin_id)    p.linkedin_id   = r.linkedin_id;
+              p.events.push(r);
+            }
+            // Stable key for React-style diffing / debugging. Derived
+            // from whichever strong identifier we have.
+            p.key =
+              p.linkedin_id   ? `id:${p.linkedin_id}` :
+              p.profile_url   ? `url:${p.profile_url.toLowerCase()}` :
+              p.sales_nav_url ? `sn:${p.sales_nav_url.toLowerCase()}` :
+              p.email         ? `email:${p.email.toLowerCase()}` :
+                                `name:${(p.name || "").toLowerCase()}`;
+            out.push({ ...p, ...rollup(p.events) });
+          }
+          return out;
         }
 
         // Compute per-prospect summary from their event list. Called
