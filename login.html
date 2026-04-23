@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — Uptown Dashboard</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body class="login-body">
+
+  <form id="login-form" class="login-card" autocomplete="on">
+    <div class="login-brand">
+      <img src="assets/logo-white.png" alt="Uptown" />
+      <div>
+        <div class="login-brand-name">Uptown Dashboard</div>
+        <div class="login-brand-sub">Operator Console</div>
+      </div>
+    </div>
+
+    <div class="login-title">Sign in to continue</div>
+
+    <div class="login-field">
+      <label class="login-label" for="email">Email</label>
+      <input id="email" class="login-input" type="email" required
+             autocomplete="email" placeholder="you@uptown.com" />
+    </div>
+
+    <div class="login-field">
+      <label class="login-label" for="password">Password</label>
+      <input id="password" class="login-input" type="password" required
+             autocomplete="current-password" placeholder="••••••••" />
+    </div>
+
+    <button id="submit-btn" class="login-submit" type="submit">Sign in</button>
+    <div id="error-msg" class="login-error"></div>
+  </form>
+
+  <script src="config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script>
+    // If the operator is already signed in, skip the form.
+    sb.ensureFreshSession().then(session => {
+      if (session) window.location.replace("dashboard.html");
+    });
+
+    const form      = document.getElementById("login-form");
+    const emailEl   = document.getElementById("email");
+    const pwEl      = document.getElementById("password");
+    const submitBtn = document.getElementById("submit-btn");
+    const errorEl   = document.getElementById("error-msg");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Signing in…";
+      try {
+        await sb.signIn(emailEl.value.trim(), pwEl.value);
+        window.location.replace("dashboard.html");
+      } catch (err) {
+        errorEl.textContent = err.message || "Sign-in failed";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Sign in";
+      }
+    });
+  </script>
+</body>
+</html>

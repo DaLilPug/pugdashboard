@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Uptown</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">
+        <img src="assets/logo-white.png" alt="Uptown" />
+        <div class="header-wordmark">
+          <div class="header-wordmark-top">UPTOWN</div>
+          <div class="header-wordmark-bot">Operator Console</div>
+        </div>
+      </div>
+      <div class="header-pipe"></div>
+      <div class="header-sub">Client dashboard</div>
+    </div>
+    <div class="header-right">
+      <div id="user-email" class="header-user"></div>
+      <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <div class="filter-bar">
+    <span class="filter-label">Timeframe</span>
+    <div class="timeframe-pills" id="timeframe-pills">
+      <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
+      <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
+      <button class="timeframe-pill" data-tf="3w" type="button">3W</button>
+      <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
+      <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
+      <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
+      <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+    </div>
+  </div>
+
+  <main class="main main-wide">
+    <div id="kpi-strip" class="kpi-strip">
+      <div class="kpi-card"><div class="kpi-label">Loading…</div></div>
+    </div>
+
+    <section class="table-section">
+      <div class="section-head">
+        <h2>Client performance</h2>
+        <span id="client-count" class="section-meta"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="client-table">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th class="num">Connections</th>
+              <th class="num">Messages</th>
+              <th class="num">Acc. rate</th>
+              <th class="num">Responses</th>
+              <th class="num">Resp. rate</th>
+              <th class="num">Meetings</th>
+              <th class="num">Booking rate</th>
+              <th class="trend">Trend</th>
+            </tr>
+          </thead>
+          <tbody id="client-tbody">
+            <tr><td colspan="9" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async function main() {
+      const session = await Auth.requireAuth();
+      Auth.wireSignOut();
+      Auth.wireUserEmail(session);
+
+      const pillsEl = document.getElementById("timeframe-pills");
+      const kpiEl   = document.getElementById("kpi-strip");
+      const tbodyEl = document.getElementById("client-tbody");
+      const countEl = document.getElementById("client-count");
+
+      const LAST_TF = "dashboard_last_timeframe";
+      let tf = localStorage.getItem(LAST_TF) || "all";
+      activatePill(tf);
+
+      pillsEl.addEventListener("click", (e) => {
+        const btn = e.target.closest(".timeframe-pill");
+        if (!btn) return;
+        tf = btn.dataset.tf;
+        localStorage.setItem(LAST_TF, tf);
+        activatePill(tf);
+        load();
+      });
+
+      load();
+
+      async function load() {
+        tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Loading…</td></tr>`;
+        kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
+
+        let clients = [];
+        try {
+          clients = await sb.sbFetch(
+            "/rest/v1/clients?select=id,name&order=name.asc"
+          );
+        } catch (err) {
+          tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Couldn't load accounts: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+
+        // Pull every outreach row for the timeframe. RLS scopes to the
+        // operator's accessible clients. We aggregate client-side — fine
+        // for pilot-scale data; add a server-side view later if this gets
+        // slow.
+        const since  = cutoffFor(tf);
+        const filter = since ? `&occurred_at=gte.${encodeURIComponent(since)}` : '';
+        let rows = [];
+        try {
+          rows = await sb.sbFetch(
+            `/rest/v1/outreach?select=client_id,type,occurred_at${filter}&limit=100000`
+          );
+        } catch (err) {
+          tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Couldn't load outreach: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+
+        const byClient = {};
+        for (const r of rows) (byClient[r.client_id] ??= []).push(r);
+
+        const clientMetrics = clients.map(c => ({ ...c, ...metricsFor(byClient[c.id] || []) }));
+        renderKpiStrip(kpiEl, clients.length, metricsFor(rows));
+
+        countEl.textContent = `— ${clients.length} client${clients.length === 1 ? '' : 's'}`;
+        if (!clientMetrics.length) {
+          tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">No accounts linked to your operator profile.</td></tr>`;
+          return;
+        }
+
+        // Sort: most connections first (rough "most active" proxy). You
+        // can click-sort later; for the pilot one client this doesn't matter.
+        clientMetrics.sort((a, b) => b.connections - a.connections);
+
+        tbodyEl.innerHTML = clientMetrics.map(renderRow).join("");
+
+        // Whole row is clickable → account page.
+        tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
+          tr.addEventListener("click", () => {
+            window.location.href = `account.html?id=${encodeURIComponent(tr.dataset.clientId)}`;
+          });
+        });
+      }
+
+      function metricsFor(rs) {
+        const counts = { connection: 0, message: 0, response: 0, meeting_booked: 0 };
+        const trend = Array(12).fill(0); // last 12 weeks, oldest → newest
+        const now = Date.now();
+        for (const r of rs) {
+          if (counts[r.type] != null) counts[r.type]++;
+          const weeksAgo = Math.floor(
+            (now - new Date(r.occurred_at).getTime()) / (7 * 86400000)
+          );
+          if (weeksAgo >= 0 && weeksAgo < 12) trend[11 - weeksAgo]++;
+        }
+        return {
+          connections: counts.connection,
+          messages:    counts.message,
+          responses:   counts.response,
+          meetings:    counts.meeting_booked,
+          accRate:     rate(counts.message,         counts.connection),
+          respRate:    rate(counts.response,        counts.message),
+          bookRate:    rate(counts.meeting_booked,  counts.response),
+          trend,
+        };
+      }
+
+      function rate(num, den) { return den ? num / den : null; }
+
+      function renderKpiStrip(root, nClients, t) {
+        const cards = [
+          ["Clients",         String(nClients)],
+          ["Connections",     fmtInt(t.connections)],
+          ["Messages",        fmtInt(t.messages)],
+          ["Acceptance rate", fmtPct(t.accRate)],
+          ["Responses",       fmtInt(t.responses)],
+          ["Response rate",   fmtPct(t.respRate)],
+          ["Meetings",        fmtInt(t.meetings)],
+          ["Booking rate",    fmtPct(t.bookRate)],
+        ];
+        root.innerHTML = cards.map(([label, value]) => `
+          <div class="kpi-card">
+            <div class="kpi-label">${esc(label)}</div>
+            <div class="kpi-value">${esc(value)}</div>
+          </div>
+        `).join("");
+      }
+
+      function renderRow(c) {
+        return `
+          <tr data-client-id="${esc(c.id)}">
+            <td class="client-cell"><div class="client-name">${esc(c.name)}</div></td>
+            <td class="num">${fmtInt(c.connections)}</td>
+            <td class="num">${fmtInt(c.messages)}</td>
+            <td class="num ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
+            <td class="num">${fmtInt(c.responses)}</td>
+            <td class="num ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
+            <td class="num">${fmtInt(c.meetings)}</td>
+            <td class="num ${rateClass(c.bookRate)}">${fmtPct(c.bookRate)}</td>
+            <td class="trend">${sparkline(c.trend)}</td>
+          </tr>
+        `;
+      }
+
+      function sparkline(values, width = 80, height = 22) {
+        const max = Math.max(...values, 1);
+        const barW = width / values.length;
+        const bars = values.map((v, i) => {
+          const h = max > 0 ? (v / max) * (height - 2) : 0;
+          return `<rect x="${(i * barW).toFixed(2)}" y="${(height - h).toFixed(2)}" width="${(barW * 0.7).toFixed(2)}" height="${h.toFixed(2)}" fill="#1EB683" rx="1"/>`;
+        }).join('');
+        return `<svg class="spark" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${bars}</svg>`;
+      }
+
+      function activatePill(v) {
+        pillsEl.querySelectorAll(".timeframe-pill").forEach(b => {
+          b.classList.toggle("active", b.dataset.tf === v);
+        });
+      }
+
+      function cutoffFor(tf) {
+        if (tf === 'all') return null;
+        const days = { '1w':7, '2w':14, '3w':21, '1m':30, '2m':60, '3m':90 }[tf];
+        if (!days) return null;
+        const d = new Date();
+        d.setDate(d.getDate() - days);
+        return d.toISOString();
+      }
+
+      function fmtInt(n) { return n == null ? "—" : n.toLocaleString(); }
+      function fmtPct(r) { return r == null ? "—" : (r * 100).toFixed(1) + "%"; }
+
+      function rateClass(r) {
+        // Loose rate-quality heuristics for pilot. Tune once we have real
+        // benchmark data from historical sheets.
+        if (r == null) return "";
+        if (r >= 0.30) return "rate-good";
+        if (r >= 0.15) return "rate-ok";
+        return "rate-bad";
+      }
+
+      function esc(s) {
+        return String(s ?? "").replace(/[&<>"']/g, c =>
+          ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
+        );
+      }
+    })();
+  </script>
+</body>
+</html>

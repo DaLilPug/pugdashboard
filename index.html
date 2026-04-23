@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Uptown Dashboard</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+</head>
+<body>
+  <script src="config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script>
+    // Send the user to the dashboard if they already have a session,
+    // otherwise to login. Avoids a flash of the login page for signed-in
+    // users hitting the root URL.
+    sb.ensureFreshSession()
+      .then(s => window.location.replace(s ? "dashboard.html" : "login.html"))
+      .catch(() => window.location.replace("login.html"));
+  </script>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account — Uptown</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <!-- Chart.js for the cumulative chart. ~70KB gz. Loaded from jsdelivr. -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">
+        <img src="assets/logo-white.png" alt="Uptown" />
+        <div class="header-wordmark">
+          <div class="header-wordmark-top">UPTOWN</div>
+          <div class="header-wordmark-bot">Operator Console</div>
+        </div>
+      </div>
+      <div class="header-pipe"></div>
+      <a href="dashboard.html" class="header-breadcrumb">← Dashboard</a>
+    </div>
+    <div class="header-right">
+      <div id="user-email" class="header-user"></div>
+      <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <div class="account-titlebar">
+    <h1 id="account-name">Loading…</h1>
+    <div id="account-meta" class="account-meta"></div>
+  </div>
+
+  <div class="sub-tabs" id="sub-tabs">
+    <button class="sub-tab active" data-tab="summary"   type="button">Summary</button>
+    <button class="sub-tab"        data-tab="followups" type="button">Follow-ups</button>
+    <button class="sub-tab"        data-tab="cadence"   type="button">Cadence</button>
+  </div>
+
+  <main class="main main-wide">
+
+    <!-- =================== SUMMARY ==================== -->
+    <section id="panel-summary" class="sub-panel">
+      <div class="picker-row">
+        <span class="picker-label">Timeframe</span>
+        <div class="timeframe-pills" id="sum-pills">
+          <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
+          <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
+          <button class="timeframe-pill" data-tf="3w" type="button">3W</button>
+          <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
+          <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
+          <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
+          <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+        </div>
+      </div>
+
+      <div id="sum-kpi" class="kpi-strip">
+        <div class="kpi-card"><div class="kpi-label">Loading…</div></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <h2>Cumulative outreach</h2>
+          <span class="section-meta">Connections · Messages · Responses · Meetings</span>
+        </div>
+        <div class="chart-container">
+          <canvas id="sum-chart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== FOLLOW-UPS ==================== -->
+    <section id="panel-followups" class="sub-panel hidden">
+      <div id="fu-root" class="fu-root">
+        <div class="loading">Loading follow-ups…</div>
+      </div>
+    </section>
+
+    <!-- =================== CADENCE ==================== -->
+    <section id="panel-cadence" class="sub-panel hidden">
+      <div class="cad-editor">
+        <div class="cad-head">
+          <h2>Cadence steps</h2>
+          <p class="page-sub">
+            Templates support <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
+            Changes apply only to this account.
+          </p>
+        </div>
+        <div id="cad-steps" class="cad-steps">
+          <div class="loading">Loading cadence…</div>
+        </div>
+        <button id="cad-add"  class="cad-add"  type="button">+ Add step</button>
+        <div class="cad-actions">
+          <button id="cad-save" class="cad-save" type="button" disabled>Save</button>
+          <span   id="cad-feedback" class="cad-feedback"></span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async function main() {
+      const session = await Auth.requireAuth();
+      Auth.wireSignOut();
+      Auth.wireUserEmail(session);
+
+      const clientId = new URLSearchParams(window.location.search).get("id");
+      if (!clientId) {
+        window.location.replace("dashboard.html");
+        return;
+      }
+
+      // Fetch the account once — name + cadence for the Cadence tab.
+      let client;
+      try {
+        const rows = await sb.sbFetch(
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates&id=eq.${encodeURIComponent(clientId)}&limit=1`
+        );
+        client = rows[0];
+      } catch (err) {
+        document.getElementById("account-name").textContent = "Couldn't load account";
+        document.getElementById("account-meta").textContent = err.message || "";
+        return;
+      }
+      if (!client) {
+        // RLS dropped it — operator doesn't have access to this ID.
+        document.getElementById("account-name").textContent = "Account not found";
+        document.getElementById("account-meta").textContent =
+          "You don't have access to this account, or the ID is invalid.";
+        return;
+      }
+
+      document.getElementById("account-name").textContent = client.name;
+      const metaEl = document.getElementById("account-meta");
+      metaEl.innerHTML = [
+        client.slug ? `<span>${esc(client.slug)}</span>` : "",
+        client.linkedin_account_url
+          ? `<a href="${esc(client.linkedin_account_url)}" target="_blank" rel="noopener">LinkedIn profile ↗</a>`
+          : "",
+      ].filter(Boolean).join(" · ");
+
+      // ---- tab switching ---------------------------------------------
+      const tabs   = document.getElementById("sub-tabs");
+      const loaded = { summary: false, followups: false, cadence: false };
+
+      tabs.addEventListener("click", (e) => {
+        const btn = e.target.closest(".sub-tab");
+        if (!btn) return;
+        selectTab(btn.dataset.tab);
+      });
+
+      function selectTab(name) {
+        tabs.querySelectorAll(".sub-tab").forEach(b =>
+          b.classList.toggle("active", b.dataset.tab === name)
+        );
+        document.querySelectorAll(".sub-panel").forEach(p =>
+          p.classList.toggle("hidden", p.id !== `panel-${name}`)
+        );
+        if (!loaded[name]) {
+          if      (name === "summary")   initSummary();
+          else if (name === "followups") initFollowups();
+          else if (name === "cadence")   initCadence();
+          loaded[name] = true;
+        }
+      }
+
+      // Summary loads on page open (it's the default tab).
+      initSummary();
+      loaded.summary = true;
+
+      // ================= SUMMARY ======================================
+
+      function initSummary() {
+        const pillsEl = document.getElementById("sum-pills");
+        const kpiEl   = document.getElementById("sum-kpi");
+        const canvas  = document.getElementById("sum-chart");
+
+        const LAST_TF = `account_${clientId}_tf`;
+        let tf = localStorage.getItem(LAST_TF) || "all";
+        activatePill(pillsEl, tf);
+
+        pillsEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".timeframe-pill");
+          if (!btn) return;
+          tf = btn.dataset.tf;
+          localStorage.setItem(LAST_TF, tf);
+          activatePill(pillsEl, tf);
+          loadSummary();
+        });
+
+        loadSummary();
+
+        let chart; // Chart.js instance
+
+        async function loadSummary() {
+          kpiEl.innerHTML = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
+
+          const since  = cutoffFor(tf);
+          const filter = since ? `&occurred_at=gte.${encodeURIComponent(since)}` : '';
+          let rows = [];
+          try {
+            rows = await sb.sbFetch(
+              `/rest/v1/outreach?select=type,occurred_at&client_id=eq.${encodeURIComponent(clientId)}${filter}&order=occurred_at.asc&limit=100000`
+            );
+          } catch (err) {
+            kpiEl.innerHTML = `<div class="placeholder"><strong>Couldn't load outreach</strong>${esc(err.message || "")}</div>`;
+            return;
+          }
+
+          renderKpis(kpiEl, metricsFor(rows));
+
+          // Cumulative chart — always drawn; if Chart.js hasn't loaded
+          // yet (defer), retry briefly.
+          if (typeof Chart === "undefined") {
+            setTimeout(() => drawChart(canvas, rows), 200);
+          } else {
+            drawChart(canvas, rows);
+          }
+        }
+
+        function drawChart(canvas, rows) {
+          if (typeof Chart === "undefined") return;
+
+          // Bucket by day, accumulate counts by type.
+          const byDay = new Map();
+          for (const r of rows) {
+            const d = dayKey(r.occurred_at);
+            const bucket = byDay.get(d) || { connection:0, message:0, response:0, meeting_booked:0 };
+            if (bucket[r.type] != null) bucket[r.type]++;
+            byDay.set(d, bucket);
+          }
+          const days = Array.from(byDay.keys()).sort();
+
+          const series = { connection:0, message:0, response:0, meeting_booked:0 };
+          const pts = { connection:[], message:[], response:[], meeting_booked:[] };
+          for (const d of days) {
+            const b = byDay.get(d);
+            series.connection     += b.connection;
+            series.message        += b.message;
+            series.response       += b.response;
+            series.meeting_booked += b.meeting_booked;
+            pts.connection.push(series.connection);
+            pts.message.push(series.message);
+            pts.response.push(series.response);
+            pts.meeting_booked.push(series.meeting_booked);
+          }
+
+          if (chart) chart.destroy();
+          chart = new Chart(canvas, {
+            type: "line",
+            data: {
+              labels: days,
+              datasets: [
+                { label: "Connections",     data: pts.connection,     borderColor: "#2d7ab8", backgroundColor: "transparent", tension: .3, borderWidth: 2 },
+                { label: "Messages",        data: pts.message,        borderColor: "#013A52", backgroundColor: "transparent", tension: .3, borderWidth: 2 },
+                { label: "Responses",       data: pts.response,       borderColor: "#A8B4C4", backgroundColor: "transparent", tension: .3, borderWidth: 2 },
+                { label: "Meetings booked", data: pts.meeting_booked, borderColor: "#1EB683", backgroundColor: "transparent", tension: .3, borderWidth: 2 },
+              ],
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: { mode: "index", intersect: false },
+              plugins: {
+                legend: { position: "bottom", labels: { boxWidth: 12, font: { family: "Montserrat", size: 11 } } },
+                tooltip: { titleFont: { family: "Montserrat" }, bodyFont: { family: "Inter" } },
+              },
+              scales: {
+                x: { ticks: { font: { family: "Inter", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { font: { family: "Inter", size: 10 } }, grid: { color: "rgba(1,58,82,.06)" } },
+              },
+            },
+          });
+        }
+
+        function renderKpis(root, t) {
+          const cards = [
+            ["Connections",     fmtInt(t.connections)],
+            ["Messages",        fmtInt(t.messages)],
+            ["Acceptance rate", fmtPct(t.accRate)],
+            ["Responses",       fmtInt(t.responses)],
+            ["Response rate",   fmtPct(t.respRate)],
+            ["Meetings",        fmtInt(t.meetings)],
+            ["Booking rate",    fmtPct(t.bookRate)],
+            ["Total outreach",  fmtInt(t.total)],
+          ];
+          root.innerHTML = cards.map(([l, v]) => `
+            <div class="kpi-card">
+              <div class="kpi-label">${esc(l)}</div>
+              <div class="kpi-value">${esc(v)}</div>
+            </div>
+          `).join("");
+        }
+      }
+
+      function metricsFor(rs) {
+        const c = { connection:0, message:0, response:0, meeting_booked:0, followup:0, retargeting:0, inmail:0 };
+        for (const r of rs) if (c[r.type] != null) c[r.type]++;
+        return {
+          connections: c.connection,
+          messages:    c.message,
+          responses:   c.response,
+          meetings:    c.meeting_booked,
+          accRate:     rate(c.message, c.connection),
+          respRate:    rate(c.response, c.message),
+          bookRate:    rate(c.meeting_booked, c.response),
+          total:       rs.length,
+        };
+      }
+
+      // ================= FOLLOW-UPS ===================================
+
+      function initFollowups() {
+        loadFollowups();
+      }
+
+      async function loadFollowups() {
+        const root = document.getElementById("fu-root");
+        root.innerHTML = `<div class="loading">Loading follow-ups…</div>`;
+
+        let rows = [];
+        try {
+          rows = await sb.sbFetch(
+            `/rest/v1/followups_due?client_id=eq.${encodeURIComponent(clientId)}&order=due_at.asc`
+          );
+        } catch (err) {
+          root.innerHTML = `<div class="placeholder"><strong>Couldn't load follow-ups</strong>${esc(err.message || "")}</div>`;
+          return;
+        }
+
+        if (!rows.length) {
+          root.innerHTML = `
+            <div class="placeholder">
+              <strong>No follow-ups queued</strong>
+              Log a <b>Message</b> in the extension to start a sequence.
+            </div>`;
+          return;
+        }
+
+        const now = Date.now();
+        const tEnd = new Date(); tEnd.setHours(23,59,59,999);
+        const overdue  = [];
+        const today    = [];
+        const upcoming = [];
+        rows.forEach((r, idx) => {
+          const due = new Date(r.due_at).getTime();
+          if      (due < now)                 overdue.push({ r, idx });
+          else if (due <= tEnd.getTime())     today.push({ r, idx });
+          else                                upcoming.push({ r, idx });
+        });
+
+        const section = (title, entries, tone) => entries.length
+          ? `<section class="fu-section">
+               <div class="fu-section-head fu-section-${tone}">
+                 ${esc(title)} <span class="fu-count">${entries.length}</span>
+               </div>
+               <div class="fu-list">${entries.map(e => renderFollowupRow(e.r, e.idx)).join("")}</div>
+             </section>`
+          : "";
+
+        root.innerHTML =
+          section("Overdue",   overdue,  "overdue") +
+          section("Due today", today,    "today") +
+          section("Upcoming",  upcoming, "upcoming");
+
+        // Delegate button clicks on the whole root.
+        root.onclick = async (e) => {
+          const btn = e.target.closest(".fu-btn");
+          if (!btn) return;
+          const idx = Number(btn.dataset.idx);
+          const action = btn.dataset.action;
+          const row = rows[idx];
+          if (!row) return;
+
+          if (action === "open") {
+            const url = row.sales_nav_url || row.profile_url;
+            if (!url) { feedback(btn, "No URL"); return; }
+            window.open(url, "_blank", "noopener");
+            return;
+          }
+          if (action === "copy") {
+            const text = renderTemplate(row.template, row);
+            if (!text) { feedback(btn, "No template"); return; }
+            try {
+              await navigator.clipboard.writeText(text);
+              feedback(btn, "Copied");
+            } catch (_) { feedback(btn, "Copy failed"); }
+            return;
+          }
+          if (action === "sent" || action === "meeting") {
+            btn.disabled = true;
+            try {
+              await logFollowupAction(row, action === "sent" ? "followup" : "meeting_booked");
+              await loadFollowups();
+            } catch (err) {
+              btn.disabled = false;
+              feedback(btn, "Failed");
+              console.error(err);
+            }
+          }
+        };
+      }
+
+      function renderFollowupRow(r, idx) {
+        const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
+        const due   = formatDueLabel(r.due_at);
+        const step  = `Step ${r.step_index} · day ${r.step_day}`;
+        const tpl   = r.template
+          ? esc(truncate(renderTemplate(r.template, r), 180))
+          : `<span class="fu-notemplate">No template set for this step.</span>`;
+        return `
+          <article class="fu-row">
+            <div class="fu-row-head">
+              <div class="fu-name">${esc(r.prospect_name)}</div>
+              <div class="fu-due">${esc(due)}</div>
+            </div>
+            <div class="fu-meta">${esc(meta)}</div>
+            <div class="fu-step">${esc(step)}</div>
+            <div class="fu-preview">${tpl}</div>
+            <div class="fu-actions">
+              <button class="fu-btn fu-btn-primary" data-action="open"    data-idx="${idx}" type="button">Open thread</button>
+              <button class="fu-btn"                data-action="copy"    data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
+              <button class="fu-btn fu-btn-success" data-action="sent"    data-idx="${idx}" type="button">Mark sent</button>
+              <button class="fu-btn fu-btn-ghost"   data-action="meeting" data-idx="${idx}" type="button" title="Log meeting booked">📅</button>
+            </div>
+          </article>
+        `;
+      }
+
+      async function logFollowupAction(row, type) {
+        const payload = {
+          client_id:     clientId,
+          operator_id:   session.user.id,
+          prospect_name: row.prospect_name,
+          company:       row.company,
+          title:         row.title,
+          linkedin_id:   row.linkedin_id,
+          profile_url:   row.profile_url,
+          sales_nav_url: row.sales_nav_url,
+          type,
+          message_sent:  type === "followup" ? renderTemplate(row.template, row) : null,
+        };
+        await sb.sbFetch("/rest/v1/outreach", {
+          method:  "POST",
+          body:    JSON.stringify([payload]),
+          headers: { Prefer: "return=minimal" },
+        });
+      }
+
+      function renderTemplate(template, row) {
+        if (!template) return "";
+        const firstName = (row.prospect_name || "").trim().split(/\s+/)[0] || "";
+        const map = {
+          first_name: firstName, firstname: firstName,
+          company: row.company || "", title: row.title || "",
+        };
+        return template.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_, key) => {
+          const v = map[key.toLowerCase()];
+          return v == null ? "" : v;
+        });
+      }
+
+      function truncate(text, max) {
+        if (!text) return "";
+        return text.length > max ? text.slice(0, max - 1) + "…" : text;
+      }
+
+      function formatDueLabel(dueIso) {
+        const due = new Date(dueIso);
+        const now = new Date();
+        const msPerDay = 86400000;
+        const dueDay = new Date(due); dueDay.setHours(0,0,0,0);
+        const today  = new Date(now); today.setHours(0,0,0,0);
+        const delta  = Math.round((dueDay - today) / msPerDay);
+        if (delta <  0)  return `${-delta}d late`;
+        if (delta === 0) return `Today`;
+        if (delta === 1) return `Tomorrow`;
+        return `in ${delta}d`;
+      }
+
+      function feedback(btn, msg) {
+        const old = btn.textContent;
+        btn.textContent = msg;
+        setTimeout(() => { btn.textContent = old; }, 1500);
+      }
+
+      // ================= CADENCE ======================================
+
+      function initCadence() {
+        const stepsEl    = document.getElementById("cad-steps");
+        const addBtn     = document.getElementById("cad-add");
+        const saveBtn    = document.getElementById("cad-save");
+        const feedbackEl = document.getElementById("cad-feedback");
+
+        // Mutable working copy of (day, template) pairs. Save flushes
+        // back to clients.cadence_days / clients.cadence_templates.
+        const days      = Array.isArray(client.cadence_days)      ? [...client.cadence_days]      : [];
+        const templates = Array.isArray(client.cadence_templates) ? [...client.cadence_templates] : [];
+        // Pad shorter array so index-paired rendering is stable.
+        while (templates.length < days.length) templates.push("");
+
+        let dirty = false;
+
+        render();
+
+        addBtn.addEventListener("click", () => {
+          const last = days.length ? days[days.length - 1] : 0;
+          days.push(Math.max(last + 3, 1));
+          templates.push("");
+          setDirty(true);
+          render();
+        });
+
+        stepsEl.addEventListener("click", (e) => {
+          const rm = e.target.closest(".cad-step-remove");
+          if (!rm) return;
+          const idx = Number(rm.dataset.idx);
+          days.splice(idx, 1);
+          templates.splice(idx, 1);
+          setDirty(true);
+          render();
+        });
+
+        stepsEl.addEventListener("input", (e) => {
+          const el = e.target;
+          const idx = Number(el.dataset.idx);
+          if (el.classList.contains("cad-step-day")) {
+            days[idx] = el.value === "" ? null : parseInt(el.value, 10);
+            setDirty(true);
+          } else if (el.classList.contains("cad-step-template")) {
+            templates[idx] = el.value;
+            setDirty(true);
+          }
+        });
+
+        saveBtn.addEventListener("click", save);
+
+        async function save() {
+          // Validate: every day must be a positive integer, strictly
+          // ascending. Catch bad input before sending to Postgres.
+          const cleanDays = [];
+          const cleanTpls = [];
+          for (let i = 0; i < days.length; i++) {
+            const d = parseInt(days[i], 10);
+            if (!Number.isFinite(d) || d < 0) {
+              return showErr(`Step ${i+1}: day must be a non-negative integer.`);
+            }
+            if (cleanDays.length && d <= cleanDays[cleanDays.length - 1]) {
+              return showErr(`Step ${i+1}: day ${d} must be greater than step ${i}.`);
+            }
+            cleanDays.push(d);
+            cleanTpls.push(String(templates[i] || "").trim());
+          }
+
+          saveBtn.disabled = true;
+          feedbackEl.className = "cad-feedback";
+          feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch(
+              `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+              {
+                method: "PATCH",
+                body:   JSON.stringify({ cadence_days: cleanDays, cadence_templates: cleanTpls }),
+                headers:{ Prefer: "return=minimal" },
+              }
+            );
+            // Update our local snapshot so re-render doesn't flash stale values.
+            client.cadence_days      = cleanDays;
+            client.cadence_templates = cleanTpls;
+            dirty = false;
+            saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok";
+            feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+          } catch (err) {
+            saveBtn.disabled = false;
+            showErr(err.message || "Save failed");
+          }
+        }
+
+        function showErr(msg) {
+          feedbackEl.className = "cad-feedback err";
+          feedbackEl.textContent = msg;
+          saveBtn.disabled = !dirty;
+        }
+
+        function setDirty(v) {
+          dirty = v;
+          saveBtn.disabled = !v;
+          if (v) {
+            feedbackEl.textContent = "";
+            feedbackEl.className = "cad-feedback";
+          }
+        }
+
+        function render() {
+          if (!days.length) {
+            stepsEl.innerHTML = `<div class="placeholder" style="padding:20px;">
+              <strong>No cadence steps yet</strong>
+              Add a step to set when the first follow-up sends.
+            </div>`;
+            return;
+          }
+          stepsEl.innerHTML = days.map((d, i) => `
+            <div class="cad-step">
+              <div class="cad-step-row">
+                <span class="cad-step-num">Step ${i + 1}</span>
+                <span class="cad-step-day-label">Day</span>
+                <input class="cad-step-day" type="number" min="0" step="1"
+                       data-idx="${i}" value="${d == null ? '' : d}" />
+                <button class="cad-step-remove" data-idx="${i}" type="button" title="Remove step">×</button>
+              </div>
+              <textarea class="cad-step-template" rows="3"
+                        data-idx="${i}"
+                        placeholder="Hi {{first_name}}, …">${esc(templates[i] || "")}</textarea>
+            </div>
+          `).join("");
+        }
+      }
+
+      // ================= helpers ======================================
+
+      function activatePill(root, v) {
+        root.querySelectorAll(".timeframe-pill").forEach(b => {
+          b.classList.toggle("active", b.dataset.tf === v);
+        });
+      }
+
+      function cutoffFor(tf) {
+        if (tf === 'all') return null;
+        const days = { '1w':7, '2w':14, '3w':21, '1m':30, '2m':60, '3m':90 }[tf];
+        if (!days) return null;
+        const d = new Date();
+        d.setDate(d.getDate() - days);
+        return d.toISOString();
+      }
+
+      function dayKey(iso) {
+        return iso.slice(0, 10); // YYYY-MM-DD
+      }
+
+      function rate(num, den) { return den ? num / den : null; }
+      function fmtInt(n) { return n == null ? "—" : n.toLocaleString(); }
+      function fmtPct(r) { return r == null ? "—" : (r * 100).toFixed(1) + "%"; }
+
+      function esc(s) {
+        return String(s ?? "").replace(/[&<>"']/g, c =>
+          ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
+        );
+      }
+    })();
+  </script>
+</body>
+</html>
