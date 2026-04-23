@@ -549,10 +549,12 @@
         async function loadAll() {
           try {
             // One big fetch with every column the table + timeline uses.
-            // sbFetchAll pages past PostgREST's 1000-row cap.
+            // sbFetchAll pages past PostgREST's 1000-row cap. Email is
+            // pulled for both the grouping waterfall and the timeline
+            // head display.
             const rows = await sb.sbFetchAll(
               `/rest/v1/outreach?` +
-              `select=type,occurred_at,prospect_name,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
+              `select=type,occurred_at,prospect_name,email,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
               `&client_id=eq.${encodeURIComponent(clientId)}` +
               `&order=occurred_at.asc`
             );
@@ -579,15 +581,21 @@
 
         // ---- data ----------------------------------------------------
 
-        // Group key: prefer the extension's linkedin_id (stable across
-        // renames, URL rewrites). Fall back to profile_url / sales_nav_url
-        // (historical imports have no linkedin_id but do have one of
-        // these). Last-ditch, key by lowercased name — imperfect but only
-        // affects the rare import where neither URL is present.
+        // Group key waterfall:
+        //   1. linkedin_id  — extension's stable identifier
+        //   2. profile_url  — /in/ URL for non-extension rows
+        //   3. sales_nav_url — /sales/lead/ URL for Sales Navigator
+        //   4. email        — once enrichment lands, externally-booked
+        //                     meetings often only carry an email address
+        //                     (the meeting link is outside LinkedIn and we
+        //                     never see an ID/URL for the prospect).
+        //   5. name         — last-ditch; imperfect but covers the rare
+        //                     historical row with no URL and no email.
         function prospectKey(r) {
           if (r.linkedin_id)   return `id:${r.linkedin_id}`;
           if (r.profile_url)   return `url:${r.profile_url.toLowerCase()}`;
           if (r.sales_nav_url) return `sn:${r.sales_nav_url.toLowerCase()}`;
+          if (r.email)         return `email:${r.email.toLowerCase()}`;
           return `name:${(r.prospect_name || "").trim().toLowerCase()}`;
         }
 
@@ -600,6 +608,7 @@
               p = {
                 key:           k,
                 name:          r.prospect_name || "",
+                email:         r.email         || "",
                 company:       r.company       || "",
                 title:         r.title         || "",
                 profile_url:   r.profile_url   || null,
@@ -613,6 +622,7 @@
             // sparse; extension rows are complete — we want the fullest
             // profile by the end of the loop).
             if (!p.name          && r.prospect_name)  p.name          = r.prospect_name;
+            if (!p.email         && r.email)          p.email         = r.email;
             if (!p.company       && r.company)        p.company       = r.company;
             if (!p.title         && r.title)          p.title         = r.title;
             if (!p.profile_url   && r.profile_url)    p.profile_url   = r.profile_url;
@@ -799,6 +809,9 @@
                 <strong>${esc(p.name || "—")}</strong>
                 ${p.company ? ` · ${esc(p.company)}` : ""}
                 ${p.title   ? ` · <span class="pr-timeline-title">${esc(p.title)}</span>` : ""}
+                ${p.email
+                  ? `<div class="pr-timeline-email"><a href="mailto:${esc(p.email)}">${esc(p.email)}</a></div>`
+                  : ""}
               </div>
               ${openUrl
                 ? `<a class="btn-secondary pr-open-linkedin" href="${esc(openUrl)}" target="_blank" rel="noopener">Open in LinkedIn ↗</a>`
@@ -845,19 +858,28 @@
         function exportCsv(prospects) {
           if (!prospects.length) return;
 
+          // Every outreach type gets its own column so nothing hides once
+          // the extension starts logging follow-ups / InMails / retargeting.
+          // Email sits next to Name so enriched rows and externally-booked
+          // meetings (where we only have an email) survive the export.
           const header = [
-            "Name", "Company", "Title", "Status", "Sentiment",
-            "Connections", "Messages", "Responses", "Positive Responses", "Meetings",
+            "Name", "Email", "Company", "Title", "Status", "Sentiment",
+            "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
+            "Responses", "Positive Responses", "Meetings",
             "Events", "Last Touch", "LinkedIn URL",
           ];
           const rows = prospects.map(p => [
             p.name || "",
+            p.email || "",
             p.company || "",
             p.title || "",
             p.status,
             p.sentiment || "",
             p.counts.connection,
+            p.counts.inmail,
             p.counts.message,
+            p.counts.followup,
+            p.counts.retargeting,
             p.counts.response,
             p.positives,
             p.counts.meeting_booked,

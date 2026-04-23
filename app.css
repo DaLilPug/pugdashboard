@@ -1637,6 +1637,17 @@ body.login-body {
   font-weight: 700;
 }
 .pr-timeline-title { color: var(--gray-600); }
+.pr-timeline-email {
+  margin-top: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--gray-600);
+}
+.pr-timeline-email a {
+  color: var(--accent-blue, #3b9fd4);
+  text-decoration: none;
+}
+.pr-timeline-email a:hover { text-decoration: underline; }
 
 .pr-open-linkedin { height: 30px; font-size: 11px; }
 
