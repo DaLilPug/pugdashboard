@@ -128,8 +128,13 @@
         const filter = since ? `&occurred_at=gte.${encodeURIComponent(since)}` : '';
         let rows = [];
         try {
-          rows = await sb.sbFetch(
-            `/rest/v1/outreach?select=client_id,type,occurred_at${filter}&limit=100000`
+          // sbFetchAll to bypass PostgREST's 1000-row cap. This query spans
+          // every client the operator can see — a single accessible client
+          // with a long history (matt-roush-style) blows past 1000 on its
+          // own, so plain sbFetch silently truncates the KPI strip and
+          // client table.
+          rows = await sb.sbFetchAll(
+            `/rest/v1/outreach?select=client_id,type,occurred_at${filter}`
           );
         } catch (err) {
           tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Couldn't load outreach: ${esc(err.message)}</td></tr>`;

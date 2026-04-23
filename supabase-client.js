@@ -148,6 +148,74 @@
     return null;
   }
 
+  // Paginated GET. PostgREST caps a single response at `max-rows` (default
+  // 1000 on Supabase), so any query returning more than that silently gets
+  // truncated unless we page via Range headers. sbFetchAll loops Range
+  // requests until it's pulled every row, concatenating into one array.
+  //
+  // Only use for SELECT reads — it's not safe to send Range with writes.
+  // Path should NOT include an offset/limit that conflicts; if the caller
+  // included `&limit=100000` etc. it's ignored in favour of PAGE-sized
+  // Range requests.
+  //
+  // Response carries `Content-Range: 0-999/3085` — the `/N` suffix is the
+  // true total (requires Prefer: count=exact). We stop when either:
+  //   (a) we've accumulated >= total rows, or
+  //   (b) a page came back short (< PAGE rows) — covers servers that don't
+  //       return a count and natural end-of-data.
+  async function sbFetchAll(path, options = {}) {
+    const s = await ensureFreshSession();
+    if (!s) throw new Error("Not signed in");
+
+    const PAGE = 1000;
+    let offset = 0;
+    const all = [];
+
+    while (true) {
+      const res = await fetch(`${URL_BASE}${path}`, {
+        ...options,
+        headers: {
+          apikey:         ANON_KEY,
+          Authorization:  `Bearer ${s.access_token}`,
+          "Content-Type": "application/json",
+          "Range-Unit":   "items",
+          "Range":        `${offset}-${offset + PAGE - 1}`,
+          "Prefer":       "count=exact",
+          ...(options.headers || {}),
+        },
+      });
+      // 206 Partial Content is the expected success code for ranged reads.
+      if (!res.ok && res.status !== 206) {
+        const text = await res.text();
+        let payload;
+        try { payload = JSON.parse(text); } catch (_) { payload = { message: text }; }
+        throw new Error(payload.message || payload.error || `HTTP ${res.status}`);
+      }
+      const batch = await res.json();
+      if (!Array.isArray(batch)) {
+        // Server returned a single object or error-shaped body. Bail cleanly.
+        return batch;
+      }
+      for (const row of batch) all.push(row);
+
+      const cr = res.headers.get("Content-Range"); // e.g. "0-999/3085" or "*/0"
+      let total = null;
+      if (cr) {
+        const slash = cr.indexOf("/");
+        if (slash >= 0) {
+          const n = parseInt(cr.slice(slash + 1), 10);
+          if (Number.isFinite(n)) total = n;
+        }
+      }
+
+      if (batch.length < PAGE) break;                  // end-of-data
+      if (total != null && all.length >= total) break; // hit the known total
+      offset += PAGE;
+    }
+
+    return all;
+  }
+
   window.sb = {
     signIn,
     signOut,
@@ -155,5 +223,6 @@
     refreshSession,
     ensureFreshSession,
     sbFetch,
+    sbFetchAll,
   };
 })();

@@ -236,8 +236,11 @@
           compareEl.innerHTML = `<div class="loading">Loading…</div>`;
 
           try {
-            allRows = await sb.sbFetch(
-              `/rest/v1/outreach?select=type,occurred_at,response_sentiment&client_id=eq.${encodeURIComponent(clientId)}&order=occurred_at.asc&limit=100000`
+            // sbFetchAll (not sbFetch) to bypass PostgREST's 1000-row cap —
+            // matt-roush alone has 3000+ rows, so plain sbFetch silently
+            // truncates and the KPIs / chart lie.
+            allRows = await sb.sbFetchAll(
+              `/rest/v1/outreach?select=type,occurred_at,response_sentiment&client_id=eq.${encodeURIComponent(clientId)}&order=occurred_at.asc`
             );
           } catch (err) {
             kpiEl.innerHTML     = `<div class="placeholder"><strong>Couldn't load outreach</strong>${esc(err.message || "")}</div>`;
