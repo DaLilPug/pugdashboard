@@ -40,6 +40,7 @@
 
   <div class="sub-tabs" id="sub-tabs">
     <button class="sub-tab active" data-tab="summary"   type="button">Summary</button>
+    <button class="sub-tab"        data-tab="prospects" type="button">Prospects</button>
     <button class="sub-tab"        data-tab="followups" type="button">Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"   type="button">Cadence</button>
   </div>
@@ -92,6 +93,58 @@
         </div>
         <div id="sum-compare" class="period-wrap">
           <div class="loading">Loading…</div>
+        </div>
+      </section>
+    </section>
+
+    <!-- =================== PROSPECTS ===================== -->
+    <section id="panel-prospects" class="sub-panel hidden">
+      <section class="panel-card">
+        <div class="panel-card-head pr-head">
+          <h2>Prospects</h2>
+          <div class="pr-toolbar">
+            <div class="timeframe-pills" id="pr-pills">
+              <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
+              <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+            </div>
+            <input id="pr-search" class="pr-search" type="search"
+                   placeholder="Search name, company, title…" autocomplete="off" />
+            <button id="pr-export" class="btn-secondary pr-export" type="button">Export CSV</button>
+          </div>
+        </div>
+
+        <!-- Status + sentiment filter pills. Status = furthest-right funnel
+             stage the prospect reached in the current timeframe. Sentiment
+             is read from the most recent response's classification. -->
+        <div class="pr-filter-row">
+          <div class="pr-filter-group">
+            <span class="pr-filter-label">Status</span>
+            <div class="pr-filter-chips" id="pr-status-filter">
+              <button class="pr-chip active" data-status="all"        type="button">All</button>
+              <button class="pr-chip"        data-status="connection" type="button">Connected</button>
+              <button class="pr-chip"        data-status="message"    type="button">Messaged</button>
+              <button class="pr-chip"        data-status="response"   type="button">Responded</button>
+              <button class="pr-chip"        data-status="meeting"    type="button">Meeting</button>
+            </div>
+          </div>
+          <div class="pr-filter-group">
+            <span class="pr-filter-label">Sentiment</span>
+            <div class="pr-filter-chips" id="pr-sentiment-filter">
+              <button class="pr-chip active" data-sentiment="all"      type="button">All</button>
+              <button class="pr-chip"        data-sentiment="positive" type="button">Positive</button>
+              <button class="pr-chip"        data-sentiment="neutral"  type="button">Neutral</button>
+              <button class="pr-chip"        data-sentiment="negative" type="button">Negative</button>
+              <button class="pr-chip"        data-sentiment="none"     type="button">Unclassified</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pr-meta" class="pr-meta"></div>
+        <div id="pr-table-wrap" class="pr-table-wrap">
+          <div class="loading">Loading prospects…</div>
         </div>
       </section>
     </section>
@@ -172,7 +225,7 @@
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, followups: false, cadence: false };
+      const loaded = { summary: false, prospects: false, followups: false, cadence: false };
 
       tabs.addEventListener("click", (e) => {
         const btn = e.target.closest(".sub-tab");
@@ -189,6 +242,7 @@
         );
         if (!loaded[name]) {
           if      (name === "summary")   initSummary();
+          else if (name === "prospects") initProspects();
           else if (name === "followups") initFollowups();
           else if (name === "cadence")   initCadence();
           loaded[name] = true;
@@ -388,6 +442,473 @@
               <div class="kpi-value">${esc(v)}</div>
             </div>
           `).join("");
+        }
+      }
+
+      // ================= PROSPECTS ====================================
+      //
+      // One row per unique prospect, clickable to expand into a full
+      // timeline of every outreach event for that person. Filters at
+      // the top scope both the rowset and the per-prospect counts.
+      //
+      // Data shape after buildProspects():
+      //   {
+      //     key, name, company, title,
+      //     profile_url, sales_nav_url, linkedin_id,
+      //     events: [...raw outreach rows sorted chronologically],
+      //     counts: { connection, message, response, meeting_booked, ... },
+      //     positives,                   // count of response rows w/ positive sentiment
+      //     last_touch,                  // ISO string of latest event
+      //     status,                      // furthest-right stage reached
+      //     sentiment,                   // most recent response sentiment, or null
+      //   }
+
+      function initProspects() {
+        const pillsEl     = document.getElementById("pr-pills");
+        const searchEl    = document.getElementById("pr-search");
+        const statusEl    = document.getElementById("pr-status-filter");
+        const sentimentEl = document.getElementById("pr-sentiment-filter");
+        const exportBtn   = document.getElementById("pr-export");
+        const metaEl      = document.getElementById("pr-meta");
+        const wrapEl      = document.getElementById("pr-table-wrap");
+
+        // Remember the operator's preferred filters between reloads.
+        const LAST_TF        = `account_${clientId}_pr_tf`;
+        const LAST_STATUS    = `account_${clientId}_pr_status`;
+        const LAST_SENTIMENT = `account_${clientId}_pr_sentiment`;
+
+        const state = {
+          tf:        localStorage.getItem(LAST_TF)        || "all",
+          status:    localStorage.getItem(LAST_STATUS)    || "all",
+          sentiment: localStorage.getItem(LAST_SENTIMENT) || "all",
+          search:    "",
+          allProspects: null, // populated once after fetch
+          filtered:     [],   // current view after applyFilters
+        };
+
+        activatePill(pillsEl, state.tf);
+        setChipActive(statusEl,    "status",    state.status);
+        setChipActive(sentimentEl, "sentiment", state.sentiment);
+
+        // ---- events --------------------------------------------------
+
+        pillsEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".timeframe-pill");
+          if (!btn) return;
+          state.tf = btn.dataset.tf;
+          localStorage.setItem(LAST_TF, state.tf);
+          activatePill(pillsEl, state.tf);
+          rerender();
+        });
+
+        statusEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".pr-chip");
+          if (!btn) return;
+          state.status = btn.dataset.status;
+          localStorage.setItem(LAST_STATUS, state.status);
+          setChipActive(statusEl, "status", state.status);
+          rerender();
+        });
+
+        sentimentEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".pr-chip");
+          if (!btn) return;
+          state.sentiment = btn.dataset.sentiment;
+          localStorage.setItem(LAST_SENTIMENT, state.sentiment);
+          setChipActive(sentimentEl, "sentiment", state.sentiment);
+          rerender();
+        });
+
+        // Debounce free-text search so every keystroke on 2,000+ rows
+        // doesn't lag.
+        let searchTimer = null;
+        searchEl.addEventListener("input", () => {
+          clearTimeout(searchTimer);
+          searchTimer = setTimeout(() => {
+            state.search = searchEl.value;
+            rerender();
+          }, 180);
+        });
+
+        exportBtn.addEventListener("click", () => exportCsv(state.filtered));
+
+        // Row expand — delegated off the table wrapper so it survives
+        // re-renders. Clicking an expanded row collapses it.
+        wrapEl.addEventListener("click", (e) => {
+          const row = e.target.closest(".pr-row");
+          if (!row) return;
+          // Don't intercept link clicks inside timelines.
+          if (e.target.closest("a")) return;
+          toggleTimeline(row);
+        });
+
+        // ---- load ----------------------------------------------------
+
+        loadAll();
+
+        async function loadAll() {
+          try {
+            // One big fetch with every column the table + timeline uses.
+            // sbFetchAll pages past PostgREST's 1000-row cap.
+            const rows = await sb.sbFetchAll(
+              `/rest/v1/outreach?` +
+              `select=type,occurred_at,prospect_name,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
+              `&client_id=eq.${encodeURIComponent(clientId)}` +
+              `&order=occurred_at.asc`
+            );
+            state.allProspects = buildProspects(rows);
+          } catch (err) {
+            wrapEl.innerHTML = `<div class="placeholder"><strong>Couldn't load prospects</strong>${esc(err.message || "")}</div>`;
+            return;
+          }
+          rerender();
+        }
+
+        function rerender() {
+          if (!state.allProspects) return;
+          const scoped   = scopeToTimeframe(state.allProspects, cutoffFor(state.tf));
+          const filtered = applyFilters(scoped, state);
+          // Sort by last_touch DESC so the most recent activity floats up.
+          filtered.sort((a, b) =>
+            (b.last_touch || "").localeCompare(a.last_touch || "")
+          );
+          state.filtered = filtered;
+          renderTable(wrapEl, filtered);
+          renderMeta(metaEl, filtered, state.allProspects.length);
+        }
+
+        // ---- data ----------------------------------------------------
+
+        // Group key: prefer the extension's linkedin_id (stable across
+        // renames, URL rewrites). Fall back to profile_url / sales_nav_url
+        // (historical imports have no linkedin_id but do have one of
+        // these). Last-ditch, key by lowercased name — imperfect but only
+        // affects the rare import where neither URL is present.
+        function prospectKey(r) {
+          if (r.linkedin_id)   return `id:${r.linkedin_id}`;
+          if (r.profile_url)   return `url:${r.profile_url.toLowerCase()}`;
+          if (r.sales_nav_url) return `sn:${r.sales_nav_url.toLowerCase()}`;
+          return `name:${(r.prospect_name || "").trim().toLowerCase()}`;
+        }
+
+        function buildProspects(rows) {
+          const byKey = new Map();
+          for (const r of rows) {
+            const k = prospectKey(r);
+            let p = byKey.get(k);
+            if (!p) {
+              p = {
+                key:           k,
+                name:          r.prospect_name || "",
+                company:       r.company       || "",
+                title:         r.title         || "",
+                profile_url:   r.profile_url   || null,
+                sales_nav_url: r.sales_nav_url || null,
+                linkedin_id:   r.linkedin_id   || null,
+                events:        [],
+              };
+              byKey.set(k, p);
+            }
+            // Fill in any blanks from this later row (historical rows are
+            // sparse; extension rows are complete — we want the fullest
+            // profile by the end of the loop).
+            if (!p.name          && r.prospect_name)  p.name          = r.prospect_name;
+            if (!p.company       && r.company)        p.company       = r.company;
+            if (!p.title         && r.title)          p.title         = r.title;
+            if (!p.profile_url   && r.profile_url)    p.profile_url   = r.profile_url;
+            if (!p.sales_nav_url && r.sales_nav_url)  p.sales_nav_url = r.sales_nav_url;
+            if (!p.linkedin_id   && r.linkedin_id)    p.linkedin_id   = r.linkedin_id;
+
+            p.events.push(r);
+          }
+          // Initial rollup — will be re-computed inside scopeToTimeframe
+          // when a timeframe filter is applied.
+          return Array.from(byKey.values()).map(p => ({ ...p, ...rollup(p.events) }));
+        }
+
+        // Compute per-prospect summary from their event list. Called
+        // fresh whenever the timeframe changes so counts + status reflect
+        // only the scoped events.
+        function rollup(events) {
+          const counts = { connection:0, message:0, response:0, meeting_booked:0, followup:0, retargeting:0, inmail:0 };
+          let positives = 0;
+          let lastTouch = null;
+          let sentiment = null;
+          let sentimentDate = "";
+
+          for (const e of events) {
+            if (counts[e.type] != null) counts[e.type]++;
+            if (e.type === "response" && e.response_sentiment === "positive") positives++;
+            if (!lastTouch || e.occurred_at > lastTouch) lastTouch = e.occurred_at;
+            if (e.type === "response" && e.response_sentiment
+                && e.occurred_at > sentimentDate) {
+              sentiment     = e.response_sentiment;
+              sentimentDate = e.occurred_at;
+            }
+          }
+
+          let status;
+          if      (counts.meeting_booked > 0) status = "meeting";
+          else if (counts.response       > 0) status = "response";
+          else if (counts.message        > 0) status = "message";
+          else if (counts.connection     > 0) status = "connection";
+          else                                status = "other";
+
+          return { counts, positives, last_touch: lastTouch, status, sentiment };
+        }
+
+        function scopeToTimeframe(prospects, since) {
+          if (!since) return prospects;
+          const t = new Date(since).getTime();
+          const out = [];
+          for (const p of prospects) {
+            const scoped = p.events.filter(e =>
+              new Date(e.occurred_at).getTime() >= t
+            );
+            if (!scoped.length) continue;
+            out.push({ ...p, events: scoped, ...rollup(scoped) });
+          }
+          return out;
+        }
+
+        function applyFilters(prospects, s) {
+          const q = s.search.trim().toLowerCase();
+          return prospects.filter(p => {
+            if (s.status !== "all" && p.status !== s.status) return false;
+            if (s.sentiment !== "all") {
+              if (s.sentiment === "none"  && p.sentiment)              return false;
+              if (s.sentiment !== "none"  && p.sentiment !== s.sentiment) return false;
+            }
+            if (q) {
+              const hay = `${p.name} ${p.company} ${p.title}`.toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            return true;
+          });
+        }
+
+        // ---- render --------------------------------------------------
+
+        function renderMeta(root, filtered, totalAll) {
+          const n = filtered.length;
+          const total = totalAll;
+          root.textContent =
+            n === total
+              ? `${fmtInt(n)} prospect${n === 1 ? "" : "s"}`
+              : `${fmtInt(n)} of ${fmtInt(total)} prospects`;
+        }
+
+        function renderTable(root, prospects) {
+          if (!prospects.length) {
+            root.innerHTML = `<div class="placeholder"><strong>No prospects match</strong>Adjust the timeframe or filters above.</div>`;
+            return;
+          }
+
+          // We render both the row and a hidden timeline row for each
+          // prospect. Clicking the visible row toggles the timeline row
+          // below it — kept as sibling <tr>s so the column alignment is
+          // preserved without CSS acrobatics.
+          const bodyHtml = prospects.map((p, i) => renderRow(p, i)).join("");
+
+          root.innerHTML = `
+            <div class="pr-table-scroll">
+              <table class="pr-table">
+                <thead>
+                  <tr>
+                    <th class="pr-col-name">Prospect</th>
+                    <th class="pr-col-company">Company</th>
+                    <th class="pr-col-title">Title</th>
+                    <th class="pr-col-status">Status</th>
+                    <th class="pr-col-sent">Sentiment</th>
+                    <th class="pr-col-events num">Events</th>
+                    <th class="pr-col-last">Last touch</th>
+                  </tr>
+                </thead>
+                <tbody>${bodyHtml}</tbody>
+              </table>
+            </div>
+          `;
+        }
+
+        function renderRow(p, idx) {
+          const statusLabel = {
+            meeting:    "Meeting",
+            response:   "Response",
+            message:    "Messaged",
+            connection: "Connected",
+            other:      "—",
+          }[p.status] || "—";
+
+          const sentimentHtml = p.sentiment
+            ? `<span class="pr-sent pr-sent-${esc(p.sentiment)}">${esc(p.sentiment)}</span>`
+            : `<span class="pr-sent-none">—</span>`;
+
+          return `
+            <tr class="pr-row" data-idx="${idx}">
+              <td class="pr-name">
+                <div class="pr-name-main">${esc(p.name || "—")}</div>
+              </td>
+              <td class="pr-company">${esc(p.company || "—")}</td>
+              <td class="pr-title">${esc(p.title || "—")}</td>
+              <td><span class="pr-status pr-status-${p.status}">${esc(statusLabel)}</span></td>
+              <td>${sentimentHtml}</td>
+              <td class="num">${fmtInt(p.events.length)}</td>
+              <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
+            </tr>
+            <tr class="pr-timeline-row hidden" data-idx="${idx}">
+              <td colspan="7" class="pr-timeline-cell"></td>
+            </tr>
+          `;
+        }
+
+        function toggleTimeline(row) {
+          const idx = row.dataset.idx;
+          const tbody = row.parentElement;
+          const timeline = tbody.querySelector(`.pr-timeline-row[data-idx="${idx}"]`);
+          if (!timeline) return;
+
+          const wasOpen = !timeline.classList.contains("hidden");
+
+          // Collapse any other open timeline — only one at a time keeps
+          // the table scannable and lazy-renders each body only on click.
+          tbody.querySelectorAll(".pr-timeline-row:not(.hidden)").forEach(t => {
+            t.classList.add("hidden");
+            t.querySelector(".pr-timeline-cell").innerHTML = "";
+          });
+          tbody.querySelectorAll(".pr-row.expanded").forEach(r => r.classList.remove("expanded"));
+
+          if (!wasOpen) {
+            const p = state.filtered[idx];
+            timeline.querySelector(".pr-timeline-cell").innerHTML = renderTimeline(p);
+            timeline.classList.remove("hidden");
+            row.classList.add("expanded");
+          }
+        }
+
+        function renderTimeline(p) {
+          // Sort events chronologically (oldest first) for a natural
+          // top-to-bottom read.
+          const events = p.events.slice().sort((a, b) =>
+            (a.occurred_at || "").localeCompare(b.occurred_at || "")
+          );
+          const openUrl = p.sales_nav_url || p.profile_url;
+
+          return `
+            <div class="pr-timeline-head">
+              <div class="pr-timeline-who">
+                <strong>${esc(p.name || "—")}</strong>
+                ${p.company ? ` · ${esc(p.company)}` : ""}
+                ${p.title   ? ` · <span class="pr-timeline-title">${esc(p.title)}</span>` : ""}
+              </div>
+              ${openUrl
+                ? `<a class="btn-secondary pr-open-linkedin" href="${esc(openUrl)}" target="_blank" rel="noopener">Open in LinkedIn ↗</a>`
+                : ""}
+            </div>
+            <ol class="pr-timeline">
+              ${events.map(renderEvent).join("")}
+            </ol>
+          `;
+        }
+
+        function renderEvent(e) {
+          const typeLabel = {
+            connection:     "Connection request",
+            inmail:         "InMail",
+            message:        "Message",
+            followup:       "Follow-up",
+            retargeting:    "Re-touch",
+            response:       "Response",
+            meeting_booked: "Meeting booked",
+          }[e.type] || e.type;
+
+          // Responses carry the body on `response`; outgoing messages
+          // carry it on `message_sent`. Historical imports have neither.
+          const body = e.response || e.message_sent || "";
+          const sentTag = (e.type === "response" && e.response_sentiment)
+            ? `<span class="pr-sent pr-sent-${esc(e.response_sentiment)}">${esc(e.response_sentiment)}</span>`
+            : "";
+
+          return `
+            <li class="pr-event pr-event-${esc(e.type)}">
+              <div class="pr-event-head">
+                <span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>
+                <span class="pr-event-type">${esc(typeLabel)}</span>
+                ${sentTag}
+              </div>
+              ${body ? `<div class="pr-event-body">${esc(body)}</div>` : ""}
+            </li>
+          `;
+        }
+
+        // ---- export --------------------------------------------------
+
+        function exportCsv(prospects) {
+          if (!prospects.length) return;
+
+          const header = [
+            "Name", "Company", "Title", "Status", "Sentiment",
+            "Connections", "Messages", "Responses", "Positive Responses", "Meetings",
+            "Events", "Last Touch", "LinkedIn URL",
+          ];
+          const rows = prospects.map(p => [
+            p.name || "",
+            p.company || "",
+            p.title || "",
+            p.status,
+            p.sentiment || "",
+            p.counts.connection,
+            p.counts.message,
+            p.counts.response,
+            p.positives,
+            p.counts.meeting_booked,
+            p.events.length,
+            p.last_touch ? p.last_touch.slice(0, 10) : "",
+            p.sales_nav_url || p.profile_url || "",
+          ]);
+
+          // UTF-8 BOM so Excel opens the file in the right encoding
+          // without the user having to pick an import option.
+          const csv = "\uFEFF" +
+            [header, ...rows]
+              .map(r => r.map(csvEscape).join(","))
+              .join("\r\n");
+
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+          const a    = document.createElement("a");
+          const url  = URL.createObjectURL(blob);
+          const tf   = state.tf === "all" ? "all-time" : state.tf;
+          a.href     = url;
+          a.download = `${client.slug || "prospects"}-${tf}-${todayStr()}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+
+        function csvEscape(v) {
+          if (v == null) return "";
+          const s = String(v);
+          return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        }
+
+        // ---- helpers -------------------------------------------------
+
+        function setChipActive(root, dataKey, val) {
+          root.querySelectorAll(".pr-chip").forEach(c => {
+            c.classList.toggle("active", c.dataset[dataKey] === val);
+          });
+        }
+
+        function fmtDate(iso) {
+          if (!iso) return "—";
+          return iso.slice(0, 10);
+        }
+
+        function todayStr() {
+          const d = new Date();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          return `${d.getFullYear()}-${mm}-${dd}`;
         }
       }
 

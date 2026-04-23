@@ -1409,3 +1409,295 @@ body.login-body {
   .chart-container { height: 280px; }
   .panel-card { padding: 16px 18px; }
 }
+
+/* ==============================================================
+   Prospects tab
+   ============================================================== */
+
+.pr-head {
+  /* Title + toolbar on one row with graceful wrap on narrow viewports. */
+  align-items: center;
+}
+
+.pr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pr-search {
+  height: 32px;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 0 14px;
+  border: 1.5px solid var(--gray-100);
+  border-radius: var(--r-pill);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+  background: var(--surface-2);
+  outline: none;
+  transition: border-color .15s, background .15s;
+}
+.pr-search::placeholder { color: var(--gray-400); }
+.pr-search:hover { border-color: var(--gray-200); background: #fff; }
+.pr-search:focus { border-color: var(--navy); background: #fff; }
+
+.pr-export { height: 32px; }
+
+/* ---------- filter row (status + sentiment chip groups) ---------- */
+
+.pr-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+.pr-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pr-filter-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+.pr-filter-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+
+.pr-chip {
+  height: 26px;
+  padding: 0 11px;
+  border: 1.5px solid var(--gray-100);
+  background: var(--bg);
+  color: var(--gray-600);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: all .12s;
+}
+.pr-chip:hover {
+  border-color: var(--navy);
+  color: var(--navy);
+  background: #fff;
+}
+.pr-chip.active {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+}
+
+/* ---------- meta + table ---------- */
+
+.pr-meta {
+  font-size: 11px;
+  color: var(--gray-400);
+  font-weight: 600;
+  letter-spacing: .03em;
+  margin-bottom: 8px;
+}
+
+.pr-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+.pr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: var(--surface-1);
+}
+.pr-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-2);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+.pr-table thead th.num { text-align: right; }
+
+.pr-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--navy);
+  vertical-align: middle;
+}
+.pr-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Prospect rows are clickable; timeline rows are not. */
+.pr-row { cursor: pointer; transition: background .12s; }
+.pr-row:hover    { background: var(--navy-light); }
+.pr-row.expanded { background: var(--navy-light); }
+.pr-row.expanded .pr-name-main { color: var(--navy); }
+
+.pr-name-main {
+  font-weight: 700;
+  color: var(--navy);
+}
+.pr-company, .pr-title {
+  color: var(--gray-600);
+}
+.pr-last {
+  color: var(--gray-400);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Truncate long titles / companies so rows stay single-height. */
+.pr-table td.pr-company, .pr-table td.pr-title {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- status + sentiment pills ---------- */
+
+.pr-status {
+  display: inline-block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 2px 9px;
+  border-radius: var(--r-pill);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pr-status-connection { background: rgba(107,154,184,.14); color: #4d7594; }
+.pr-status-message    { background: rgba(59,159,212,.16);  color: #1f6a95; }
+.pr-status-response   { background: rgba(245,158,11,.14);  color: #b97706; }
+.pr-status-meeting    { background: rgba(30,182,131,.16);  color: #107a3e; }
+.pr-status-other      { background: var(--gray-100);       color: var(--gray-400); }
+
+.pr-sent {
+  display: inline-block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  text-transform: capitalize;
+}
+.pr-sent-positive { background: rgba(30,182,131,.14); color: #107a3e; }
+.pr-sent-neutral  { background: rgba(136,153,166,.18); color: var(--gray-600); }
+.pr-sent-negative { background: rgba(224,72,72,.14); color: #c01111; }
+.pr-sent-none     { color: var(--gray-400); font-size: 11px; }
+
+/* ---------- timeline (expanded row) ---------- */
+
+.pr-timeline-cell {
+  background: var(--surface-2);
+  padding: 14px 18px 18px !important;
+  border-bottom: 1px solid var(--border);
+}
+
+.pr-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.pr-timeline-who {
+  font-size: 12px;
+  color: var(--navy);
+}
+.pr-timeline-who strong {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+.pr-timeline-title { color: var(--gray-600); }
+
+.pr-open-linkedin { height: 30px; font-size: 11px; }
+
+.pr-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pr-event {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  border-left: 3px solid var(--gray-200);
+}
+.pr-event-connection     { border-left-color: #6B9AB8; }
+.pr-event-inmail         { border-left-color: #6B9AB8; }
+.pr-event-message        { border-left-color: #3b9fd4; }
+.pr-event-followup       { border-left-color: #3b9fd4; }
+.pr-event-retargeting    { border-left-color: #8899a6; }
+.pr-event-response       { border-left-color: #f59e0b; }
+.pr-event-meeting_booked { border-left-color: #1EB683; }
+
+.pr-event-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pr-event-date {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-400);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.pr-event-type {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.pr-event-body {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--navy);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .pr-toolbar { justify-content: flex-start; }
+  .pr-search  { min-width: 0; width: 100%; }
+  .pr-filter-row { flex-direction: column; gap: 10px; }
+  .pr-table td.pr-company, .pr-table td.pr-title { max-width: 160px; }
+}
