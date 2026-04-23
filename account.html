@@ -48,32 +48,32 @@
 
     <!-- =================== SUMMARY ==================== -->
     <section id="panel-summary" class="sub-panel">
-      <div class="picker-row">
-        <span class="picker-label">Timeframe</span>
-        <div class="timeframe-pills" id="sum-pills">
-          <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
-          <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
-          <button class="timeframe-pill" data-tf="3w" type="button">3W</button>
-          <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
-          <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
-          <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
-          <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+      <section class="panel-card summary-panel">
+        <div class="panel-card-head">
+          <h2>Summary</h2>
+          <div class="timeframe-pills" id="sum-pills">
+            <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+            <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+            <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+            <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+            <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+            <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+            <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+          </div>
         </div>
-      </div>
 
-      <div id="sum-kpi" class="kpi-strip">
-        <div class="kpi-card"><div class="kpi-label">Loading…</div></div>
-      </div>
+        <div id="sum-kpi" class="kpi-strip">
+          <div class="kpi-card"><div class="kpi-label">Loading…</div></div>
+        </div>
 
-      <div class="chart-card">
-        <div class="chart-head">
-          <h2>Cumulative outreach</h2>
-          <span class="section-meta">Connections · Messages · Responses · Meetings</span>
+        <div class="chart-head chart-head-inline">
+          <h3 class="chart-subhead">Cumulative</h3>
+          <div id="sum-legend" class="chart-legend"></div>
         </div>
         <div class="chart-container">
           <canvas id="sum-chart"></canvas>
         </div>
-      </div>
+      </section>
 
       <section class="panel-card">
         <div class="panel-card-head">
@@ -325,7 +325,9 @@
               maintainAspectRatio: false,
               interaction: { mode: "index", intersect: false },
               plugins: {
-                legend: { position: "bottom", labels: { boxWidth: 12, font: { family: "Montserrat", size: 11 } } },
+                // Chart.js default legend is disabled — we render a custom
+                // checkbox legend in #sum-legend (see renderLegend below).
+                legend:  { display: false },
                 tooltip: { titleFont: { family: "Montserrat" }, bodyFont: { family: "Inter" } },
               },
               scales: {
@@ -334,6 +336,33 @@
               },
             },
           });
+
+          renderLegend(document.getElementById("sum-legend"), chart);
+        }
+
+        // Custom legend: each dataset gets a clickable checkbox. Checked =
+        // visible. Unchecked = filled-outline box (not a strike-through).
+        // Keeps the label readable regardless of visibility state.
+        function renderLegend(root, chart) {
+          if (!root || !chart) return;
+          root.innerHTML = chart.data.datasets.map((ds, i) => {
+            const visible = chart.isDatasetVisible(i);
+            return `
+              <label class="legend-item" data-idx="${i}">
+                <span class="legend-box ${visible ? 'checked' : ''}" style="--c:${esc(ds.borderColor)}"></span>
+                <span class="legend-label" style="color:${esc(ds.borderColor)}">${esc(ds.label)}</span>
+              </label>
+            `;
+          }).join("");
+          root.onclick = (e) => {
+            const item = e.target.closest(".legend-item");
+            if (!item) return;
+            e.preventDefault();
+            const i = Number(item.dataset.idx);
+            chart.setDatasetVisibility(i, !chart.isDatasetVisible(i));
+            chart.update();
+            renderLegend(root, chart);
+          };
         }
 
         function renderKpis(root, t) {
