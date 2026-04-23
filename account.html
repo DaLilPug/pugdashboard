@@ -826,6 +826,7 @@
                     <th class="pr-col-sent">Sentiment</th>
                     <th class="pr-col-events num">Events</th>
                     <th class="pr-col-last">Last touch</th>
+                    <th class="pr-col-link"></th>
                   </tr>
                 </thead>
                 <tbody>${bodyHtml}</tbody>
@@ -847,6 +848,15 @@
             ? `<span class="pr-sent pr-sent-${esc(p.sentiment)}">${esc(p.sentiment)}</span>`
             : `<span class="pr-sent-none">—</span>`;
 
+          // LinkedIn link lives in its own compact column so operators can
+          // jump straight into LinkedIn without expanding the timeline
+          // first. Falls back to profile_url when sales_nav_url isn't
+          // populated — same waterfall as the timeline head used to use.
+          const linkUrl = p.sales_nav_url || p.profile_url;
+          const linkCell = linkUrl
+            ? `<a class="pr-link-btn" href="${esc(linkUrl)}" target="_blank" rel="noopener" title="Open in LinkedIn">LinkedIn ↗</a>`
+            : "";
+
           return `
             <tr class="pr-row" data-idx="${idx}">
               <td class="pr-name">
@@ -858,9 +868,10 @@
               <td>${sentimentHtml}</td>
               <td class="num">${fmtInt(p.events.length)}</td>
               <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
+              <td class="pr-link">${linkCell}</td>
             </tr>
             <tr class="pr-timeline-row hidden" data-idx="${idx}">
-              <td colspan="7" class="pr-timeline-cell"></td>
+              <td colspan="8" class="pr-timeline-cell"></td>
             </tr>
           `;
         }
@@ -895,7 +906,6 @@
           const events = p.events.slice().sort((a, b) =>
             (a.occurred_at || "").localeCompare(b.occurred_at || "")
           );
-          const openUrl = p.sales_nav_url || p.profile_url;
           const hasMeeting = p.events.some(e => e.type === "meeting_booked");
 
           // Meeting button: hidden once a meeting is on record. Re-opens
@@ -931,9 +941,6 @@
                 <button class="btn-secondary pr-action" data-action="show-info-form" type="button">Edit info</button>
                 ${meetingBtn}
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
-                ${openUrl
-                  ? `<a class="btn-secondary pr-open-linkedin" href="${esc(openUrl)}" target="_blank" rel="noopener">Open in LinkedIn ↗</a>`
-                  : ""}
               </div>
             </div>
 
@@ -1091,7 +1098,7 @@
             p.positives,
             p.counts.meeting_booked,
             p.events.length,
-            p.last_touch ? p.last_touch.slice(0, 10) : "",
+            p.last_touch ? usDate(p.last_touch.slice(0, 10)) : "",
             p.sales_nav_url || p.profile_url || "",
           ]);
 
@@ -1430,7 +1437,18 @@
 
         function fmtDate(iso) {
           if (!iso) return "—";
-          return iso.slice(0, 10);
+          return usDate(iso.slice(0, 10));
+        }
+
+        // YYYY-MM-DD → MM/DD/YYYY. We slice the ISO string directly
+        // instead of constructing a Date object so the rendered calendar
+        // day doesn't shift when the viewer's timezone is west of UTC
+        // (an "occurred_at" of 2026-01-16T03:00:00Z would otherwise
+        // render as 01/15 for PT operators).
+        function usDate(ymd) {
+          if (!ymd) return "";
+          const [y, m, d] = ymd.split("-");
+          return `${m}/${d}/${y}`;
         }
 
         function todayStr() {

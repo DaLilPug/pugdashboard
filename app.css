@@ -1567,6 +1567,30 @@ body.login-body {
   white-space: nowrap;
 }
 
+/* LinkedIn link in its own compact column on the right of every prospect
+   row. Renders as a small pill so it doesn't visually compete with the
+   status/sentiment pills earlier in the row. */
+.pr-col-link { width: 1%; white-space: nowrap; }
+.pr-link { text-align: right; padding-right: 12px !important; }
+.pr-link-btn {
+  display: inline-block;
+  padding: 4px 9px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  text-decoration: none;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.pr-link-btn:hover {
+  background: var(--surface-1);
+  border-color: var(--gray-400);
+}
+
 /* Truncate long titles / companies so rows stay single-height. */
 .pr-table td.pr-company, .pr-table td.pr-title {
   max-width: 260px;
