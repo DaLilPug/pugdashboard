@@ -574,13 +574,36 @@ body.login-body {
 }
 
 .kpi-card {
+  position: relative;
+  overflow: hidden;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 14px 16px;
+  padding: 14px 16px 14px 18px;
   box-shadow: var(--shadow-xs);
   animation: fadeUp .35s ease both;
 }
+/* Colored left-border accent. Each card's accent color is tied to its
+   position in the summary strip — keep renderKpis() card order stable or
+   the colors drift off-metric. Order: Connections, Messages, Acc Rate,
+   Responses, Resp Rate, Positives, Pos Resp Rate, Meetings, Pos Book Rate. */
+.kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: #8899a6;
+}
+.kpi-card:nth-child(1)::before { background: #3b9fd4; }
+.kpi-card:nth-child(2)::before { background: #013A52; }
+.kpi-card:nth-child(3)::before { background: #1EB683; }
+.kpi-card:nth-child(4)::before { background: #3b9fd4; }
+.kpi-card:nth-child(5)::before { background: #f59e0b; }
+.kpi-card:nth-child(6)::before { background: #1EB683; }
+.kpi-card:nth-child(7)::before { background: #013A52; }
+.kpi-card:nth-child(8)::before { background: #013A52; }
+.kpi-card:nth-child(9)::before { background: #f59e0b; }
+
 .kpi-card:nth-child(1) { animation-delay:   0ms; }
 .kpi-card:nth-child(2) { animation-delay:  30ms; }
 .kpi-card:nth-child(3) { animation-delay:  60ms; }
@@ -589,6 +612,7 @@ body.login-body {
 .kpi-card:nth-child(6) { animation-delay: 150ms; }
 .kpi-card:nth-child(7) { animation-delay: 180ms; }
 .kpi-card:nth-child(8) { animation-delay: 210ms; }
+.kpi-card:nth-child(9) { animation-delay: 240ms; }
 
 .kpi-label {
   font-size: 10px;
@@ -1129,6 +1153,180 @@ body.login-body {
 .cad-feedback.ok  { color: #107a3e; }
 .cad-feedback.err { color: #c01111; }
 
+/* ---------- trends by period + period comparison ---------- */
+
+.panel-card {
+  background: #fff;
+  border: 1px solid rgba(1, 58, 82, 0.08);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-top: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.02);
+  animation: fadeUp .35s ease both;
+}
+.panel-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.panel-card-head h2 {
+  font-family: Montserrat, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--navy, #013A52);
+  margin: 0;
+}
+.panel-card-sub {
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: #6e7a87;
+}
+
+.trends-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+.trend-chart {
+  background: #f8fafb;
+  border: 1px solid rgba(1, 58, 82, 0.06);
+  border-radius: 10px;
+  padding: 14px 16px 12px;
+}
+.trend-chart-label {
+  font-family: Montserrat, sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #6e7a87;
+  margin-bottom: 4px;
+}
+.trend-chart-main {
+  font-family: Montserrat, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--navy, #013A52);
+  line-height: 1.1;
+}
+.trend-chart-sub {
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  color: #6e7a87;
+  margin-top: 2px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.trend-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.period-wrap {
+  overflow-x: auto;
+}
+.period-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  min-width: 620px;
+}
+.period-table th,
+.period-table td {
+  padding: 10px 10px;
+  text-align: right;
+  border-bottom: 1px solid rgba(1, 58, 82, 0.06);
+  white-space: nowrap;
+}
+.period-table thead th {
+  font-family: Montserrat, sans-serif;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #6e7a87;
+  font-weight: 700;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(1, 58, 82, 0.12);
+}
+.period-table tbody th {
+  text-align: left;
+  font-family: Montserrat, sans-serif;
+  font-weight: 600;
+  color: var(--navy, #013A52);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.period-table tbody tr:hover {
+  background: rgba(1, 58, 82, 0.02);
+}
+.period-table td.rate-good { color: #107a3e; font-weight: 600; }
+.period-table td.rate-ok   { color: var(--navy, #013A52); }
+.period-table td.rate-bad  { color: #c01111; font-weight: 600; }
+.period-table td.rate-none { color: #9aa5b1; }
+.period-table .period-all {
+  background: rgba(1, 58, 82, 0.03);
+  font-weight: 700;
+}
+
+/* Cell layout: main value + delta chip right-aligned. Chip hugs the value
+   and wraps below on very narrow columns. */
+.period-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.period-cell-val {
+  font-variant-numeric: tabular-nums;
+}
+
+.period-subhead {
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  font-style: italic;
+  color: #8899a6;
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+/* ---------- delta chips (↑22% / ↓11% / →) ---------- */
+
+.pct-change {
+  display: inline-flex;
+  align-items: center;
+  font-family: Montserrat, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+.pct-up   { color: #107a3e; background: rgba(30, 182, 131, 0.14); }
+.pct-down { color: #c01111; background: rgba(224, 72, 72, 0.12); }
+.pct-flat { color: #9aa5b1; background: rgba(154, 165, 177, 0.12); }
+
+/* Inline chips inside trend-chart subhead reuse the colors without the pill
+   background for a cleaner look. */
+.trend-chart-sub .pct-change {
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+}
+
 /* ---------- small responsive tweaks ---------- */
 
 @media (max-width: 900px) {
@@ -1136,4 +1334,5 @@ body.login-body {
   .filter-bar, .sub-tabs, .account-titlebar { padding-left: 16px; padding-right: 16px; }
   .fu-list { grid-template-columns: 1fr; }
   .chart-container { height: 280px; }
+  .panel-card { padding: 16px 18px; }
 }
