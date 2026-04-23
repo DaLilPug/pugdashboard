@@ -939,28 +939,35 @@
 
             <!-- Edit-info form — hidden by default, shown when "Edit info"
                  is clicked. Save PATCHes all outreach rows in this
-                 prospect's cluster with any changed fields. -->
-            <form class="pr-info-form hidden" data-action="submit-info">
+                 prospect's cluster with any changed fields.
+
+                 Autofill suppression: Chrome pattern-matches on name="name"
+                 / "email" / "phone" and on input type="email"/"tel" to
+                 offer the current user's saved contact info. That's wrong
+                 here — we're editing someone else's data. We neuter all
+                 three signals: non-standard pr_* names, type="text" on
+                 every field, and autocomplete="off" on form + inputs. -->
+            <form class="pr-info-form hidden" data-action="submit-info" autocomplete="off">
               <div class="pr-info-grid">
                 <label class="pr-info-field">
                   <span class="pr-form-label">Name</span>
-                  <input type="text" name="name" value="${esc(p.name || "")}" />
+                  <input type="text" name="pr_name" value="${esc(p.name || "")}" autocomplete="off" />
                 </label>
                 <label class="pr-info-field">
                   <span class="pr-form-label">Company</span>
-                  <input type="text" name="company" value="${esc(p.company || "")}" />
+                  <input type="text" name="pr_company" value="${esc(p.company || "")}" autocomplete="off" />
                 </label>
                 <label class="pr-info-field">
                   <span class="pr-form-label">Title</span>
-                  <input type="text" name="title" value="${esc(p.title || "")}" />
+                  <input type="text" name="pr_title" value="${esc(p.title || "")}" autocomplete="off" />
                 </label>
                 <label class="pr-info-field">
                   <span class="pr-form-label">Email</span>
-                  <input type="email" name="email" value="${esc(p.email || "")}" />
+                  <input type="text" name="pr_email" value="${esc(p.email || "")}" autocomplete="off" />
                 </label>
                 <label class="pr-info-field">
                   <span class="pr-form-label">Phone</span>
-                  <input type="tel" name="phone" value="${esc(p.phone || "")}" />
+                  <input type="text" name="pr_phone" value="${esc(p.phone || "")}" autocomplete="off" />
                 </label>
               </div>
               <div class="pr-info-form-footer">
@@ -1058,10 +1065,11 @@
 
           // Every outreach type gets its own column so nothing hides once
           // the extension starts logging follow-ups / InMails / retargeting.
-          // Email sits next to Name so enriched rows and externally-booked
-          // meetings (where we only have an email) survive the export.
+          // Email + Phone sit next to Name so enriched rows and externally-
+          // booked meetings (where we may only have a contact) survive
+          // the export.
           const header = [
-            "Name", "Email", "Company", "Title", "Status", "Sentiment",
+            "Name", "Email", "Phone", "Company", "Title", "Status", "Sentiment",
             "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
             "Responses", "Positive Responses", "Meetings",
             "Events", "Last Touch", "LinkedIn URL",
@@ -1069,6 +1077,7 @@
           const rows = prospects.map(p => [
             p.name || "",
             p.email || "",
+            p.phone || "",
             p.company || "",
             p.title || "",
             p.status,
@@ -1247,11 +1256,11 @@
           // didn't touch and keeps the request body small.
           const fd = new FormData(form);
           const next = {
-            prospect_name: (fd.get("name")    || "").trim(),
-            company:       (fd.get("company") || "").trim(),
-            title:         (fd.get("title")   || "").trim(),
-            email:         (fd.get("email")   || "").trim(),
-            phone:         (fd.get("phone")   || "").trim(),
+            prospect_name: (fd.get("pr_name")    || "").trim(),
+            company:       (fd.get("pr_company") || "").trim(),
+            title:         (fd.get("pr_title")   || "").trim(),
+            email:         (fd.get("pr_email")   || "").trim(),
+            phone:         (fd.get("pr_phone")   || "").trim(),
           };
           const current = {
             prospect_name: prospect.name    || "",
