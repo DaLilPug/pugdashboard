@@ -1637,17 +1637,20 @@ body.login-body {
   font-weight: 700;
 }
 .pr-timeline-title { color: var(--gray-600); }
-.pr-timeline-email {
+
+/* Email + phone line under the name/company/title. Either or both links
+   appear; both are mailto: / tel: so they work from the OS. */
+.pr-timeline-contact {
   margin-top: 4px;
   font-family: 'Inter', sans-serif;
   font-size: 11px;
   color: var(--gray-600);
 }
-.pr-timeline-email a {
+.pr-timeline-contact a {
   color: var(--accent-blue, #3b9fd4);
   text-decoration: none;
 }
-.pr-timeline-email a:hover { text-decoration: underline; }
+.pr-timeline-contact a:hover { text-decoration: underline; }
 
 .pr-open-linkedin { height: 30px; font-size: 11px; }
 
@@ -1737,6 +1740,58 @@ body.login-body {
 .pr-response-form-buttons {
   display: flex;
   gap: 8px;
+}
+
+/* ---- Edit-info inline form ----------------------------------------- */
+.pr-info-form {
+  margin-top: 10px;
+  margin-bottom: 12px;
+  padding: 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pr-info-form.hidden { display: none; }
+.pr-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 14px;
+}
+.pr-info-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pr-info-field input {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  color: var(--navy);
+  box-sizing: border-box;
+  width: 100%;
+}
+.pr-info-field input:focus {
+  outline: none;
+  border-color: var(--accent, #1EB683);
+  box-shadow: 0 0 0 2px rgba(30, 182, 131, 0.15);
+}
+.pr-info-form-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pr-info-note {
+  font-size: 10px;
+  color: var(--gray-600);
+  font-style: italic;
 }
 
 /* ---- Editable sentiment pill (appears inside each response event) --- */

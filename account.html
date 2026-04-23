@@ -553,13 +553,22 @@
           toggleTimeline(row);
         });
 
-        // Response form submit (distinct from clicks so <enter> works
-        // naturally and the default form behavior is preempted).
+        // Form submits (response log + info edit). Distinct from clicks
+        // so <enter> works naturally and the default form behavior is
+        // preempted.
         wrapEl.addEventListener("submit", (e) => {
-          const form = e.target.closest("form[data-action='submit-response']");
-          if (!form) return;
-          e.preventDefault();
-          handleLogResponse(form);
+          const respForm = e.target.closest("form[data-action='submit-response']");
+          if (respForm) {
+            e.preventDefault();
+            handleLogResponse(respForm);
+            return;
+          }
+          const infoForm = e.target.closest("form[data-action='submit-info']");
+          if (infoForm) {
+            e.preventDefault();
+            handleSaveInfo(infoForm);
+            return;
+          }
         });
 
         // Sentiment edit — click the pill to swap in a <select>, then
@@ -578,12 +587,12 @@
           try {
             // One big fetch with every column the table + timeline uses.
             // sbFetchAll pages past PostgREST's 1000-row cap. `id` is
-            // included so we can PATCH individual rows (sentiment edit)
-            // by primary key; email is pulled for both the grouping
-            // waterfall and the timeline head display.
+            // included so we can PATCH individual rows (sentiment + info
+            // edits) by primary key; email + phone are pulled for both
+            // the grouping waterfall and the timeline head display.
             const rows = await sb.sbFetchAll(
               `/rest/v1/outreach?` +
-              `select=id,type,occurred_at,prospect_name,email,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
+              `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
               `&client_id=eq.${encodeURIComponent(clientId)}` +
               `&order=occurred_at.asc`
             );
@@ -689,6 +698,7 @@
               key:           "",
               name:          "",
               email:         "",
+              phone:         "",
               company:       "",
               title:         "",
               profile_url:   null,
@@ -699,6 +709,7 @@
             for (const r of clusterRows) {
               if (!p.name          && r.prospect_name)  p.name          = r.prospect_name;
               if (!p.email         && r.email)          p.email         = r.email;
+              if (!p.phone         && r.phone)          p.phone         = r.phone;
               if (!p.company       && r.company)        p.company       = r.company;
               if (!p.title         && r.title)          p.title         = r.title;
               if (!p.profile_url   && r.profile_url)    p.profile_url   = r.profile_url;
@@ -894,17 +905,30 @@
             ? `<span class="pr-action-status" title="A meeting_booked event is already logged">Meeting logged ✓</span>`
             : `<button class="btn-secondary pr-action" data-action="log-meeting" type="button">Mark meeting booked</button>`;
 
+          // Email + phone contact line. Either can be clicked (mailto / tel);
+          // both live in the same row so the head doesn't grow vertically
+          // when only one is present.
+          const contactBits = [];
+          if (p.email) {
+            contactBits.push(`<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`);
+          }
+          if (p.phone) {
+            contactBits.push(`<a href="tel:${esc(p.phone)}">${esc(p.phone)}</a>`);
+          }
+          const contactLine = contactBits.length
+            ? `<div class="pr-timeline-contact">${contactBits.join(" · ")}</div>`
+            : "";
+
           return `
             <div class="pr-timeline-head">
               <div class="pr-timeline-who">
                 <strong>${esc(p.name || "—")}</strong>
                 ${p.company ? ` · ${esc(p.company)}` : ""}
                 ${p.title   ? ` · <span class="pr-timeline-title">${esc(p.title)}</span>` : ""}
-                ${p.email
-                  ? `<div class="pr-timeline-email"><a href="mailto:${esc(p.email)}">${esc(p.email)}</a></div>`
-                  : ""}
+                ${contactLine}
               </div>
               <div class="pr-timeline-actions">
+                <button class="btn-secondary pr-action" data-action="show-info-form" type="button">Edit info</button>
                 ${meetingBtn}
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
                 ${openUrl
@@ -912,6 +936,41 @@
                   : ""}
               </div>
             </div>
+
+            <!-- Edit-info form — hidden by default, shown when "Edit info"
+                 is clicked. Save PATCHes all outreach rows in this
+                 prospect's cluster with any changed fields. -->
+            <form class="pr-info-form hidden" data-action="submit-info">
+              <div class="pr-info-grid">
+                <label class="pr-info-field">
+                  <span class="pr-form-label">Name</span>
+                  <input type="text" name="name" value="${esc(p.name || "")}" />
+                </label>
+                <label class="pr-info-field">
+                  <span class="pr-form-label">Company</span>
+                  <input type="text" name="company" value="${esc(p.company || "")}" />
+                </label>
+                <label class="pr-info-field">
+                  <span class="pr-form-label">Title</span>
+                  <input type="text" name="title" value="${esc(p.title || "")}" />
+                </label>
+                <label class="pr-info-field">
+                  <span class="pr-form-label">Email</span>
+                  <input type="email" name="email" value="${esc(p.email || "")}" />
+                </label>
+                <label class="pr-info-field">
+                  <span class="pr-form-label">Phone</span>
+                  <input type="tel" name="phone" value="${esc(p.phone || "")}" />
+                </label>
+              </div>
+              <div class="pr-info-form-footer">
+                <span class="pr-info-note">Edits apply to all ${fmtInt(p.events.length)} event row${p.events.length === 1 ? "" : "s"} for this prospect.</span>
+                <div class="pr-response-form-buttons">
+                  <button type="button" class="btn-secondary pr-action" data-action="hide-info-form">Cancel</button>
+                  <button type="submit" class="btn-primary pr-action">Save</button>
+                </div>
+              </div>
+            </form>
 
             <!-- Response log form — hidden by default, shown when "Mark
                  responded" is clicked. Submit creates a type=response row
@@ -1096,6 +1155,26 @@
             form.reset();
             return;
           }
+          if (action === "show-info-form") {
+            clickEvt.preventDefault();
+            const form = timelineRow.querySelector(".pr-info-form");
+            if (!form) return;
+            form.classList.remove("hidden");
+            const firstInput = form.querySelector("input");
+            if (firstInput) firstInput.focus();
+            return;
+          }
+          if (action === "hide-info-form") {
+            clickEvt.preventDefault();
+            const form = timelineRow.querySelector(".pr-info-form");
+            if (!form) return;
+            form.classList.add("hidden");
+            // reset() restores each input to its HTML `value` attribute
+            // (the prospect's original value), not to blank — so partial
+            // edits discarded here go back to pre-open state.
+            form.reset();
+            return;
+          }
         }
 
         async function handleLogMeeting(btn, prospect) {
@@ -1154,6 +1233,92 @@
             submitBtn.disabled = false;
             submitBtn.textContent = prevLabel;
             alert("Couldn't log response: " + (err.message || err));
+          }
+        }
+
+        async function handleSaveInfo(form) {
+          const timelineRow = form.closest(".pr-timeline-row");
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          // Diff the form against the prospect's current field values.
+          // Only changed fields get PATCHed — avoids stomping on data we
+          // didn't touch and keeps the request body small.
+          const fd = new FormData(form);
+          const next = {
+            prospect_name: (fd.get("name")    || "").trim(),
+            company:       (fd.get("company") || "").trim(),
+            title:         (fd.get("title")   || "").trim(),
+            email:         (fd.get("email")   || "").trim(),
+            phone:         (fd.get("phone")   || "").trim(),
+          };
+          const current = {
+            prospect_name: prospect.name    || "",
+            company:       prospect.company || "",
+            title:         prospect.title   || "",
+            email:         prospect.email   || "",
+            phone:         prospect.phone   || "",
+          };
+          const patch = {};
+          for (const k of Object.keys(next)) {
+            if (next[k] !== current[k]) {
+              // prospect_name is NOT NULL in the schema; for everything
+              // else, empty → null so the column is genuinely cleared.
+              if (k === "prospect_name") {
+                patch[k] = next[k];
+              } else {
+                patch[k] = next[k] === "" ? null : next[k];
+              }
+            }
+          }
+
+          if (Object.keys(patch).length === 0) {
+            form.classList.add("hidden");
+            return;
+          }
+
+          const submitBtn = form.querySelector("button[type='submit']");
+          const prevLabel = submitBtn.textContent;
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Saving…";
+          try {
+            // PATCH every outreach row in this prospect's cluster. RLS
+            // enforces operator_id = auth.uid() so rows the operator
+            // didn't log silently drop out of the UPDATE — we'll surface
+            // that if it matters, but for the pilot (one operator) every
+            // row is owned by the current user.
+            const ids = prospect.events.map(e => e.id).filter(Boolean);
+            if (!ids.length) throw new Error("No event rows to update");
+            const inList = ids.map(encodeURIComponent).join(",");
+            await sb.sbFetch(
+              `/rest/v1/outreach?id=in.(${inList})`,
+              {
+                method:  "PATCH",
+                body:    JSON.stringify(patch),
+                headers: { Prefer: "return=minimal" },
+              }
+            );
+
+            // Mirror the PATCH in local state.
+            const canonical = findCanonical(prospect);
+            if (canonical) {
+              for (const evt of canonical.events) {
+                for (const [col, val] of Object.entries(patch)) {
+                  evt[col] = val;
+                }
+              }
+              if ("prospect_name" in patch) canonical.name    = patch.prospect_name;
+              if ("company"       in patch) canonical.company = patch.company || "";
+              if ("title"         in patch) canonical.title   = patch.title   || "";
+              if ("email"         in patch) canonical.email   = patch.email   || "";
+              if ("phone"         in patch) canonical.phone   = patch.phone   || "";
+            }
+            reopenAfterMutation(prospect);
+          } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = prevLabel;
+            alert("Couldn't save: " + (err.message || err));
           }
         }
 
