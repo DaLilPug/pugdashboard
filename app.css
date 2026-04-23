@@ -1651,6 +1651,120 @@ body.login-body {
 
 .pr-open-linkedin { height: 30px; font-size: 11px; }
 
+/* ---- timeline actions (Mark meeting / Mark responded / Open LI) ---- */
+.pr-timeline-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pr-action {
+  height: 30px;
+  font-size: 11px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+.pr-action-status {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1EB683;
+  background: rgba(30, 182, 131, 0.1);
+  border-radius: 6px;
+}
+
+/* ---- Log-response inline form --------------------------------------- */
+.pr-response-form {
+  margin-top: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pr-response-form.hidden { display: none; }
+.pr-response-text {
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  resize: vertical;
+  min-height: 56px;
+  box-sizing: border-box;
+}
+.pr-response-text:focus {
+  outline: none;
+  border-color: var(--accent, #1EB683);
+  box-shadow: 0 0 0 2px rgba(30, 182, 131, 0.15);
+}
+.pr-response-form-row {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pr-sentiment-picker {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--navy);
+}
+.pr-sentiment-picker label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+.pr-form-label {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-600);
+  margin-right: 4px;
+}
+.pr-response-form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- Editable sentiment pill (appears inside each response event) --- */
+.pr-sent-edit {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-1);
+  cursor: pointer;
+  color: var(--navy);
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 18px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'><path d='M1 2l3 3 3-3' fill='none' stroke='%238899a6' stroke-width='1.4'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 5px center;
+}
+.pr-sent-edit:focus { outline: 1px solid var(--accent, #1EB683); }
+.pr-sent-edit-positive { background-color: rgba(30, 182, 131, 0.1); color: #0d7a4f; }
+.pr-sent-edit-neutral  { background-color: rgba(107, 154, 184, 0.1); color: #4a7a99; }
+.pr-sent-edit-negative { background-color: rgba(239, 68, 68, 0.1);   color: #b91c1c; }
+.pr-sent-edit-none     { color: var(--gray-600); }
+
 .pr-timeline {
   list-style: none;
   padding: 0;

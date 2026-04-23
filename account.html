@@ -532,14 +532,42 @@
 
         exportBtn.addEventListener("click", () => exportCsv(state.filtered));
 
-        // Row expand — delegated off the table wrapper so it survives
-        // re-renders. Clicking an expanded row collapses it.
+        // Delegated click handler — survives timeline re-renders.
+        //
+        // Precedence:
+        //   1. A button/element with [data-action] → run the action, DON'T
+        //      toggle the row. (Includes "Mark meeting booked", "Mark
+        //      responded", "Cancel response form".)
+        //   2. A link (<a>) → let the browser handle it (open LinkedIn,
+        //      mailto, etc.), don't toggle.
+        //   3. Otherwise, a click inside a .pr-row toggles its timeline.
         wrapEl.addEventListener("click", (e) => {
+          const actionEl = e.target.closest("[data-action]");
+          if (actionEl) {
+            handleAction(actionEl, e);
+            return;
+          }
+          if (e.target.closest("a")) return;
           const row = e.target.closest(".pr-row");
           if (!row) return;
-          // Don't intercept link clicks inside timelines.
-          if (e.target.closest("a")) return;
           toggleTimeline(row);
+        });
+
+        // Response form submit (distinct from clicks so <enter> works
+        // naturally and the default form behavior is preempted).
+        wrapEl.addEventListener("submit", (e) => {
+          const form = e.target.closest("form[data-action='submit-response']");
+          if (!form) return;
+          e.preventDefault();
+          handleLogResponse(form);
+        });
+
+        // Sentiment edit — click the pill to swap in a <select>, then
+        // change event triggers the PATCH.
+        wrapEl.addEventListener("change", (e) => {
+          const sel = e.target.closest(".pr-sent-edit");
+          if (!sel) return;
+          handleUpdateSentiment(sel);
         });
 
         // ---- load ----------------------------------------------------
@@ -549,12 +577,13 @@
         async function loadAll() {
           try {
             // One big fetch with every column the table + timeline uses.
-            // sbFetchAll pages past PostgREST's 1000-row cap. Email is
-            // pulled for both the grouping waterfall and the timeline
-            // head display.
+            // sbFetchAll pages past PostgREST's 1000-row cap. `id` is
+            // included so we can PATCH individual rows (sentiment edit)
+            // by primary key; email is pulled for both the grouping
+            // waterfall and the timeline head display.
             const rows = await sb.sbFetchAll(
               `/rest/v1/outreach?` +
-              `select=type,occurred_at,prospect_name,email,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
+              `select=id,type,occurred_at,prospect_name,email,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
               `&client_id=eq.${encodeURIComponent(clientId)}` +
               `&order=occurred_at.asc`
             );
@@ -856,6 +885,14 @@
             (a.occurred_at || "").localeCompare(b.occurred_at || "")
           );
           const openUrl = p.sales_nav_url || p.profile_url;
+          const hasMeeting = p.events.some(e => e.type === "meeting_booked");
+
+          // Meeting button: hidden once a meeting is on record. Re-opens
+          // only if the existing meeting event is deleted (not yet wired —
+          // delete path is a later pass).
+          const meetingBtn = hasMeeting
+            ? `<span class="pr-action-status" title="A meeting_booked event is already logged">Meeting logged ✓</span>`
+            : `<button class="btn-secondary pr-action" data-action="log-meeting" type="button">Mark meeting booked</button>`;
 
           return `
             <div class="pr-timeline-head">
@@ -867,10 +904,35 @@
                   ? `<div class="pr-timeline-email"><a href="mailto:${esc(p.email)}">${esc(p.email)}</a></div>`
                   : ""}
               </div>
-              ${openUrl
-                ? `<a class="btn-secondary pr-open-linkedin" href="${esc(openUrl)}" target="_blank" rel="noopener">Open in LinkedIn ↗</a>`
-                : ""}
+              <div class="pr-timeline-actions">
+                ${meetingBtn}
+                <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
+                ${openUrl
+                  ? `<a class="btn-secondary pr-open-linkedin" href="${esc(openUrl)}" target="_blank" rel="noopener">Open in LinkedIn ↗</a>`
+                  : ""}
+              </div>
             </div>
+
+            <!-- Response log form — hidden by default, shown when "Mark
+                 responded" is clicked. Submit creates a type=response row
+                 with the pasted text + sentiment. -->
+            <form class="pr-response-form hidden" data-action="submit-response">
+              <textarea class="pr-response-text" rows="3"
+                        placeholder="Paste what they said…" required></textarea>
+              <div class="pr-response-form-row">
+                <div class="pr-sentiment-picker">
+                  <span class="pr-form-label">Sentiment</span>
+                  <label><input type="radio" name="pr-resp-sent" value="positive"> Positive</label>
+                  <label><input type="radio" name="pr-resp-sent" value="neutral" checked> Neutral</label>
+                  <label><input type="radio" name="pr-resp-sent" value="negative"> Negative</label>
+                </div>
+                <div class="pr-response-form-buttons">
+                  <button type="button" class="btn-secondary pr-action" data-action="hide-response-form">Cancel</button>
+                  <button type="submit" class="btn-primary pr-action">Log response</button>
+                </div>
+              </div>
+            </form>
+
             <ol class="pr-timeline">
               ${events.map(renderEvent).join("")}
             </ol>
@@ -891,9 +953,32 @@
           // Responses carry the body on `response`; outgoing messages
           // carry it on `message_sent`. Historical imports have neither.
           const body = e.response || e.message_sent || "";
-          const sentTag = (e.type === "response" && e.response_sentiment)
-            ? `<span class="pr-sent pr-sent-${esc(e.response_sentiment)}">${esc(e.response_sentiment)}</span>`
-            : "";
+
+          // Sentiment rendering for response rows:
+          //   - If the row has an id (all real DB rows do) and the current
+          //     operator can UPDATE it, render an editable <select>.
+          //   - Fallback: static pill (shouldn't happen in practice).
+          // The select shows an "empty" option so operators can clear
+          // sentiment back to unclassified.
+          let sentTag = "";
+          if (e.type === "response") {
+            if (e.id) {
+              const cur = e.response_sentiment || "";
+              sentTag = `
+                <select class="pr-sent-edit pr-sent-edit-${esc(cur || "none")}"
+                        data-event-id="${esc(e.id)}"
+                        data-prev="${esc(cur)}"
+                        title="Click to change sentiment">
+                  <option value=""         ${cur === ""         ? "selected" : ""}>— unclassified</option>
+                  <option value="positive" ${cur === "positive" ? "selected" : ""}>positive</option>
+                  <option value="neutral"  ${cur === "neutral"  ? "selected" : ""}>neutral</option>
+                  <option value="negative" ${cur === "negative" ? "selected" : ""}>negative</option>
+                </select>
+              `;
+            } else if (e.response_sentiment) {
+              sentTag = `<span class="pr-sent pr-sent-${esc(e.response_sentiment)}">${esc(e.response_sentiment)}</span>`;
+            }
+          }
 
           return `
             <li class="pr-event pr-event-${esc(e.type)}">
@@ -965,6 +1050,200 @@
           if (v == null) return "";
           const s = String(v);
           return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        }
+
+        // ---- inline actions -----------------------------------------
+        //
+        // These handle the "Mark meeting booked", "Mark responded", and
+        // "Edit sentiment" buttons rendered in the timeline head / event
+        // list. All are inline mutations — POST a new outreach row or
+        // PATCH an existing one, then splice the server's canonical row
+        // back into state.allProspects and re-render in place.
+        //
+        // We mutate state.allProspects (not state.filtered) so the change
+        // survives subsequent filter/timeframe re-renders. In the all-time
+        // case these arrays share objects, so one assignment is enough;
+        // in scoped cases scopeToTimeframe clones, so we always go
+        // through rerender() after mutating the source of truth.
+
+        function handleAction(actionEl, clickEvt) {
+          const action = actionEl.dataset.action;
+          const timelineRow = actionEl.closest(".pr-timeline-row");
+          if (!timelineRow) return;
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          if (action === "log-meeting") {
+            clickEvt.preventDefault();
+            handleLogMeeting(actionEl, prospect);
+            return;
+          }
+          if (action === "show-response-form") {
+            clickEvt.preventDefault();
+            const form = timelineRow.querySelector(".pr-response-form");
+            if (!form) return;
+            form.classList.remove("hidden");
+            const ta = form.querySelector("textarea");
+            if (ta) ta.focus();
+            return;
+          }
+          if (action === "hide-response-form") {
+            clickEvt.preventDefault();
+            const form = timelineRow.querySelector(".pr-response-form");
+            if (!form) return;
+            form.classList.add("hidden");
+            form.reset();
+            return;
+          }
+        }
+
+        async function handleLogMeeting(btn, prospect) {
+          const prevLabel = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = "Logging…";
+          try {
+            const payload = buildOutreachPayload(prospect, {
+              type: "meeting_booked",
+            });
+            const created = await sb.sbFetch("/rest/v1/outreach", {
+              method:  "POST",
+              body:    JSON.stringify([payload]),
+              headers: { Prefer: "return=representation" },
+            });
+            applyNewEvents(prospect, created);
+            reopenAfterMutation(prospect);
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = prevLabel;
+            alert("Couldn't log meeting: " + (err.message || err));
+          }
+        }
+
+        async function handleLogResponse(form) {
+          const timelineRow = form.closest(".pr-timeline-row");
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          const text = (form.querySelector(".pr-response-text")?.value || "").trim();
+          const sentimentEl = form.querySelector("input[name='pr-resp-sent']:checked");
+          const sentiment = sentimentEl ? sentimentEl.value : null;
+          if (!text) return;
+
+          const submitBtn = form.querySelector("button[type='submit']");
+          const prevLabel = submitBtn.textContent;
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Saving…";
+          try {
+            const now = new Date().toISOString();
+            const payload = buildOutreachPayload(prospect, {
+              type:               "response",
+              response:           text,
+              responded_at:       now,
+              response_sentiment: sentiment,
+            });
+            const created = await sb.sbFetch("/rest/v1/outreach", {
+              method:  "POST",
+              body:    JSON.stringify([payload]),
+              headers: { Prefer: "return=representation" },
+            });
+            applyNewEvents(prospect, created);
+            reopenAfterMutation(prospect);
+          } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = prevLabel;
+            alert("Couldn't log response: " + (err.message || err));
+          }
+        }
+
+        async function handleUpdateSentiment(sel) {
+          const eventId = sel.dataset.eventId;
+          const prev    = sel.dataset.prev || "";
+          const next    = sel.value || "";
+          if (next === prev) return;
+
+          const timelineRow = sel.closest(".pr-timeline-row");
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          sel.disabled = true;
+          try {
+            // PATCH null when the operator clears classification so the DB
+            // matches an unclassified extension row.
+            const body = { response_sentiment: next === "" ? null : next };
+            await sb.sbFetch(
+              `/rest/v1/outreach?id=eq.${encodeURIComponent(eventId)}`,
+              {
+                method:  "PATCH",
+                body:    JSON.stringify(body),
+                headers: { Prefer: "return=minimal" },
+              }
+            );
+            // Patch local state: find the row in the canonical prospect
+            // (in allProspects, keyed by prospect.key) and update it.
+            const canonical = findCanonical(prospect);
+            if (canonical) {
+              const evt = canonical.events.find(e => e.id === eventId);
+              if (evt) evt.response_sentiment = next === "" ? null : next;
+              Object.assign(canonical, rollup(canonical.events));
+            }
+            reopenAfterMutation(prospect);
+          } catch (err) {
+            sel.disabled = false;
+            sel.value = prev; // revert
+            alert("Couldn't update sentiment: " + (err.message || err));
+          }
+        }
+
+        // Build an outreach insert payload from the prospect's clustered
+        // identifiers. Defaults the required fields; caller overrides
+        // type-specific ones (response text, sentiment, etc.).
+        function buildOutreachPayload(prospect, overrides) {
+          return {
+            client_id:     clientId,
+            operator_id:   session.user.id,
+            prospect_name: prospect.name || "",
+            email:         prospect.email || null,
+            company:       prospect.company || null,
+            title:         prospect.title || null,
+            linkedin_id:   prospect.linkedin_id || null,
+            profile_url:   prospect.profile_url || null,
+            sales_nav_url: prospect.sales_nav_url || null,
+            ...overrides,
+          };
+        }
+
+        // Splice freshly-returned rows into the canonical prospect and
+        // recompute its rollup. `created` is the array returned by
+        // Prefer: return=representation on a POST.
+        function applyNewEvents(prospect, created) {
+          const canonical = findCanonical(prospect);
+          if (!canonical) return;
+          for (const row of created) canonical.events.push(row);
+          Object.assign(canonical, rollup(canonical.events));
+        }
+
+        // Re-render the table + re-expand the prospect's row. Uses the
+        // prospect's key (stable across re-renders) to find the row
+        // after sort order may have shifted (e.g., new event becomes
+        // last_touch → prospect jumps to the top).
+        function reopenAfterMutation(prospect) {
+          rerender();
+          const newIdx = state.filtered.findIndex(p => p.key === prospect.key);
+          if (newIdx < 0) return;
+          const row = wrapEl.querySelector(`.pr-row[data-idx="${newIdx}"]`);
+          if (row) {
+            // toggleTimeline collapses if open; to force-open we need the
+            // row to be currently closed. rerender() produces a collapsed
+            // table by default, so one toggle opens.
+            toggleTimeline(row);
+          }
+        }
+
+        function findCanonical(prospect) {
+          return state.allProspects.find(p => p.key === prospect.key);
         }
 
         // ---- helpers -------------------------------------------------
