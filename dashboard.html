@@ -174,12 +174,24 @@
       const LS_SORT_DIR  = "dashboard_sort_dir";
       const LS_SEL_ACCTS = "dashboard_sel_accts";
       const LS_SEL_COS   = "dashboard_sel_cos";
+      const LS_SORT_VER  = "dashboard_sort_version";
+
+      // v2: default sort changed from connections desc → startDate desc
+      // (empties first, then newest start date). Bumping this key wipes
+      // anyone still carrying the previous "connections desc" fallback
+      // in their localStorage so they see the new default on next load.
+      const SORT_VERSION = "2";
+      if (localStorage.getItem(LS_SORT_VER) !== SORT_VERSION) {
+        localStorage.removeItem(LS_SORT_KEY);
+        localStorage.removeItem(LS_SORT_DIR);
+        localStorage.setItem(LS_SORT_VER, SORT_VERSION);
+      }
 
       let tf         = localStorage.getItem(LS_TF)     || "all";
       let statusVal  = localStorage.getItem(LS_STATUS) || "all";
       let dateFrom   = localStorage.getItem(LS_FROM)   || "";
       let dateTo     = localStorage.getItem(LS_TO)     || "";
-      let sortKey    = localStorage.getItem(LS_SORT_KEY) || "connections";
+      let sortKey    = localStorage.getItem(LS_SORT_KEY) || "startDate";
       let sortDir    = localStorage.getItem(LS_SORT_DIR) || "desc";
       // Multiselect state: either null (meaning "all") or a Set of string IDs.
       // Stored in localStorage as a JSON array of ids; null = absent.
@@ -238,13 +250,13 @@
 
       // Click-to-sort on numeric + date column headers. Three-state cycle:
       // first click on a new column → desc. Click same column → asc. Third
-      // click on same column → clear (fall back to default connections desc).
+      // click on same column → clear (fall back to the default: startDate desc).
       tableEl.querySelectorAll("th.sortable").forEach(th => {
         th.addEventListener("click", () => {
           const key = th.dataset.sort;
           if (sortKey === key) {
             if (sortDir === "desc")      sortDir = "asc";
-            else if (sortDir === "asc") { sortKey = "connections"; sortDir = "desc"; }
+            else if (sortDir === "asc") { sortKey = "startDate"; sortDir = "desc"; }
             else                         sortDir = "desc";
           } else {
             sortKey = key;
@@ -586,16 +598,20 @@
 
       function sortComparator(key, dir) {
         const sign = dir === "asc" ? 1 : -1;
+        const toNum = (v) => {
+          if (v == null) return Infinity;
+          if (key === "startDate" || key === "endDate") return new Date(v).getTime();
+          return v;
+        };
         return (a, b) => {
-          const av = a[key], bv = b[key];
-          // Nulls go to the bottom regardless of direction — the operator
-          // doesn't want rows with no data pushing signal off-screen.
-          if (av == null && bv == null) return 0;
-          if (av == null) return 1;
-          if (bv == null) return -1;
-          if (key === "startDate" || key === "endDate") {
-            return sign * (new Date(av) - new Date(bv));
-          }
+          // Treat missing values as +Infinity: largest possible value. So:
+          //   - descending (biggest first) → empties at the top
+          //   - ascending  (smallest first) → empties at the bottom
+          // Matches SQL's "NULLS LAST" for ASC and "NULLS FIRST" for DESC.
+          const av = toNum(a[key]);
+          const bv = toNum(b[key]);
+          if (av === bv) return 0;
+          if (av === Infinity && bv === Infinity) return 0;
           return sign * (av - bv);
         };
       }
