@@ -39,10 +39,12 @@
   </div>
 
   <div class="sub-tabs" id="sub-tabs">
-    <button class="sub-tab active" data-tab="summary"   type="button">Summary</button>
-    <button class="sub-tab"        data-tab="prospects" type="button">Prospects</button>
-    <button class="sub-tab"        data-tab="followups" type="button">Follow-ups</button>
-    <button class="sub-tab"        data-tab="cadence"   type="button">Cadence</button>
+    <button class="sub-tab active" data-tab="summary"       type="button">Summary</button>
+    <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
+    <button class="sub-tab"        data-tab="followups"     type="button">Follow-ups</button>
+    <button class="sub-tab"        data-tab="templates"     type="button">Templates</button>
+    <button class="sub-tab"        data-tab="replyinst"     type="button">Reply Instructions</button>
+    <button class="sub-tab"        data-tab="cadence"       type="button">Cadence</button>
   </div>
 
   <main class="main main-wide">
@@ -156,6 +158,46 @@
       </div>
     </section>
 
+    <!-- =================== TEMPLATES ==================== -->
+    <section id="panel-templates" class="sub-panel hidden">
+      <div class="cad-editor">
+        <div class="cad-head">
+          <h2>Templates</h2>
+          <p class="page-sub">
+            Reusable messages for initial outreach and retargeting — distinct from the cadence follow-up sequence.
+            Up to 10. Supports <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
+          </p>
+        </div>
+        <div id="tmpl-list" class="tmpl-list-d">
+          <div class="loading">Loading templates…</div>
+        </div>
+        <button id="tmpl-add"  class="cad-add"  type="button">+ Add template</button>
+        <div class="cad-actions">
+          <button id="tmpl-save" class="cad-save" type="button" disabled>Save</button>
+          <span   id="tmpl-feedback" class="cad-feedback"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================== REPLY INSTRUCTIONS ==================== -->
+    <section id="panel-replyinst" class="sub-panel hidden">
+      <div class="cad-editor">
+        <div class="cad-head">
+          <h2>Reply Instructions</h2>
+          <p class="page-sub">
+            Guidance for the AI when it drafts suggested replies in the Sales Nav sidebar.
+            Injected alongside the message sent and the pasted LinkedIn response.
+          </p>
+        </div>
+        <textarea id="rpl-text" class="rpl-text-d"
+                  placeholder="e.g. Be warm but brief. If they ask about pricing, pivot to booking a call. Never quote numbers."></textarea>
+        <div class="cad-actions">
+          <button id="rpl-save" class="cad-save" type="button" disabled>Save</button>
+          <span   id="rpl-feedback" class="cad-feedback"></span>
+        </div>
+      </div>
+    </section>
+
     <!-- =================== CADENCE ==================== -->
     <section id="panel-cadence" class="sub-panel hidden">
       <div class="cad-editor">
@@ -198,7 +240,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -225,7 +267,7 @@
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, prospects: false, followups: false, cadence: false };
+      const loaded = { summary: false, prospects: false, followups: false, templates: false, replyinst: false, cadence: false };
 
       tabs.addEventListener("click", (e) => {
         const btn = e.target.closest(".sub-tab");
@@ -244,6 +286,8 @@
           if      (name === "summary")   initSummary();
           else if (name === "prospects") initProspects();
           else if (name === "followups") initFollowups();
+          else if (name === "templates") initTemplates();
+          else if (name === "replyinst") initReplyInstructions();
           else if (name === "cadence")   initCadence();
           loaded[name] = true;
         }
@@ -2012,6 +2056,207 @@
             </div>
           `).join("");
         }
+      }
+
+      // ================= TEMPLATES ====================================
+      //
+      // Mirror of the extension's templates drawer. client.templates is
+      // a jsonb array of {name, body}; one PATCH rewrites the whole
+      // array on save. UI is capped at 10 to match the popup.
+
+      function initTemplates() {
+        const listEl     = document.getElementById("tmpl-list");
+        const addBtn     = document.getElementById("tmpl-add");
+        const saveBtn    = document.getElementById("tmpl-save");
+        const feedbackEl = document.getElementById("tmpl-feedback");
+        const MAX = 10;
+
+        // Working copy — decoupled from client.templates so an in-progress
+        // edit doesn't mutate the source snapshot until Save succeeds.
+        let items = Array.isArray(client.templates)
+          ? client.templates.map(t => ({
+              name: typeof t?.name === "string" ? t.name : "",
+              body: typeof t?.body === "string" ? t.body : "",
+            })).slice(0, MAX)
+          : [];
+        let dirty = false;
+
+        render();
+
+        addBtn.addEventListener("click", () => {
+          if (items.length >= MAX) return;
+          items.push({ name: `Template ${items.length + 1}`, body: "" });
+          setDirty(true);
+          render();
+        });
+
+        listEl.addEventListener("click", async (e) => {
+          const rm = e.target.closest(".tmpl-remove-d");
+          if (rm) {
+            const idx = Number(rm.dataset.idx);
+            items.splice(idx, 1);
+            setDirty(true);
+            render();
+            return;
+          }
+          const copy = e.target.closest(".tmpl-copy-d");
+          if (copy) {
+            const idx = Number(copy.dataset.idx);
+            const body = items[idx]?.body || "";
+            try {
+              await navigator.clipboard.writeText(body);
+              const orig = copy.textContent;
+              copy.textContent = "Copied";
+              copy.classList.add("copied");
+              setTimeout(() => {
+                copy.textContent = orig;
+                copy.classList.remove("copied");
+              }, 1400);
+            } catch (err) {
+              copy.textContent = "Failed";
+              setTimeout(() => { copy.textContent = "Copy"; }, 1400);
+            }
+          }
+        });
+
+        // Input handler updates backing array in place (no rerender —
+        // would steal focus from whichever field the operator is typing).
+        listEl.addEventListener("input", (e) => {
+          const el = e.target;
+          const idx = Number(el.dataset.idx);
+          if (!Number.isInteger(idx) || !items[idx]) return;
+          if (el.classList.contains("tmpl-name-d")) {
+            items[idx].name = el.value;
+            setDirty(true);
+          } else if (el.classList.contains("tmpl-body-d")) {
+            items[idx].body = el.value;
+            setDirty(true);
+          }
+        });
+
+        saveBtn.addEventListener("click", save);
+
+        async function save() {
+          // Blank names → "Template N" so the jsonb payload is never
+          // missing a label. Bodies may legitimately stay blank.
+          const payload = items.slice(0, MAX).map((t, i) => ({
+            name: (t.name || "").trim() || `Template ${i + 1}`,
+            body: (t.body || ""),
+          }));
+          saveBtn.disabled = true;
+          feedbackEl.className = "cad-feedback";
+          feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch(
+              `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+              {
+                method: "PATCH",
+                body:   JSON.stringify({ templates: payload }),
+                headers:{ Prefer: "return=minimal" },
+              }
+            );
+            items = payload;
+            client.templates = payload; // keep local snapshot fresh
+            dirty = false;
+            saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok";
+            feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+            render();
+          } catch (err) {
+            saveBtn.disabled = false;
+            feedbackEl.className = "cad-feedback err";
+            feedbackEl.textContent = err.message || "Save failed";
+          }
+        }
+
+        function setDirty(v) {
+          dirty = v;
+          saveBtn.disabled = !v;
+          if (v) {
+            feedbackEl.textContent = "";
+            feedbackEl.className = "cad-feedback";
+          }
+        }
+
+        function render() {
+          if (!items.length) {
+            listEl.innerHTML = `<div class="placeholder" style="padding:20px;">
+              <strong>No templates yet</strong>
+              Click <em>+ Add template</em> to create one.
+            </div>`;
+          } else {
+            listEl.innerHTML = items.map((t, i) => `
+              <div class="tmpl-row-d">
+                <div class="tmpl-row-head-d">
+                  <input class="tmpl-name-d" type="text" data-idx="${i}"
+                         value="${esc(t.name || "")}" placeholder="Template name" />
+                  <button type="button" class="tmpl-copy-d"   data-idx="${i}">Copy</button>
+                  <button type="button" class="tmpl-remove-d" data-idx="${i}" title="Remove template">×</button>
+                </div>
+                <textarea class="tmpl-body-d" rows="3" data-idx="${i}"
+                          placeholder="Hey {{first_name}}, ...">${esc(t.body || "")}</textarea>
+              </div>
+            `).join("");
+          }
+          addBtn.disabled = items.length >= MAX;
+          addBtn.textContent = items.length >= MAX
+            ? `+ Add template (${MAX} max)`
+            : `+ Add template`;
+        }
+      }
+
+      // ================= REPLY INSTRUCTIONS ===========================
+      //
+      // Single-field editor backing client.reply_instructions. The Edge
+      // Function that generates suggested replies reads this verbatim.
+
+      function initReplyInstructions() {
+        const textEl     = document.getElementById("rpl-text");
+        const saveBtn    = document.getElementById("rpl-save");
+        const feedbackEl = document.getElementById("rpl-feedback");
+
+        textEl.value = typeof client.reply_instructions === "string"
+          ? client.reply_instructions
+          : "";
+        let dirty = false;
+
+        textEl.addEventListener("input", () => {
+          dirty = true;
+          saveBtn.disabled = false;
+          feedbackEl.textContent = "";
+          feedbackEl.className = "cad-feedback";
+        });
+
+        saveBtn.addEventListener("click", async () => {
+          const text = (textEl.value || "").trim();
+          saveBtn.disabled = true;
+          feedbackEl.className = "cad-feedback";
+          feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch(
+              `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+              {
+                method: "PATCH",
+                // Empty string → null so the column stays clean if the
+                // operator wants to clear instructions.
+                body:   JSON.stringify({ reply_instructions: text === "" ? null : text }),
+                headers:{ Prefer: "return=minimal" },
+              }
+            );
+            client.reply_instructions = text === "" ? null : text;
+            textEl.value = text;
+            dirty = false;
+            saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok";
+            feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+          } catch (err) {
+            saveBtn.disabled = false;
+            feedbackEl.className = "cad-feedback err";
+            feedbackEl.textContent = err.message || "Save failed";
+          }
+        });
       }
 
       // ================= helpers ======================================
