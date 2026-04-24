@@ -47,6 +47,13 @@
     <div class="account-meta">
       <span id="team-subtitle">Invite admins and members, revoke access, and assign account visibility.</span>
     </div>
+    <!-- Org switcher: rendered only when the signed-in user admins more
+         than one org. Lets a multi-org admin flip between teams without
+         going through the platform-admin tool. -->
+    <div id="org-switcher" class="org-switcher hidden">
+      <label class="org-switcher-label" for="org-switcher-select">Switch organization</label>
+      <select id="org-switcher-select" class="org-switcher-select" aria-label="Switch organization"></select>
+    </div>
   </div>
 
   <main class="main main-wide">
@@ -135,6 +142,19 @@
         </table>
       </div>
     </section>
+
+    <!-- Recent activity: append-only audit log of team mutations.
+         Org admins see their org's events; the panel auto-refreshes
+         after every action the admin takes on this page. -->
+    <section class="team-section" id="activity-section">
+      <div class="section-head">
+        <h2>Recent activity</h2>
+        <span id="activity-count" class="section-meta"></span>
+      </div>
+      <div id="activity-list" class="activity-list">
+        <div class="loading">Loading…</div>
+      </div>
+    </section>
   </main>
 
   <!-- Client access modal: opens from a member row's "Manage access"
@@ -191,12 +211,39 @@
 
       // Resolve which org we're managing. After this block, `org` is
       // {id, name, seats_paid} and everything downstream assumes it's set.
+      //
+      // We always fetch the user's full set of admin orgs up front:
+      //   - drives the multi-org switcher dropdown (rendered when >1)
+      //   - makes the ?as_org gate work for non-PA admins switching
+      //     between their own orgs
+      //   - lets the no-as_org branch pick a default without a second
+      //     round-trip
       let org = null;
+      let myAdminOrgs = [];
+      try {
+        const rows = await sb.sbFetch(
+          "/rest/v1/organization_members?select=role,organizations(id,name,seats_paid)&role=eq.admin"
+        );
+        myAdminOrgs = (rows || [])
+          .map(r => r.organizations)
+          .filter(o => o && o.id);
+        // Stable order — alphabetical by name. Picker dropdown reads it.
+        myAdminOrgs.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      } catch (err) {
+        console.warn("Couldn't enumerate admin orgs:", err);
+      }
+      const myAdminOrgIds = new Set(myAdminOrgs.map(o => o.id));
 
       if (requestedOrg) {
         const isPA = await isPlatformAdminPromise;
-        if (!isPA) {
-          alert("Platform admin access is required to manage another organization's team. Opening your own team instead.");
+        const adminsRequested = myAdminOrgIds.has(requestedOrg);
+        // Two valid paths to ?as_org=<X>:
+        //   (a) Platform admin drilling in from the platform-admin tool.
+        //   (b) Non-PA admin switching between orgs they admin via the
+        //       org switcher dropdown on this page.
+        // Anything else is a permission error.
+        if (!isPA && !adminsRequested) {
+          alert("You're not an admin of that organization. Opening your own team instead.");
           window.location.replace("team.html");
           return;
         }
@@ -206,54 +253,69 @@
           );
           if (!rows || !rows.length) {
             alert("That organization wasn't found.");
-            window.location.replace("platform-admin.html");
+            window.location.replace(isPA ? "platform-admin.html" : "team.html");
             return;
           }
           org = { id: rows[0].id, name: rows[0].name, seats_paid: rows[0].seats_paid };
-          const banner = document.getElementById("drill-in-banner");
-          const nameEl = document.getElementById("drill-in-org-name");
-          if (banner && nameEl) {
-            nameEl.textContent = org.name;
-            banner.classList.remove("hidden");
+          // Drill-in banner only for platform admins. A non-PA admin
+          // using the org switcher to flip between their own orgs gets
+          // the picker dropdown alone — no "Exit to platform admin"
+          // link, since that page would refuse them anyway.
+          if (isPA) {
+            const banner = document.getElementById("drill-in-banner");
+            const nameEl = document.getElementById("drill-in-org-name");
+            if (banner && nameEl) {
+              nameEl.textContent = org.name;
+              banner.classList.remove("hidden");
+            }
           }
           document.title = `${org.name} team — Uptown`;
         } catch (err) {
           alert(`Couldn't load that organization: ${err.message}`);
-          window.location.replace("platform-admin.html");
+          window.location.replace(isPA ? "platform-admin.html" : "team.html");
           return;
         }
       } else {
-        // Find the org this user admins. If they admin multiple, the
-        // picker is out of scope for slice 1 — fall back to the first
-        // and log a warning; Austin can always drill in as a platform
-        // admin if needed.
-        try {
-          const rows = await sb.sbFetch(
-            "/rest/v1/organization_members?select=role,organizations(id,name,seats_paid)&role=eq.admin"
-          );
-          if (!rows || !rows.length || !rows[0].organizations) {
-            // Not an admin of any org. Platform admins without as_org
-            // get routed to the org list; regular members get punted
-            // back to the dashboard.
-            const isPA = await isPlatformAdminPromise;
-            if (isPA) {
-              window.location.replace("platform-admin.html");
-            } else {
-              alert("You need to be an org admin to manage a team.");
-              window.location.replace("dashboard.html");
-            }
-            return;
+        // No ?as_org. Default to the user's first admin org (alphabetical).
+        // If they admin multiple, the org-switcher dropdown lets them
+        // flip; if zero, route appropriately.
+        if (!myAdminOrgs.length) {
+          const isPA = await isPlatformAdminPromise;
+          if (isPA) {
+            window.location.replace("platform-admin.html");
+          } else {
+            alert("You need to be an org admin to manage a team.");
+            window.location.replace("dashboard.html");
           }
-          if (rows.length > 1) {
-            console.warn(`Operator is admin of ${rows.length} orgs; showing the first. Slice 1 doesn't ship a picker.`);
-          }
-          const o = rows[0].organizations;
-          org = { id: o.id, name: o.name, seats_paid: o.seats_paid };
-          document.title = `Team — ${org.name}`;
-        } catch (err) {
-          alert(`Couldn't look up your organization: ${err.message}`);
-          window.location.replace("dashboard.html");
           return;
+        }
+        const o = myAdminOrgs[0];
+        org = { id: o.id, name: o.name, seats_paid: o.seats_paid };
+        document.title = `Team — ${org.name}`;
+      }
+
+      // Render the org switcher if the user admins more than one org
+      // AND the currently-viewed org is one of them. The second clause
+      // skips the picker for platform admins drilled into an org they
+      // don't admin (their navigation tool is platform-admin.html).
+      // Selecting a different option navigates to ?as_org=<that-id>
+      // (full reload — simplest way to re-resolve all org-scoped state
+      // without hand-stitching cache invalidation).
+      if (myAdminOrgs.length > 1 && myAdminOrgIds.has(org.id)) {
+        const switcher = document.getElementById("org-switcher");
+        const select   = document.getElementById("org-switcher-select");
+        if (switcher && select) {
+          select.innerHTML = myAdminOrgs.map(o => {
+            const sel = o.id === org.id ? "selected" : "";
+            return `<option value="${esc(o.id)}" ${sel}>${esc(o.name)}</option>`;
+          }).join("");
+          select.addEventListener("change", () => {
+            const next = select.value;
+            if (next && next !== org.id) {
+              window.location.href = `team.html?as_org=${encodeURIComponent(next)}`;
+            }
+          });
+          switcher.classList.remove("hidden");
         }
       }
 
@@ -289,7 +351,12 @@
       // ---- loaders -----------------------------------------------------
 
       async function loadAll() {
-        await Promise.all([loadMembers(), loadInvites(), loadClientsAndAccess()]);
+        await Promise.all([
+          loadMembers(),
+          loadInvites(),
+          loadClientsAndAccess(),
+          loadActivity(),
+        ]);
         // loadMembers renders as soon as membership rows arrive, but the
         // Access column depends on clients + accessMap which come from
         // loadClientsAndAccess. Re-render once everything's settled so
@@ -335,6 +402,130 @@
         } catch (err) {
           tb.innerHTML = `<tr><td colspan="4" class="loading">Couldn't load invites: ${esc(err.message)}</td></tr>`;
         }
+      }
+
+      async function loadActivity() {
+        const listEl = document.getElementById("activity-list");
+        const countEl = document.getElementById("activity-count");
+        if (!listEl) return;
+        try {
+          // PostgREST embeds: actor_id and target_id both reference
+          // public.operators, so we disambiguate with !actor_id /
+          // !target_id (column-name hint). Either embed can come back
+          // null if the operator was deleted (FK ON DELETE SET NULL)
+          // or if RLS hides them — formatActivity falls back to
+          // payload.email in those cases.
+          const rows = await sb.sbFetch(
+            `/rest/v1/audit_events?select=id,action,payload,created_at,actor:operators!actor_id(id,name,email),target:operators!target_id(id,name,email)&org_id=eq.${encodeURIComponent(org.id)}&order=created_at.desc&limit=50`
+          );
+          renderActivity(rows || []);
+        } catch (err) {
+          // 404 is the expected error if the audit_events table doesn't
+          // exist yet (migration not applied). Surface a softer message
+          // than the table loaders so the page still works.
+          const m = err.message || "";
+          if (/not found|does not exist|404/i.test(m)) {
+            listEl.innerHTML = `<div class="loading">Activity log not enabled yet for this organization.</div>`;
+          } else {
+            listEl.innerHTML = `<div class="loading">Couldn't load activity: ${esc(m)}</div>`;
+          }
+          if (countEl) countEl.textContent = "";
+        }
+      }
+
+      function renderActivity(events) {
+        const listEl = document.getElementById("activity-list");
+        const countEl = document.getElementById("activity-count");
+        if (!listEl) return;
+        if (!events.length) {
+          listEl.innerHTML = `<div class="loading">No activity yet. Invites, role changes, and member events will appear here.</div>`;
+          if (countEl) countEl.textContent = "";
+          return;
+        }
+        if (countEl) countEl.textContent = `— last ${events.length}`;
+        listEl.innerHTML = events.map(renderActivityRow).join("");
+      }
+
+      function renderActivityRow(ev) {
+        return `
+          <div class="activity-item" data-action="${esc(ev.action)}">
+            <span class="activity-text">${formatActivity(ev)}</span>
+            <span class="activity-time" title="${esc(ev.created_at)}">${esc(fmtRelativeTime(ev.created_at))}</span>
+          </div>
+        `;
+      }
+
+      // Renders one event row to safe HTML. Callers paste the result
+      // directly into innerHTML — every value that could be user-supplied
+      // (names, emails) goes through esc() here, not at the call site.
+      function formatActivity(ev) {
+        const p = ev.payload || {};
+        const actorName  = ev.actor?.name  || ev.actor?.email  || "(unknown)";
+        const targetName = ev.target?.name || ev.target?.email || p.email || "(unknown)";
+        const actor  = `<span class="activity-actor">${esc(actorName)}</span>`;
+        const target = `<span class="activity-target">${esc(targetName)}</span>`;
+        const role   = p.role || "";
+        const email  = p.email || "";
+
+        switch (ev.action) {
+          case "invite.created":
+            return `${actor} invited ${esc(email || targetName)}${role ? ` as <strong>${esc(role)}</strong>` : ""}`;
+          case "invite.refreshed":
+            return `${actor} re-invited ${esc(email || targetName)}${role ? ` as <strong>${esc(role)}</strong>` : ""}`;
+          case "invite.resent":
+            return `${actor} resent invite to ${esc(email || targetName)}`;
+          case "invite.revoked":
+            return `${actor} revoked invite for ${esc(email || targetName)}`;
+          case "invite.accepted":
+            return `${target} accepted invite${role ? ` (joined as <strong>${esc(role)}</strong>)` : ""}`;
+          case "invite.declined":
+            return `${target} declined invite`;
+          case "member.joined":
+            return `${target} joined${role ? ` as <strong>${esc(role)}</strong>` : ""}${p.via === "signup" ? " via signup" : ""}`;
+          case "member.removed": {
+            const wasRole = p.prior_role ? ` (was ${esc(p.prior_role)})` : "";
+            return `${actor} removed ${esc(email || targetName)}${wasRole}`;
+          }
+          case "member.role_changed": {
+            const verb = p.new_role === "admin" ? "promoted" : "demoted";
+            const dest = p.new_role === "admin" ? "admin" : "member";
+            return `${actor} ${verb} ${esc(email || targetName)} to <strong>${esc(dest)}</strong>`;
+          }
+
+          // Account-lifecycle events fired by the clients trigger and
+          // the update_seats_paid RPC. target_id is null for these
+          // (target column references operators, not clients), so we
+          // pull the account name out of payload.
+          case "account.created":
+            return `${actor} added account <strong>${esc(p.name || "(unnamed)")}</strong>`;
+          case "account.archived":
+            return `${actor} archived account <strong>${esc(p.name || "(unnamed)")}</strong>`;
+          case "account.unarchived":
+            return `${actor} unarchived account <strong>${esc(p.name || "(unnamed)")}</strong>`;
+          case "seats.cap_changed": {
+            const oldCap = p.old_cap ?? "?";
+            const newCap = p.new_cap ?? "?";
+            return `${actor} changed seat cap from <strong>${esc(oldCap)}</strong> to <strong>${esc(newCap)}</strong>`;
+          }
+
+          default:
+            return `${actor} performed <code>${esc(ev.action)}</code>`;
+        }
+      }
+
+      // Compact relative-time formatter for the activity feed. Falls
+      // back to absolute date for anything older than a week so the
+      // user sees a real timestamp instead of "47d ago".
+      function fmtRelativeTime(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso);
+        const sec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+        if (sec < 45)         return "just now";
+        if (sec < 3600)       return `${Math.floor(sec / 60)}m ago`;
+        if (sec < 86400)      return `${Math.floor(sec / 3600)}h ago`;
+        if (sec < 86400 * 7)  return `${Math.floor(sec / 86400)}d ago`;
+        return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       }
 
       async function loadClientsAndAccess() {
@@ -476,6 +667,13 @@
           ? `<span class="row-action-note" title="They'll see an Accept / Decline prompt on their dashboard the next time they sign in.">Awaiting their acceptance</span>`
           : `<button type="button" class="btn-row-action btn-copy-link" data-email="${esc(inv.email)}">Copy signup link</button>`;
 
+        // Resend bumps the invited_at timestamp and emits invite.resent
+        // in the audit log. In D2 it'll additionally trigger a real
+        // email send through an Edge Function; today it's a stub that
+        // gives the admin a way to refresh the "Invited" date after
+        // pinging the invitee elsewhere.
+        const resendBtn = `<button type="button" class="btn-row-action btn-resend-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}" title="Bump the invite timestamp. (Real email sending lands in a later phase.)">Resend</button>`;
+
         return `
           <tr data-invite="${esc(inv.id)}">
             <td>${esc(inv.email)}</td>
@@ -487,6 +685,7 @@
             <td>${fmtDate(inv.invited_at)}</td>
             <td class="col-actions">
               ${primaryAction}
+              ${resendBtn}
               <button type="button" class="btn-row-action btn-row-action-danger btn-revoke-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}">Revoke</button>
             </td>
           </tr>
@@ -497,6 +696,9 @@
         const tb = document.getElementById("invite-tbody");
         tb.querySelectorAll(".btn-copy-link").forEach(btn => {
           btn.addEventListener("click", () => onCopyLink(btn, btn.dataset.email));
+        });
+        tb.querySelectorAll(".btn-resend-invite").forEach(btn => {
+          btn.addEventListener("click", () => onResendInvite(btn, btn.dataset.invite, btn.dataset.email));
         });
         tb.querySelectorAll(".btn-revoke-invite").forEach(btn => {
           btn.addEventListener("click", () => onRevokeInvite(btn.dataset.invite, btn.dataset.email));
@@ -545,7 +747,7 @@
               ${esc(email)} already has an Uptown account. We'll show them an Accept / Decline prompt on their dashboard the next time they sign in. They'll appear in Members here once they accept.
             </div>`;
             emailEl.value = "";
-            await loadInvites();
+            await Promise.all([loadInvites(), loadActivity()]);
           } else if (outcome.status === "added_existing") {
             // Legacy path — only returned if add_invite_consent.sql
             // hasn't been run yet. Left in place so the UI doesn't
@@ -555,7 +757,7 @@
               ${esc(email)} already had an Uptown account — added as ${esc(outcome.role)}. They'll see the org next time they refresh the dashboard.
             </div>`;
             emailEl.value = "";
-            await loadMembers();
+            await Promise.all([loadMembers(), loadActivity()]);
           } else if (outcome.status === "invited_pending") {
             const link = buildSignupLink(outcome.email || email);
             resultEl.innerHTML = `
@@ -574,10 +776,10 @@
                 copyText(link, ev.currentTarget);
               });
             emailEl.value = "";
-            await loadInvites();
+            await Promise.all([loadInvites(), loadActivity()]);
           } else {
             resultEl.innerHTML = `<div class="invite-result-info">Invite submitted.</div>`;
-            await loadInvites();
+            await Promise.all([loadInvites(), loadActivity()]);
           }
         } catch (err) {
           const m = err.message || "";
@@ -611,7 +813,7 @@
               new_role:           newRole,
             }),
           });
-          await loadMembers();
+          await Promise.all([loadMembers(), loadActivity()]);
         } catch (err) {
           alert(`Couldn't change role: ${err.message}`);
         }
@@ -629,7 +831,7 @@
           });
           // Access map entry is stale now — drop it.
           accessMap.delete(operatorId);
-          await loadMembers();
+          await Promise.all([loadMembers(), loadActivity()]);
         } catch (err) {
           alert(`Couldn't remove: ${err.message}`);
         }
@@ -642,9 +844,38 @@
             method: "POST",
             body:   JSON.stringify({ invite_id: inviteId }),
           });
-          await loadInvites();
+          await Promise.all([loadInvites(), loadActivity()]);
         } catch (err) {
           alert(`Couldn't revoke: ${err.message}`);
+        }
+      }
+
+      // Resend stub: bumps invited_at + writes invite.resent to the
+      // audit log. UI does NOT show a confirmation prompt since this
+      // is a low-stakes action (no destruction, no privilege change),
+      // but we disable the button briefly + flash "Resent ✓" so the
+      // admin gets visible feedback.
+      async function onResendInvite(btn, inviteId, email) {
+        const orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "Resending…";
+        try {
+          await sb.sbFetch("/rest/v1/rpc/resend_invite", {
+            method: "POST",
+            body:   JSON.stringify({ invite_id: inviteId }),
+          });
+          btn.textContent = "Resent ✓";
+          // Refresh the invites table to reflect the new invited_at
+          // and the activity panel to show invite.resent.
+          await Promise.all([loadInvites(), loadActivity()]);
+          // loadInvites re-renders the row, so this btn reference is
+          // stale. The new row's button starts in its default "Resend"
+          // state, which is fine — the user already saw the "Resent ✓"
+          // flash before the re-render replaced the DOM.
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = orig;
+          alert(`Couldn't resend: ${err.message}`);
         }
       }
 

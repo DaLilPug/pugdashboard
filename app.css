@@ -2989,3 +2989,101 @@ body.login-body {
   color: var(--gray-400);
   font-style: italic;
 }
+
+/* ---------- Org switcher (multi-org admins) ----------
+   Sits below the team subtitle on team.html. Hidden by default; the
+   page's main IIFE pulls .hidden off when the signed-in user admins
+   more than one org. Switching the dropdown navigates to ?as_org=<id>. */
+.org-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.org-switcher.hidden { display: none; }
+.org-switcher-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+.org-switcher-select {
+  height: 30px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--navy-dark);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  /* native chevron — keep the form control feeling */
+}
+.org-switcher-select:hover { border-color: var(--navy); }
+.org-switcher-select:focus {
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(1,58,82,.10);
+}
+
+/* ---------- Recent activity panel ----------
+   Append-only event log for team mutations. Each .activity-item is a
+   single line: text on the left (with subtle emphasis on actor /
+   target / role), relative time on the right. The text container can
+   wrap on narrow viewports; the timestamp stays in its own column so
+   the right edge lines up. */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--r-lg);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+.activity-list .loading {
+  padding: 16px 18px;
+  color: var(--gray-400);
+  font-size: 13px;
+}
+.activity-item {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--gray-100);
+  font-size: 13px;
+  color: var(--gray-600);
+  line-height: 1.45;
+}
+.activity-item:first-child { border-top: none; }
+.activity-item:hover { background: var(--surface-2); }
+.activity-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+.activity-text strong { color: var(--navy-dark); font-weight: 600; }
+.activity-actor,
+.activity-target {
+  color: var(--navy-dark);
+  font-weight: 500;
+}
+.activity-text code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  background: var(--gray-100);
+  color: var(--navy-dark);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.activity-time {
+  flex: 0 0 auto;
+  color: var(--gray-400);
+  font-size: 11.5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
