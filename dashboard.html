@@ -49,6 +49,7 @@
             <button type="button" class="ms-link" data-ms-action="all">Select all</button>
             <button type="button" class="ms-link" data-ms-action="none">Clear</button>
           </div>
+          <input type="search" class="ms-search" placeholder="Search accounts…" aria-label="Search accounts" />
           <div class="ms-options" data-ms-target="accounts"></div>
         </div>
       </div>
@@ -66,6 +67,7 @@
             <button type="button" class="ms-link" data-ms-action="all">Select all</button>
             <button type="button" class="ms-link" data-ms-action="none">Clear</button>
           </div>
+          <input type="search" class="ms-search" placeholder="Search companies…" aria-label="Search companies" />
           <div class="ms-options" data-ms-target="companies"></div>
         </div>
       </div>
@@ -257,6 +259,9 @@
       updateSortCarets();
 
       // Multiselect popovers (Accounts + Companies). Outside-click closes.
+      // When opening a popover, focus its search input so the operator can
+      // type straight away. When closing, reset the search + re-show every
+      // option — no stale "filtered to nothing" state on next open.
       document.addEventListener("click", (e) => {
         document.querySelectorAll(".ms-wrap").forEach(w => {
           const btn = w.querySelector(".ms-button");
@@ -265,21 +270,46 @@
             if (btn.contains(e.target)) {
               const isOpen = !pop.classList.contains("hidden");
               // Close other popovers before opening this one.
-              document.querySelectorAll(".ms-popover").forEach(p => p.classList.add("hidden"));
+              document.querySelectorAll(".ms-popover").forEach(p => {
+                if (!p.classList.contains("hidden")) resetMsSearch(p);
+                p.classList.add("hidden");
+              });
               document.querySelectorAll(".ms-button").forEach(b => b.setAttribute("aria-expanded", "false"));
               if (!isOpen) {
                 pop.classList.remove("hidden");
                 btn.setAttribute("aria-expanded", "true");
+                const search = pop.querySelector(".ms-search");
+                if (search) { search.focus(); search.select(); }
               }
             }
-            // clicks inside the popover (checkboxes + select all/clear) are
-            // handled by their own listeners below
+            // clicks inside the popover (checkboxes + search + select/clear)
+            // are handled by their own listeners below
           } else {
+            if (!pop.classList.contains("hidden")) resetMsSearch(pop);
             pop.classList.add("hidden");
             btn.setAttribute("aria-expanded", "false");
           }
         });
       });
+
+      // Apply the current search query as a visibility filter. Hidden rows
+      // are tagged with .ms-hidden so Select all / Clear can skip them.
+      function applyMsSearch(pop) {
+        const q = (pop.querySelector(".ms-search")?.value || "").trim().toLowerCase();
+        pop.querySelectorAll(".ms-option").forEach(opt => {
+          const text = opt.textContent.trim().toLowerCase();
+          const match = !q || text.includes(q);
+          opt.classList.toggle("ms-hidden", !match);
+        });
+      }
+
+      function resetMsSearch(pop) {
+        const search = pop.querySelector(".ms-search");
+        if (search && search.value) {
+          search.value = "";
+          applyMsSearch(pop);
+        }
+      }
 
       // ---- data load + render loop --------------------------------------
       //
@@ -445,6 +475,10 @@
         }).join("") || `<div class="ms-empty">No companies set yet.</div>`;
 
         refreshMsLabels();
+        // If a popover happens to be open with an active search query when
+        // we re-render (e.g. after saving an inline edit), re-apply the
+        // filter so the new options honour the existing query.
+        document.querySelectorAll(".ms-popover").forEach(applyMsSearch);
       }
 
       // One-time wiring for the multiselect popovers. Listeners live on the
@@ -457,19 +491,35 @@
         accEl.addEventListener("change", onAccountMsChange);
         coEl .addEventListener("change", onCompanyMsChange);
 
-        // "Select all" / "Clear" buttons inside both popovers.
         document.querySelectorAll(".ms-popover").forEach(pop => {
+          // Type-to-filter: hide rows whose label doesn't contain the query.
+          const search = pop.querySelector(".ms-search");
+          if (search) {
+            search.addEventListener("input", () => applyMsSearch(pop));
+            // Prevent the outer document click from treating Enter-in-search
+            // as a button click that would toggle the popover closed.
+            search.addEventListener("keydown", (e) => {
+              if (e.key === "Escape") {
+                if (search.value) { search.value = ""; applyMsSearch(pop); }
+                else              { pop.classList.add("hidden"); pop.closest(".ms-wrap").querySelector(".ms-button").setAttribute("aria-expanded", "false"); }
+              }
+            });
+          }
+
+          // "Select all" / "Clear" operate on the currently VISIBLE options
+          // so filtering + bulk toggle chain usefully. Hidden-by-search rows
+          // keep whatever state they had.
           pop.addEventListener("click", (e) => {
             const link = e.target.closest(".ms-link");
             if (!link) return;
             const wrap = pop.closest(".ms-wrap");
             const kind = wrap.dataset.filter; // "accounts" | "companies"
-            const boxes = pop.querySelectorAll('input[type="checkbox"]');
-            if (link.dataset.msAction === "all") {
-              boxes.forEach(b => b.checked = true);
-            } else {
-              boxes.forEach(b => b.checked = false);
-            }
+            pop.querySelectorAll(".ms-option").forEach(opt => {
+              if (opt.classList.contains("ms-hidden")) return;
+              const box = opt.querySelector('input[type="checkbox"]');
+              if (!box) return;
+              box.checked = (link.dataset.msAction === "all");
+            });
             if (kind === "accounts") onAccountMsChange();
             else                     onCompanyMsChange();
           });
