@@ -61,6 +61,7 @@
             <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
             <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
             <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+            <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
             <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
           </div>
         </div>
@@ -110,6 +111,7 @@
               <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
               <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
               <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
               <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
             </div>
             <input id="pr-search" class="pr-search" type="search"
@@ -2313,6 +2315,11 @@
 
       function cutoffFor(tf) {
         if (tf === 'all') return null;
+        // "This Year" → Jan 1 local time → UTC ISO. Mirrors dashboard.html
+        // effectiveRange() for consistency across the two views.
+        if (tf === 'yr') {
+          return new Date(new Date().getFullYear(), 0, 1).toISOString();
+        }
         const days = { '1w':7, '2w':14, '3w':21, '1m':30, '2m':60, '3m':90 }[tf];
         if (!days) return null;
         const d = new Date();

@@ -93,7 +93,12 @@
         <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
         <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
         <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
-        <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+        <!-- "This Year" (Jan 1 of current year → today) is the default.
+             Cuts dashboard load from the full outreach history down to
+             the current year — the dominant cost when an org accumulates
+             multi-year data. All Time is still one click away. -->
+        <button class="timeframe-pill active" data-tf="yr" type="button">This Year</button>
+        <button class="timeframe-pill" data-tf="all" type="button">All Time</button>
       </div>
     </div>
 
@@ -194,6 +199,7 @@
       const LS_SEL_COS   = "dashboard_sel_cos";
       const LS_SORT_VER  = "dashboard_sort_version";
       const LS_SHOW_ARCH = "dashboard_show_archived";
+      const LS_TF_VER    = "dashboard_tf_version";
 
       // v2: default sort changed from connections desc → startDate desc
       // (empties first, then newest start date). Bumping this key wipes
@@ -206,7 +212,25 @@
         localStorage.setItem(LS_SORT_VER, SORT_VERSION);
       }
 
-      let tf         = localStorage.getItem(LS_TF)     || "all";
+      // v1: "This Year" added as the new default timeframe. Anyone still
+      // sitting on the old default ("all") gets bumped to "yr" once so
+      // existing operators — Austin included — see the faster bounded
+      // query on next load without having to click. Explicit picks of
+      // any specific sub-timeframe ("3m", "1w", …) are preserved.
+      //
+      // Can't distinguish "user explicitly chose All Time" from "user
+      // accepted the default of All Time" in localStorage, so we treat
+      // both as the default and migrate. Anyone who really wants All
+      // Time is one click away from it.
+      const TF_VERSION = "1";
+      if (localStorage.getItem(LS_TF_VER) !== TF_VERSION) {
+        if ((localStorage.getItem(LS_TF) || "all") === "all") {
+          localStorage.setItem(LS_TF, "yr");
+        }
+        localStorage.setItem(LS_TF_VER, TF_VERSION);
+      }
+
+      let tf         = localStorage.getItem(LS_TF)     || "yr";
       let statusVal  = localStorage.getItem(LS_STATUS) || "all";
       let dateFrom   = localStorage.getItem(LS_FROM)   || "";
       let dateTo     = localStorage.getItem(LS_TO)     || "";
@@ -1171,6 +1195,13 @@
           return [since, until];
         }
         if (tf === "all" || tf === "custom") return [null, null];
+        // "This Year" is Jan 1 of the current year in the operator's local
+        // time, converted to UTC ISO for the query. Matches the custom-range
+        // convention (local-time input → UTC ISO output).
+        if (tf === "yr") {
+          const jan1 = new Date(new Date().getFullYear(), 0, 1);
+          return [jan1.toISOString(), null];
+        }
         const days = { '1w':7, '2w':14, '3w':21, '1m':30, '2m':60, '3m':90 }[tf];
         if (!days) return [null, null];
         const d = new Date();
