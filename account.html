@@ -1968,6 +1968,7 @@
             days[idx] = el.value === "" ? null : parseInt(el.value, 10);
             setDirty(true);
           } else if (el.classList.contains("cad-step-template")) {
+            autoGrow(el);
             templates[idx] = el.value;
             setDirty(true);
           }
@@ -2055,6 +2056,9 @@
                         placeholder="Hi {{first_name}}, …">${esc(templates[i] || "")}</textarea>
             </div>
           `).join("");
+          // Fit each step's height to its content. selectTab un-hid the panel
+          // before initCadence ran, so scrollHeight is meaningful here.
+          autoGrowAll(stepsEl, ".cad-step-template");
         }
       }
 
@@ -2129,6 +2133,7 @@
             items[idx].name = el.value;
             setDirty(true);
           } else if (el.classList.contains("tmpl-body-d")) {
+            autoGrow(el);
             items[idx].body = el.value;
             setDirty(true);
           }
@@ -2203,6 +2208,9 @@
           addBtn.textContent = items.length >= MAX
             ? `+ Add template (${MAX} max)`
             : `+ Add template`;
+          // Fit each template's body to its content. selectTab un-hid the
+          // panel before initTemplates ran, so scrollHeight is meaningful.
+          autoGrowAll(listEl, ".tmpl-body-d");
         }
       }
 
@@ -2219,9 +2227,13 @@
         textEl.value = typeof client.reply_instructions === "string"
           ? client.reply_instructions
           : "";
+        // Panel was un-hid by selectTab before init ran — scrollHeight is
+        // meaningful, so autoGrow fits the loaded text on first paint.
+        autoGrow(textEl);
         let dirty = false;
 
         textEl.addEventListener("input", () => {
+          autoGrow(textEl);
           dirty = true;
           saveBtn.disabled = false;
           feedbackEl.textContent = "";
@@ -2246,6 +2258,7 @@
             );
             client.reply_instructions = text === "" ? null : text;
             textEl.value = text;
+            autoGrow(textEl);
             dirty = false;
             saveBtn.disabled = true;
             feedbackEl.className = "cad-feedback ok";
@@ -2288,6 +2301,25 @@
         return String(s ?? "").replace(/[&<>"']/g, c =>
           ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
         );
+      }
+
+      // Size a textarea to its content. min-height / max-height in app.css
+      // bound the range — below min, the textarea stays at min; above max,
+      // scroll kicks in. Called on input, on initial render, and whenever
+      // a tab becomes visible.
+      //
+      // NOTE: requires the textarea (and every ancestor) to be visible —
+      // elements inside a `.hidden` panel have scrollHeight === 0 and we'd
+      // collapse them. Callers ensure the panel is visible first.
+      function autoGrow(ta) {
+        if (!ta) return;
+        ta.style.height = "auto";
+        ta.style.height = ta.scrollHeight + "px";
+      }
+
+      function autoGrowAll(root, selector) {
+        if (!root) return;
+        root.querySelectorAll(selector).forEach(autoGrow);
       }
     })();
   </script>

@@ -1162,7 +1162,13 @@ body.login-body {
   background: #fff;
   outline: none;
   resize: vertical;
-  min-height: 64px;
+  /* autoGrow (account.html) sizes height to content; min/max bound the range.
+     min = ~4 lines so an empty step still reads as a message field; max caps
+     around 25 lines before falling back to scroll. */
+  min-height: 84px;
+  max-height: 540px;
+  overflow-y: auto;
+  box-sizing: border-box;
   transition: border-color .15s;
 }
 .cad-step-template:focus { border-color: var(--navy); }
@@ -1309,7 +1315,12 @@ body.login-body {
   color: var(--navy);
   outline: none;
   resize: vertical;
-  min-height: 72px;
+  /* autoGrow (account.html) sizes height to content; min/max bound the range.
+     min = ~6 lines so a lengthy message is visible at a glance even when
+     loaded; max caps around 30 lines before we fall back to scroll. */
+  min-height: 124px;
+  max-height: 620px;
+  overflow-y: auto;
   background: #fff;
   box-sizing: border-box;
 }
@@ -1328,7 +1339,13 @@ body.login-body {
   color: var(--navy);
   outline: none;
   resize: vertical;
-  min-height: 180px;
+  /* autoGrow (account.html) sizes height to content; min/max bound the range.
+     Austin wants to see a "whole sheet of paper" if needed — max ≈ 44 lines
+     (~900px) fits well more than a letter page of typed instructions before
+     scroll kicks in. min = ~13 lines so the field always feels substantial. */
+  min-height: 260px;
+  max-height: 900px;
+  overflow-y: auto;
   background: #fff;
   box-sizing: border-box;
   margin-bottom: 16px;
