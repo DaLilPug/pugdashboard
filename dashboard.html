@@ -114,6 +114,7 @@
       <div class="section-head">
         <h2>Account performance</h2>
         <span id="client-count" class="section-meta"></span>
+        <button id="add-account-btn" class="btn-add-account" type="button">+ Add new account</button>
       </div>
       <div class="table-wrap">
         <table class="client-table" id="client-table">
@@ -269,6 +270,54 @@
         });
       });
       updateSortCarets();
+
+      // "+ Add new account" → prompt for the name, slug it, POST to clients.
+      // The SECURITY DEFINER trigger on public.clients will insert the
+      // matching operator_client_access row so we can see the new client
+      // immediately. On success we reload; on failure we alert the
+      // Postgres error (usually "slug already taken").
+      const addBtnEl = document.getElementById("add-account-btn");
+      if (addBtnEl) addBtnEl.addEventListener("click", onAddAccount);
+
+      async function onAddAccount() {
+        const raw = window.prompt("New account name:");
+        if (raw == null) return;           // cancelled
+        const name = raw.trim();
+        if (!name) return;                 // empty → bail silently
+
+        // slug = lowercased, non-alphanumerics collapsed to a single dash,
+        // trimmed of leading/trailing dashes. Matches the pattern used by
+        // existing seed rows (e.g. "matt-roush").
+        const slug = name.toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+        if (!slug) {
+          alert("That name didn't produce a usable slug — please include at least one letter or number.");
+          return;
+        }
+
+        addBtnEl.disabled = true;
+        const prevLabel = addBtnEl.textContent;
+        addBtnEl.textContent = "Creating…";
+        try {
+          await sb.sbFetch("/rest/v1/clients", {
+            method:  "POST",
+            body:    JSON.stringify({ name, slug }),
+            headers: { Prefer: "return=minimal" },
+          });
+          await load();
+        } catch (err) {
+          // Uniqueness collisions surface as a Postgres 23505 — translate
+          // the common case to plain English; fall back to raw for the rest.
+          const msg = /duplicate key|23505/i.test(err.message)
+            ? `An account with that slug ("${slug}") already exists. Try a more specific name.`
+            : `Couldn't create account: ${err.message}`;
+          alert(msg);
+        } finally {
+          addBtnEl.disabled = false;
+          addBtnEl.textContent = prevLabel;
+        }
+      }
 
       // Multiselect popovers (Accounts + Companies). Outside-click closes.
       // When opening a popover, focus its search input so the operator can

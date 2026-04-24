@@ -659,6 +659,37 @@ body.login-body {
   color: var(--gray-400);
 }
 
+/* "+ Add new account" button sits in the section header, right-aligned
+   via margin-left:auto so the h2 + count meta stay left. Uses the navy
+   primary vibe — compact pill, Montserrat uppercase like the sign-out
+   button, but filled (not ghost) so it reads as the primary action. */
+.btn-add-account {
+  margin-left: auto;
+  background: var(--navy);
+  border: 1px solid var(--navy);
+  color: #fff;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.btn-add-account:hover:not(:disabled) {
+  background: var(--navy-dark);
+  border-color: var(--navy-dark);
+}
+.btn-add-account:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn-add-account:disabled {
+  opacity: .6;
+  cursor: progress;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
