@@ -13,6 +13,12 @@
 </head>
 <body class="login-body">
 
+  <!--
+    One form, two modes. `?signup=1` or `?email=…` flips into sign-up
+    mode; otherwise the card renders as sign-in. The toggle at the
+    bottom swaps modes in-place without a page reload so the URL
+    params (email pre-fill, in particular) don't get stripped.
+  -->
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
       <img src="assets/logo-white.png" alt="Uptown" />
@@ -22,7 +28,15 @@
       </div>
     </div>
 
-    <div class="login-title">Sign in to continue</div>
+    <div id="login-title" class="login-title">Sign in to continue</div>
+
+    <!-- Hidden in sign-in mode. Name ends up on auth.users.raw_user_meta_data
+         where the handle_new_auth_user trigger reads it into operators.name. -->
+    <div id="name-field" class="login-field" hidden>
+      <label class="login-label" for="name">Full name</label>
+      <input id="name" class="login-input" type="text"
+             autocomplete="name" placeholder="Alex Rivera" />
+    </div>
 
     <div class="login-field">
       <label class="login-label" for="email">Email</label>
@@ -38,34 +52,121 @@
 
     <button id="submit-btn" class="login-submit" type="submit">Sign in</button>
     <div id="error-msg" class="login-error"></div>
+    <div id="info-msg" class="login-info"></div>
+
+    <div class="login-switch">
+      <span id="switch-prompt">New to Uptown?</span>
+      <a id="switch-link" href="#" role="button">Create an account</a>
+    </div>
   </form>
 
   <script src="config.js"></script>
   <script src="supabase-client.js"></script>
   <script>
-    // If the operator is already signed in, skip the form.
-    sb.ensureFreshSession().then(session => {
-      if (session) window.location.replace("dashboard.html");
-    });
+    // If the operator is already signed in, skip the form entirely.
+    // Exception: if they arrived via a signup link (?signup=1 or ?email=),
+    // staying here would be confusing — so we honor signup mode even for
+    // signed-in users and let them re-auth.
+    const initialParams = new URLSearchParams(location.search);
+    const wantsSignup   = initialParams.has("signup")
+                       || initialParams.has("email");
 
-    const form      = document.getElementById("login-form");
-    const emailEl   = document.getElementById("email");
-    const pwEl      = document.getElementById("password");
-    const submitBtn = document.getElementById("submit-btn");
-    const errorEl   = document.getElementById("error-msg");
+    if (!wantsSignup) {
+      sb.ensureFreshSession().then(session => {
+        if (session) window.location.replace("dashboard.html");
+      });
+    }
+
+    const form         = document.getElementById("login-form");
+    const titleEl      = document.getElementById("login-title");
+    const nameFieldEl  = document.getElementById("name-field");
+    const nameEl       = document.getElementById("name");
+    const emailEl      = document.getElementById("email");
+    const pwEl         = document.getElementById("password");
+    const submitBtn    = document.getElementById("submit-btn");
+    const errorEl      = document.getElementById("error-msg");
+    const infoEl       = document.getElementById("info-msg");
+    const switchPromptEl = document.getElementById("switch-prompt");
+    const switchLinkEl   = document.getElementById("switch-link");
+
+    let mode = wantsSignup ? "signup" : "signin";
+
+    // Pre-fill from ?email= (used when an org admin copies a signup
+    // link and hands it to an invitee).
+    const emailFromUrl = initialParams.get("email");
+    if (emailFromUrl) emailEl.value = emailFromUrl;
+
+    applyMode();
+
+    function applyMode() {
+      errorEl.textContent = "";
+      infoEl.textContent  = "";
+      if (mode === "signup") {
+        titleEl.textContent      = "Create your account";
+        nameFieldEl.hidden       = false;
+        nameEl.required          = true;
+        pwEl.setAttribute("autocomplete", "new-password");
+        submitBtn.textContent    = "Create account";
+        switchPromptEl.textContent = "Already have an account?";
+        switchLinkEl.textContent   = "Sign in";
+        document.title           = "Create account — Uptown Dashboard";
+      } else {
+        titleEl.textContent      = "Sign in to continue";
+        nameFieldEl.hidden       = true;
+        nameEl.required          = false;
+        pwEl.setAttribute("autocomplete", "current-password");
+        submitBtn.textContent    = "Sign in";
+        switchPromptEl.textContent = "New to Uptown?";
+        switchLinkEl.textContent   = "Create an account";
+        document.title           = "Sign in — Uptown Dashboard";
+      }
+    }
+
+    switchLinkEl.addEventListener("click", (e) => {
+      e.preventDefault();
+      mode = (mode === "signup") ? "signin" : "signup";
+      applyMode();
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       errorEl.textContent = "";
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Signing in…";
+      infoEl.textContent  = "";
+      submitBtn.disabled  = true;
+      const prevLabel     = submitBtn.textContent;
+      submitBtn.textContent = (mode === "signup") ? "Creating account…" : "Signing in…";
+
       try {
+        if (mode === "signup") {
+          const result = await sb.signUp(
+            emailEl.value.trim(),
+            pwEl.value,
+            { name: nameEl.value.trim() }
+          );
+          if (result.needsConfirmation) {
+            // Confirm-email mode (Supabase project setting). The trigger
+            // chain only fires once the user clicks the confirmation
+            // email, so we can't drop them on the dashboard yet.
+            infoEl.textContent =
+              "Check your inbox to confirm your email, then sign in.";
+            submitBtn.disabled    = false;
+            submitBtn.textContent = prevLabel;
+            return;
+          }
+          // Auto-confirm mode: trigger chain has already created the
+          // operators row and claimed any pending invites. Dashboard is
+          // ready.
+          window.location.replace("dashboard.html");
+          return;
+        }
+
         await sb.signIn(emailEl.value.trim(), pwEl.value);
         window.location.replace("dashboard.html");
       } catch (err) {
-        errorEl.textContent = err.message || "Sign-in failed";
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Sign in";
+        errorEl.textContent   = err.message
+          || ((mode === "signup") ? "Sign-up failed" : "Sign-in failed");
+        submitBtn.disabled    = false;
+        submitBtn.textContent = prevLabel;
       }
     });
   </script>

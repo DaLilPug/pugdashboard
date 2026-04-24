@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team — Uptown</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">
+        <img src="assets/logo-white.png" alt="Uptown" />
+        <div class="header-wordmark">
+          <div class="header-wordmark-top">UPTOWN</div>
+          <div class="header-wordmark-bot">Operator Console</div>
+        </div>
+      </div>
+      <div class="header-pipe"></div>
+      <a href="dashboard.html" class="header-breadcrumb">← Dashboard</a>
+    </div>
+    <div class="header-right">
+      <div id="user-email" class="header-user"></div>
+      <a id="platform-admin-link" href="platform-admin.html" class="btn-platform-admin hidden">Platform admin</a>
+      <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <!-- Drill-in banner: same pattern as dashboard.html. Shown when a
+       platform admin landed here via ?as_org=<uuid> so they can
+       manage another org's team. -->
+  <div id="drill-in-banner" class="drill-in-banner hidden" role="status" aria-live="polite">
+    <span class="drill-in-text">
+      Managing team for <strong id="drill-in-org-name"></strong>
+    </span>
+    <a href="platform-admin.html" class="drill-in-exit">Exit to platform admin</a>
+  </div>
+
+  <div class="account-titlebar">
+    <h1>Team</h1>
+    <div class="account-meta">
+      <span id="team-subtitle">Invite admins and members, revoke access, and assign client visibility.</span>
+    </div>
+  </div>
+
+  <main class="main main-wide">
+
+    <!-- Invite form. Admin types email + role, hits Invite.
+         Response drives one of three UX paths (see invite_member RPC). -->
+    <section class="team-section">
+      <div class="section-head">
+        <h2>Invite someone</h2>
+        <span class="section-meta">They'll get a shareable signup link you can paste into Slack or email.</span>
+      </div>
+      <form id="invite-form" class="invite-form" autocomplete="off">
+        <div class="invite-field">
+          <label class="invite-label" for="invite-email">Email</label>
+          <input id="invite-email" class="invite-input" type="email" required
+                 autocomplete="off" placeholder="teammate@company.com" />
+        </div>
+        <div class="invite-field invite-field-role">
+          <label class="invite-label" for="invite-role">Role</label>
+          <select id="invite-role" class="invite-input">
+            <option value="member" selected>Member — see only assigned accounts</option>
+            <option value="admin">Admin — see everything, manage the team</option>
+          </select>
+        </div>
+        <button id="invite-submit" class="btn-primary invite-submit" type="submit">Invite</button>
+      </form>
+      <div id="invite-result" class="invite-result" aria-live="polite"></div>
+    </section>
+
+    <!-- Members list: who's in the org right now. -->
+    <section class="team-section">
+      <div class="section-head">
+        <h2>Members</h2>
+        <span id="member-count" class="section-meta"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="client-table" id="member-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Added</th>
+              <th class="col-actions" aria-label="Row actions"></th>
+            </tr>
+          </thead>
+          <tbody id="member-tbody">
+            <tr><td colspan="5" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Pending invites: people who were invited but haven't signed up yet. -->
+    <section class="team-section" id="invites-section">
+      <div class="section-head">
+        <h2>Pending invites</h2>
+        <span id="invite-count" class="section-meta"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="client-table" id="invite-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Invited</th>
+              <th class="col-actions" aria-label="Row actions"></th>
+            </tr>
+          </thead>
+          <tbody id="invite-tbody">
+            <tr><td colspan="4" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Client access modal: opens from a member row's "Manage access"
+       button. Shows one checkbox per client in this org; toggling
+       grants or revokes operator_client_access. -->
+  <div id="access-modal" class="access-modal hidden" role="dialog" aria-modal="true" aria-labelledby="access-modal-title">
+    <div class="access-modal-backdrop" data-close="1"></div>
+    <div class="access-modal-card">
+      <div class="access-modal-head">
+        <div>
+          <h3 id="access-modal-title">Client access</h3>
+          <div id="access-modal-sub" class="access-modal-sub"></div>
+        </div>
+        <button type="button" class="access-modal-close" data-close="1" aria-label="Close">×</button>
+      </div>
+      <div id="access-modal-body" class="access-modal-body">
+        <div class="loading">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async function main() {
+      const session = await Auth.requireAuth();
+      Auth.wireSignOut();
+      Auth.wireUserEmail(session);
+
+      // ---- scope resolution -------------------------------------------
+      //
+      // Three ways to end up on this page:
+      //
+      //   (a) Regular org admin → we look up the single org they admin
+      //       and manage that.
+      //   (b) Platform admin with ?as_org=<uuid> → manage that org.
+      //   (c) Platform admin without ?as_org → there's no "my" org to
+      //       default to (they're not necessarily a member of anything).
+      //       Send them to platform-admin.html to pick one.
+      //
+      // Members (non-admins) shouldn't reach this page. If they do
+      // somehow, bounce them back to the dashboard.
+
+      const urlParams    = new URLSearchParams(window.location.search);
+      const requestedOrg = urlParams.get("as_org");
+
+      const isPlatformAdminPromise = Auth.isPlatformAdmin();
+
+      // Reveal platform-admin nav link if applicable.
+      isPlatformAdminPromise.then(isPA => {
+        if (isPA) document.getElementById("platform-admin-link")?.classList.remove("hidden");
+      });
+
+      // Resolve which org we're managing. After this block, `org` is
+      // {id, name, seats_paid} and everything downstream assumes it's set.
+      let org = null;
+
+      if (requestedOrg) {
+        const isPA = await isPlatformAdminPromise;
+        if (!isPA) {
+          alert("Platform admin access is required to manage another organization's team. Opening your own team instead.");
+          window.location.replace("team.html");
+          return;
+        }
+        try {
+          const rows = await sb.sbFetch(
+            `/rest/v1/organizations?select=id,name,seats_paid&id=eq.${encodeURIComponent(requestedOrg)}`
+          );
+          if (!rows || !rows.length) {
+            alert("That organization wasn't found.");
+            window.location.replace("platform-admin.html");
+            return;
+          }
+          org = { id: rows[0].id, name: rows[0].name, seats_paid: rows[0].seats_paid };
+          const banner = document.getElementById("drill-in-banner");
+          const nameEl = document.getElementById("drill-in-org-name");
+          if (banner && nameEl) {
+            nameEl.textContent = org.name;
+            banner.classList.remove("hidden");
+          }
+          document.title = `${org.name} team — Uptown`;
+        } catch (err) {
+          alert(`Couldn't load that organization: ${err.message}`);
+          window.location.replace("platform-admin.html");
+          return;
+        }
+      } else {
+        // Find the org this user admins. If they admin multiple, the
+        // picker is out of scope for slice 1 — fall back to the first
+        // and log a warning; Austin can always drill in as a platform
+        // admin if needed.
+        try {
+          const rows = await sb.sbFetch(
+            "/rest/v1/organization_members?select=role,organizations(id,name,seats_paid)&role=eq.admin"
+          );
+          if (!rows || !rows.length || !rows[0].organizations) {
+            // Not an admin of any org. Platform admins without as_org
+            // get routed to the org list; regular members get punted
+            // back to the dashboard.
+            const isPA = await isPlatformAdminPromise;
+            if (isPA) {
+              window.location.replace("platform-admin.html");
+            } else {
+              alert("You need to be an org admin to manage a team.");
+              window.location.replace("dashboard.html");
+            }
+            return;
+          }
+          if (rows.length > 1) {
+            console.warn(`Operator is admin of ${rows.length} orgs; showing the first. Slice 1 doesn't ship a picker.`);
+          }
+          const o = rows[0].organizations;
+          org = { id: o.id, name: o.name, seats_paid: o.seats_paid };
+          document.title = `Team — ${org.name}`;
+        } catch (err) {
+          alert(`Couldn't look up your organization: ${err.message}`);
+          window.location.replace("dashboard.html");
+          return;
+        }
+      }
+
+      document.getElementById("team-subtitle").textContent =
+        `Managing team for ${org.name}. Invite admins and members, revoke access, and assign client visibility.`;
+
+      // ---- state -------------------------------------------------------
+      //
+      // Kept as module-level so the access modal can look up who it was
+      // opened for without a re-fetch.
+
+      let members = [];  // [{ operator_id, name, email, role, added_at }]
+      let invites = [];  // [{ id, email, role, invited_at }]
+      let clients = [];  // [{ id, name }] — this org's clients
+      let accessMap = new Map();  // operator_id → Set<client_id>
+      const me = session.user?.id;
+
+      // ---- wiring ------------------------------------------------------
+
+      document.getElementById("invite-form")
+        .addEventListener("submit", onInviteSubmit);
+
+      document.getElementById("access-modal")
+        .addEventListener("click", (e) => {
+          if (e.target.dataset.close === "1") closeAccessModal();
+        });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeAccessModal();
+      });
+
+      await loadAll();
+
+      // ---- loaders -----------------------------------------------------
+
+      async function loadAll() {
+        await Promise.all([loadMembers(), loadInvites(), loadClientsAndAccess()]);
+      }
+
+      async function loadMembers() {
+        const tb = document.getElementById("member-tbody");
+        tb.innerHTML = `<tr><td colspan="5" class="loading">Loading…</td></tr>`;
+        try {
+          // Embed operator fields via a PostgREST foreign-key expansion
+          // so we can show name + email without a second round-trip.
+          const rows = await sb.sbFetch(
+            `/rest/v1/organization_members?select=role,added_at,operator_id,operators(id,name,email)&org_id=eq.${encodeURIComponent(org.id)}&order=added_at.asc`
+          );
+          members = (rows || []).map(r => ({
+            operator_id: r.operator_id,
+            name:        r.operators?.name  || "—",
+            email:       r.operators?.email || "—",
+            role:        r.role,
+            added_at:    r.added_at,
+          }));
+          renderMembers();
+        } catch (err) {
+          tb.innerHTML = `<tr><td colspan="5" class="loading">Couldn't load members: ${esc(err.message)}</td></tr>`;
+        }
+      }
+
+      async function loadInvites() {
+        const tb = document.getElementById("invite-tbody");
+        tb.innerHTML = `<tr><td colspan="4" class="loading">Loading…</td></tr>`;
+        try {
+          const rows = await sb.sbFetch(
+            `/rest/v1/pending_invites?select=id,email,role,invited_at&org_id=eq.${encodeURIComponent(org.id)}&order=invited_at.desc`
+          );
+          invites = rows || [];
+          renderInvites();
+        } catch (err) {
+          tb.innerHTML = `<tr><td colspan="4" class="loading">Couldn't load invites: ${esc(err.message)}</td></tr>`;
+        }
+      }
+
+      async function loadClientsAndAccess() {
+        // Clients in this org, for the access grid.
+        try {
+          clients = await sb.sbFetchAll(
+            `/rest/v1/clients?select=id,name&org_id=eq.${encodeURIComponent(org.id)}&order=name.asc`
+          ) || [];
+        } catch (err) {
+          console.warn("loadClients failed:", err);
+          clients = [];
+        }
+        // All grants to clients in this org. We pre-load once so opening
+        // the modal doesn't hit the network. Rebuilt on every grant/revoke.
+        accessMap = new Map();
+        if (!clients.length) return;
+        const ids = clients.map(c => c.id).join(",");
+        try {
+          const rows = await sb.sbFetchAll(
+            `/rest/v1/operator_client_access?select=operator_id,client_id&client_id=in.(${ids})`
+          ) || [];
+          for (const r of rows) {
+            if (!accessMap.has(r.operator_id)) accessMap.set(r.operator_id, new Set());
+            accessMap.get(r.operator_id).add(r.client_id);
+          }
+        } catch (err) {
+          console.warn("loadAccess failed:", err);
+        }
+      }
+
+      // ---- renderers ---------------------------------------------------
+
+      function renderMembers() {
+        const tb = document.getElementById("member-tbody");
+        const countEl = document.getElementById("member-count");
+        if (!members.length) {
+          tb.innerHTML = `<tr><td colspan="5" class="loading">Nobody here yet.</td></tr>`;
+          countEl.textContent = "";
+          return;
+        }
+        countEl.textContent = `— ${members.length} member${members.length === 1 ? '' : 's'}`;
+        tb.innerHTML = members.map(renderMemberRow).join("");
+        wireMemberRowHandlers();
+      }
+
+      function renderMemberRow(m) {
+        const isSelf = m.operator_id === me;
+        const roleBadge = m.role === "admin"
+          ? `<span class="role-badge role-admin">Admin</span>`
+          : `<span class="role-badge role-member">Member</span>`;
+        const accessBtn = m.role === "member"
+          ? `<button type="button" class="btn-row-action btn-manage-access" data-op="${esc(m.operator_id)}">Manage access</button>`
+          : `<span class="row-action-note" title="Admins see every client in the org automatically.">Sees all</span>`;
+        // Self-rows get the role+remove actions disabled — otherwise an
+        // admin could lock themselves out by demoting or removing themselves.
+        // (Technically the RPC doesn't block it; UI does.)
+        const roleCell = isSelf
+          ? roleBadge + `<span class="row-action-note"> (you)</span>`
+          : `<button type="button" class="role-btn" data-op="${esc(m.operator_id)}" data-role="${esc(m.role)}" title="Click to change role">${roleBadge}</button>`;
+        const removeBtn = isSelf
+          ? ""
+          : `<button type="button" class="btn-row-action btn-row-action-danger btn-remove-member" data-op="${esc(m.operator_id)}" data-name="${esc(m.name)}">Remove</button>`;
+
+        return `
+          <tr data-op="${esc(m.operator_id)}">
+            <td class="client-cell"><span class="client-name">${esc(m.name)}</span></td>
+            <td>${esc(m.email)}</td>
+            <td>${roleCell}</td>
+            <td>${fmtDate(m.added_at)}</td>
+            <td class="col-actions">
+              ${accessBtn}
+              ${removeBtn}
+            </td>
+          </tr>
+        `;
+      }
+
+      function wireMemberRowHandlers() {
+        const tb = document.getElementById("member-tbody");
+        tb.querySelectorAll(".role-btn").forEach(btn => {
+          btn.addEventListener("click", () => onChangeRole(btn.dataset.op, btn.dataset.role));
+        });
+        tb.querySelectorAll(".btn-remove-member").forEach(btn => {
+          btn.addEventListener("click", () => onRemoveMember(btn.dataset.op, btn.dataset.name));
+        });
+        tb.querySelectorAll(".btn-manage-access").forEach(btn => {
+          btn.addEventListener("click", () => openAccessModal(btn.dataset.op));
+        });
+      }
+
+      function renderInvites() {
+        const tb = document.getElementById("invite-tbody");
+        const countEl = document.getElementById("invite-count");
+        if (!invites.length) {
+          tb.innerHTML = `<tr><td colspan="4" class="loading">No pending invites.</td></tr>`;
+          countEl.textContent = "";
+          return;
+        }
+        countEl.textContent = `— ${invites.length} pending`;
+        tb.innerHTML = invites.map(renderInviteRow).join("");
+        wireInviteRowHandlers();
+      }
+
+      function renderInviteRow(inv) {
+        return `
+          <tr data-invite="${esc(inv.id)}">
+            <td>${esc(inv.email)}</td>
+            <td>
+              ${inv.role === "admin"
+                ? `<span class="role-badge role-admin">Admin</span>`
+                : `<span class="role-badge role-member">Member</span>`}
+            </td>
+            <td>${fmtDate(inv.invited_at)}</td>
+            <td class="col-actions">
+              <button type="button" class="btn-row-action btn-copy-link" data-email="${esc(inv.email)}">Copy signup link</button>
+              <button type="button" class="btn-row-action btn-row-action-danger btn-revoke-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}">Revoke</button>
+            </td>
+          </tr>
+        `;
+      }
+
+      function wireInviteRowHandlers() {
+        const tb = document.getElementById("invite-tbody");
+        tb.querySelectorAll(".btn-copy-link").forEach(btn => {
+          btn.addEventListener("click", () => onCopyLink(btn, btn.dataset.email));
+        });
+        tb.querySelectorAll(".btn-revoke-invite").forEach(btn => {
+          btn.addEventListener("click", () => onRevokeInvite(btn.dataset.invite, btn.dataset.email));
+        });
+      }
+
+      // ---- actions -----------------------------------------------------
+
+      async function onInviteSubmit(e) {
+        e.preventDefault();
+        const emailEl  = document.getElementById("invite-email");
+        const roleEl   = document.getElementById("invite-role");
+        const btn      = document.getElementById("invite-submit");
+        const resultEl = document.getElementById("invite-result");
+        resultEl.innerHTML = "";
+
+        const email = emailEl.value.trim();
+        const role  = roleEl.value;
+        if (!email) return;
+
+        btn.disabled = true;
+        const prev = btn.textContent;
+        btn.textContent = "Inviting…";
+        try {
+          const res = await sb.sbFetch("/rest/v1/rpc/invite_member", {
+            method: "POST",
+            body:   JSON.stringify({
+              target_email:  email,
+              target_org_id: org.id,
+              target_role:   role,
+            }),
+          });
+          // PostgREST returns the jsonb result directly.
+          const outcome = res || {};
+          if (outcome.status === "already_member") {
+            resultEl.innerHTML = `<div class="invite-result-info">
+              ${esc(email)} is already a ${esc(outcome.current_role || "member")} of this org. You can change their role in the members list.
+            </div>`;
+          } else if (outcome.status === "added_existing") {
+            resultEl.innerHTML = `<div class="invite-result-ok">
+              ${esc(email)} already had an Uptown account — added as ${esc(outcome.role)}. They'll see the org next time they refresh the dashboard.
+            </div>`;
+            emailEl.value = "";
+            await loadMembers();
+          } else if (outcome.status === "invited_pending") {
+            const link = buildSignupLink(outcome.email || email);
+            resultEl.innerHTML = `
+              <div class="invite-result-ok">
+                Invite ready. Share this link with ${esc(outcome.email || email)}:
+              </div>
+              <div class="invite-link-row">
+                <input type="text" class="invite-link" readonly value="${esc(link)}" />
+                <button type="button" class="btn-primary btn-copy-link-inline">Copy link</button>
+              </div>
+            `;
+            resultEl.querySelector(".btn-copy-link-inline")
+              .addEventListener("click", (ev) => {
+                const input = resultEl.querySelector(".invite-link");
+                input.select();
+                copyText(link, ev.currentTarget);
+              });
+            emailEl.value = "";
+            await loadInvites();
+          } else {
+            resultEl.innerHTML = `<div class="invite-result-info">Invite submitted.</div>`;
+            await loadInvites();
+          }
+        } catch (err) {
+          const m = err.message || "";
+          let msg;
+          if (/insufficient_privilege|Only org admins/i.test(m)) {
+            msg = "You don't have permission to invite members to this org.";
+          } else if (/seats_paid|seat cap|exceeds/i.test(m)) {
+            msg = m;
+          } else {
+            msg = `Couldn't invite: ${m}`;
+          }
+          resultEl.innerHTML = `<div class="invite-result-error">${esc(msg)}</div>`;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = prev;
+        }
+      }
+
+      async function onChangeRole(operatorId, currentRole) {
+        const newRole = currentRole === "admin" ? "member" : "admin";
+        const m = members.find(x => x.operator_id === operatorId);
+        if (!m) return;
+        const verb = newRole === "admin" ? "promote" : "demote";
+        if (!confirm(`${verb === "promote" ? "Promote" : "Demote"} ${m.name} to ${newRole}?`)) return;
+        try {
+          await sb.sbFetch("/rest/v1/rpc/change_member_role", {
+            method: "POST",
+            body:   JSON.stringify({
+              target_org_id:      org.id,
+              target_operator_id: operatorId,
+              new_role:           newRole,
+            }),
+          });
+          await loadMembers();
+        } catch (err) {
+          alert(`Couldn't change role: ${err.message}`);
+        }
+      }
+
+      async function onRemoveMember(operatorId, name) {
+        if (!confirm(`Remove ${name} from ${org.name}? They'll lose access to every account in this org.`)) return;
+        try {
+          await sb.sbFetch("/rest/v1/rpc/remove_member", {
+            method: "POST",
+            body:   JSON.stringify({
+              target_org_id:      org.id,
+              target_operator_id: operatorId,
+            }),
+          });
+          // Access map entry is stale now — drop it.
+          accessMap.delete(operatorId);
+          await loadMembers();
+        } catch (err) {
+          alert(`Couldn't remove: ${err.message}`);
+        }
+      }
+
+      async function onRevokeInvite(inviteId, email) {
+        if (!confirm(`Revoke the invite for ${email}?`)) return;
+        try {
+          await sb.sbFetch("/rest/v1/rpc/revoke_invite", {
+            method: "POST",
+            body:   JSON.stringify({ invite_id: inviteId }),
+          });
+          await loadInvites();
+        } catch (err) {
+          alert(`Couldn't revoke: ${err.message}`);
+        }
+      }
+
+      function onCopyLink(btn, email) {
+        const link = buildSignupLink(email);
+        copyText(link, btn);
+      }
+
+      function buildSignupLink(email) {
+        const base = `${location.origin}${location.pathname.replace(/team\.html$/, "")}login.html`;
+        return `${base}?signup=1&email=${encodeURIComponent(email)}`;
+      }
+
+      // ---- access modal ------------------------------------------------
+
+      function openAccessModal(operatorId) {
+        const m = members.find(x => x.operator_id === operatorId);
+        if (!m) return;
+        const modal = document.getElementById("access-modal");
+        const sub   = document.getElementById("access-modal-sub");
+        const body  = document.getElementById("access-modal-body");
+        sub.textContent = `${m.name} · ${m.email}`;
+        modal.dataset.op = operatorId;
+
+        if (!clients.length) {
+          body.innerHTML = `<div class="loading">This org doesn't have any accounts yet. Add accounts from the dashboard first, then come back here to assign access.</div>`;
+        } else {
+          const granted = accessMap.get(operatorId) || new Set();
+          body.innerHTML = `
+            <div class="access-grid-head">
+              Check the accounts ${esc(m.name)} should be able to see. Changes save immediately.
+            </div>
+            <ul class="access-grid-list">
+              ${clients.map(c => `
+                <li class="access-grid-row">
+                  <label class="access-grid-label">
+                    <input type="checkbox" class="access-grid-check"
+                           data-client="${esc(c.id)}"
+                           ${granted.has(c.id) ? "checked" : ""} />
+                    <span>${esc(c.name)}</span>
+                  </label>
+                  <span class="access-grid-status" data-status-for="${esc(c.id)}"></span>
+                </li>
+              `).join("")}
+            </ul>
+          `;
+          body.querySelectorAll(".access-grid-check").forEach(cb => {
+            cb.addEventListener("change", () => onToggleAccess(operatorId, cb));
+          });
+        }
+        modal.classList.remove("hidden");
+      }
+
+      function closeAccessModal() {
+        const modal = document.getElementById("access-modal");
+        modal.classList.add("hidden");
+        delete modal.dataset.op;
+      }
+
+      async function onToggleAccess(operatorId, cb) {
+        const clientId = cb.dataset.client;
+        const wantGrant = cb.checked;
+        const statusEl = document.querySelector(`[data-status-for="${CSS.escape(clientId)}"]`);
+        cb.disabled = true;
+        if (statusEl) statusEl.textContent = "Saving…";
+        try {
+          if (wantGrant) {
+            await sb.sbFetch("/rest/v1/rpc/grant_client_access", {
+              method: "POST",
+              body:   JSON.stringify({
+                target_client_id:   clientId,
+                target_operator_id: operatorId,
+              }),
+            });
+            if (!accessMap.has(operatorId)) accessMap.set(operatorId, new Set());
+            accessMap.get(operatorId).add(clientId);
+          } else {
+            await sb.sbFetch("/rest/v1/rpc/revoke_client_access", {
+              method: "POST",
+              body:   JSON.stringify({
+                target_client_id:   clientId,
+                target_operator_id: operatorId,
+              }),
+            });
+            accessMap.get(operatorId)?.delete(clientId);
+          }
+          if (statusEl) {
+            statusEl.textContent = "Saved";
+            setTimeout(() => { if (statusEl.textContent === "Saved") statusEl.textContent = ""; }, 1500);
+          }
+        } catch (err) {
+          cb.checked = !wantGrant;  // roll back the UI state
+          if (statusEl) statusEl.textContent = "";
+          alert(`Couldn't update access: ${err.message}`);
+        } finally {
+          cb.disabled = false;
+        }
+      }
+
+      // ---- clipboard ---------------------------------------------------
+
+      async function copyText(text, btn) {
+        const orig = btn ? btn.textContent : null;
+        try {
+          await navigator.clipboard.writeText(text);
+          if (btn) {
+            btn.textContent = "Copied!";
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+          }
+        } catch (_) {
+          // Fallback: select a temporary textarea so the user can Ctrl-C.
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity  = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand("copy"); } catch (_) {}
+          document.body.removeChild(ta);
+          if (btn) {
+            btn.textContent = "Copied!";
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+          }
+        }
+      }
+
+      // ---- formatters --------------------------------------------------
+
+      function fmtDate(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return esc(String(iso));
+        return d.toLocaleDateString(undefined, {
+          year: "numeric", month: "short", day: "numeric",
+        });
+      }
+
+      function esc(s) {
+        return String(s ?? "").replace(/[&<>"']/g, c =>
+          ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
+        );
+      }
+    })();
+  </script>
+</body>
+</html>

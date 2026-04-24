@@ -2548,3 +2548,317 @@ body.login-body {
 #org-table tbody tr { cursor: default; }
 #org-table tbody tr:hover { background: transparent; }
 #org-table tbody tr:hover td.editable-seats .editable-value { background: var(--navy-light); }
+
+/* ---------- Team nav link ---------- */
+/* Matches the Platform admin pill so the header-right cluster reads
+   as one group of utility nav. Same palette; same reveal pattern
+   (hidden by default, revealed at runtime by JS). */
+.btn-team-link {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.85);
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn-team-link:hover {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.24);
+  color: #fff;
+}
+
+/* ---------- Login: signup-mode switcher ---------- */
+/* Small prompt + link at the bottom of the login card that flips
+   between "Sign in" and "Create account" modes without a reload. */
+.login-switch {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--gray-400);
+}
+.login-switch a {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 4px;
+}
+.login-switch a:hover { text-decoration: underline; }
+
+/* Info-style message for the "check your inbox" confirm-email flow.
+   Distinct from .login-error (red) so a success-ish state doesn't
+   shout at the user. */
+.login-info {
+  color: var(--navy);
+  font-size: 12px;
+  min-height: 16px;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ---------- Team page ---------- */
+/* Stack of sections on team.html. Mirrors .table-section spacing but
+   gives the invite form its own visual block above the table stack. */
+.team-section {
+  margin-top: 28px;
+}
+.team-section:first-of-type { margin-top: 12px; }
+
+/* Invite form — email + role + submit on one row, wrapping on narrow
+   viewports. Kept inline (not modal) because invite is the highest-
+   frequency action on this page and shouldn't be hidden behind a click. */
+.invite-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+.invite-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.invite-field-role { flex: 0 1 280px; }
+.invite-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin-bottom: 6px;
+}
+.invite-input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  background: #fff;
+  color: var(--navy-dark);
+  transition: border-color .15s, box-shadow .15s;
+}
+.invite-input:focus {
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px var(--navy-light);
+}
+.invite-submit {
+  height: 38px;
+  padding: 0 22px;
+  white-space: nowrap;
+}
+
+/* Invite result surface: rendered below the form after a submit.
+   Three visual states (ok / info / error) matching the three outcomes
+   of invite_member. */
+.invite-result {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.invite-result-ok {
+  background: #e8f5ea;
+  color: #1f5a2e;
+  border: 1px solid #bce0c4;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+.invite-result-info {
+  background: var(--navy-light);
+  color: var(--navy-dark);
+  border: 1px solid rgba(0,45,90,.12);
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+.invite-result-error {
+  background: #fdecec;
+  color: #7b1414;
+  border: 1px solid #f3c2c2;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+/* The copyable signup-link row. Monospaced input so URLs don't get
+   ligature-ed, plus a button hugging its right edge. */
+.invite-link-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: stretch;
+}
+.invite-link {
+  flex: 1 1 auto;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--navy-dark);
+  background: #fff;
+}
+.invite-link:focus { outline: 2px solid var(--navy); outline-offset: -1px; }
+
+/* Role badges on member + invite rows. Admins get the primary navy
+   color; members get a neutral gray so the table reads calmly. */
+.role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.role-badge.role-admin  { background: var(--navy); color: #fff; }
+.role-badge.role-member { background: var(--gray-100); color: var(--gray-600); }
+/* The role cell is a button for easy toggle; strip native chrome
+   so it looks like a plain badge until hovered. */
+.role-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 2px 2px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.role-btn:hover { border-color: var(--gray-200); background: var(--surface-2); }
+.row-action-note {
+  color: var(--gray-400);
+  font-size: 11px;
+  font-style: italic;
+  margin-left: 6px;
+}
+
+/* Destructive row action (Remove, Revoke). Same shape as .btn-row-action
+   but the hover tints red so the admin knows what they're about to do. */
+.btn-row-action.btn-row-action-danger:hover:not(:disabled) {
+  color: #b01818;
+  border-color: #d88888;
+  background: #fdecec;
+}
+
+/* Team tables: unset the cursor:pointer that .client-table tbody tr
+   inherits from the dashboard, because team rows aren't row-clickable. */
+#member-table tbody tr,
+#invite-table tbody tr { cursor: default; }
+#member-table tbody tr:hover,
+#invite-table tbody tr:hover { background: transparent; }
+
+/* ---------- Team: client access modal ---------- */
+/* Opens from the "Manage access" button on a non-admin member row.
+   Backdrop + centered card; closed by clicking the backdrop, the ×,
+   or pressing Escape. */
+.access-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.access-modal.hidden { display: none; }
+.access-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 20, 35, .45);
+}
+.access-modal-card {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(10, 20, 35, .25);
+  width: 100%;
+  max-width: 520px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.access-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.access-modal-head h3 {
+  margin: 0 0 2px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy-dark);
+}
+.access-modal-sub {
+  font-size: 12px;
+  color: var(--gray-400);
+}
+.access-modal-close {
+  background: transparent;
+  border: none;
+  color: var(--gray-400);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.access-modal-close:hover { background: var(--surface-2); color: var(--navy-dark); }
+.access-modal-body {
+  padding: 14px 22px 20px;
+  overflow-y: auto;
+}
+.access-grid-head {
+  font-size: 12px;
+  color: var(--gray-600);
+  margin-bottom: 10px;
+}
+.access-grid-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--gray-100);
+}
+.access-grid-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.access-grid-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--navy-dark);
+  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.access-grid-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+.access-grid-status {
+  font-size: 11px;
+  color: var(--gray-400);
+  font-style: italic;
+  white-space: nowrap;
+  margin-left: 10px;
+}

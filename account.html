@@ -29,6 +29,10 @@
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
+      <!-- Team nav: shown for org admins + platform admins. Mirrors
+           the reveal logic in dashboard.html so team management stays
+           one click away from any account page. -->
+      <a id="team-link" href="team.html" class="btn-team-link hidden">Team</a>
       <!-- Platform admin nav: hidden by default; revealed via JS when
            isPlatformAdmin() returns true. Mirrors dashboard.html so a
            platform admin on an account drill-down can jump back to
@@ -239,9 +243,35 @@
 
       // Reveal the Platform admin nav link for platform admins. Same
       // pattern as dashboard.html — probe async, don't block rendering.
-      Auth.isPlatformAdmin().then(isPA => {
+      const isPlatformAdminPromise = Auth.isPlatformAdmin();
+      isPlatformAdminPromise.then(isPA => {
         if (isPA) document.getElementById("platform-admin-link")?.classList.remove("hidden");
       });
+
+      // Reveal the Team nav link for org admins / platform admins.
+      // Mirrors dashboard.html. The link doesn't carry an as_org param
+      // here because the account page is already scoped to a single
+      // client — team.html will find the admin's org on its own.
+      (async () => {
+        const link = document.getElementById("team-link");
+        if (!link) return;
+        try {
+          const rows = await sb.sbFetch(
+            "/rest/v1/organization_members?select=role&role=eq.admin&limit=1"
+          );
+          if (rows && rows.length) {
+            link.classList.remove("hidden");
+            return;
+          }
+          const isPA = await isPlatformAdminPromise;
+          if (isPA) {
+            link.href = "platform-admin.html";
+            link.classList.remove("hidden");
+          }
+        } catch (err) {
+          console.warn("team-link reveal probe failed:", err);
+        }
+      })();
 
       const clientId = new URLSearchParams(window.location.search).get("id");
       if (!clientId) {

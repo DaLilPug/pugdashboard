@@ -58,6 +58,58 @@
     return session;
   }
 
+  // Create a new Supabase auth account from login.html's signup mode.
+  //
+  // On success Supabase returns one of two shapes, depending on the
+  // project's "Confirm email" setting:
+  //
+  //   - Confirm email OFF: response includes access_token + refresh_token
+  //     and we can drop the user straight onto the dashboard. This is
+  //     what we want for Phase C slice 1 (no email infrastructure yet).
+  //
+  //   - Confirm email ON: response has user but no tokens, and the
+  //     session field is null until the user clicks the email link.
+  //     We return { session: null } so the caller can show a
+  //     "check your inbox" message instead of redirecting.
+  //
+  // options.name → stored on auth.users.raw_user_meta_data.name, where
+  // the handle_new_auth_user trigger picks it up as the operators.name.
+  async function signUp(email, password, options = {}) {
+    const body = { email, password };
+    if (options.name) {
+      body.data = { name: options.name };
+    }
+    const res = await fetch(`${URL_BASE}/auth/v1/signup`, {
+      method: "POST",
+      headers: {
+        apikey:         ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(
+        data.error_description || data.msg || data.error || "Sign-up failed"
+      );
+    }
+    // Newer GoTrue nests tokens under `session`; older versions return
+    // them at the top level. Handle both.
+    const tokenSource = data.session || data;
+    if (tokenSource.access_token && tokenSource.refresh_token) {
+      const session = {
+        access_token:  tokenSource.access_token,
+        refresh_token: tokenSource.refresh_token,
+        user:          data.user || tokenSource.user,
+        expires_at:    Date.now() + ((tokenSource.expires_in || 3600) * 1000),
+      };
+      setSession(session);
+      return { session, needsConfirmation: false };
+    }
+    // Confirm-email mode — no session yet.
+    return { session: null, needsConfirmation: true, user: data.user };
+  }
+
   async function refreshSession() {
     const current = getSession();
     if (!current?.refresh_token) throw new Error("No refresh token");
@@ -218,6 +270,7 @@
 
   window.sb = {
     signIn,
+    signUp,
     signOut,
     getSession,
     refreshSession,

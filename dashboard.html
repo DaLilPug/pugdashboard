@@ -27,6 +27,11 @@
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
+      <!-- Team nav: hidden by default; revealed below for users who
+           are admin of at least one org (or platform admins). Drill-in
+           mode for platform admins carries the as_org param through so
+           team.html lands on the same org they're viewing. -->
+      <a id="team-link" href="team.html" class="btn-team-link hidden">Team</a>
       <!-- Platform admin nav: hidden by default; revealed via JS when
            isPlatformAdmin() returns true. Keeps the link invisible
            (and the list of orgs private) for regular customer admins. -->
@@ -258,6 +263,41 @@
           document.getElementById("platform-admin-link")?.classList.remove("hidden");
         }
       });
+
+      // Reveal the Team nav link for anyone who can actually use it.
+      // Visibility rule: user admins ≥1 org, OR user is a platform admin
+      // in drill-in mode (they admin the target org by definition).
+      // Runs in the background; don't await. If the probe fails the link
+      // just stays hidden, which is the safe default.
+      (async () => {
+        const link = document.getElementById("team-link");
+        if (!link) return;
+        try {
+          // Carry the drill-in context through so "Team" stays scoped
+          // to the org the platform admin is currently viewing.
+          if (drillInOrg) {
+            link.href = `team.html?as_org=${encodeURIComponent(drillInOrg.id)}`;
+            link.classList.remove("hidden");
+            return;
+          }
+          const rows = await sb.sbFetch(
+            "/rest/v1/organization_members?select=role&role=eq.admin&limit=1"
+          );
+          if (rows && rows.length) {
+            link.classList.remove("hidden");
+            return;
+          }
+          // Non-admin of any org but still a platform admin → route to
+          // the org picker instead of team.html (nothing to default to).
+          const isPA = await isPlatformAdminPromise;
+          if (isPA) {
+            link.href = "platform-admin.html";
+            link.classList.remove("hidden");
+          }
+        } catch (err) {
+          console.warn("team-link reveal probe failed:", err);
+        }
+      })();
 
       const pillsEl    = document.getElementById("timeframe-pills");
       const dateFromEl = document.getElementById("date-from");
@@ -602,12 +642,25 @@
         // showArchived is on we drop that filter so archived rows
         // reappear (rendered greyed-out with an Unarchive action).
         const archivedFilter = showArchived ? "" : "&archived_at=is.null";
-        // In drill-in mode, scope the clients query to the target org.
-        // Server-side RLS lets a platform admin SELECT every client, so
-        // without this filter the drill-in view would leak clients from
-        // other tenants into this org's dashboard.
-        const orgFilter = drillInOrg
-          ? `&org_id=eq.${encodeURIComponent(drillInOrg.id)}`
+        // Scope the clients query to an org:
+        //   drill-in mode  → the target org (?as_org=<id>)
+        //   non-drill-in   → the signed-in user's own org (if they're
+        //                    admin of one; otherwise fall through to
+        //                    the RLS-only path)
+        //
+        // Why scope when drillInOrg is null? For platform admins, RLS
+        // lets them SELECT every client in every tenant — without the
+        // filter the main dashboard would silently mix Austin's own
+        // clients with every customer's once multi-tenant launches.
+        // Cross-tenant visibility stays available via platform-admin.html.
+        //
+        // For regular org admins the filter is redundant with RLS (same
+        // rows come back either way). For non-admin members, getUserOrg
+        // returns null and we fall through to no filter — RLS already
+        // scopes them to their operator_client_access grants.
+        const scopeOrg = drillInOrg || await getUserOrg();
+        const orgFilter = scopeOrg
+          ? `&org_id=eq.${encodeURIComponent(scopeOrg.id)}`
           : "";
         try {
           clientsCache = await sb.sbFetch(
@@ -659,12 +712,19 @@
         const parts = [];
         if (since) parts.push(`occurred_at=gte.${encodeURIComponent(since)}`);
         if (until) parts.push(`occurred_at=lte.${encodeURIComponent(until)}`);
-        // In drill-in mode, scope outreach to this org's clients.
+        // Scope outreach to whichever org is active:
+        //   drill-in mode           → the target org's clients
+        //   platform admin, no d-i  → their own org's clients
+        //   regular admin / member  → their own org's clients
+        //
         // RLS lets a platform admin read every outreach row in the
-        // system, so without this filter the drill-in view would pull
-        // megabytes of unrelated data just for the JS KPI strip to
-        // ignore it. UUIDs are URL-safe characters so no encoding.
-        if (drillInOrg) {
+        // system, so without this filter the main + drill-in views
+        // would pull megabytes of unrelated data just for the JS KPI
+        // strip to ignore it. UUIDs are URL-safe characters so no
+        // encoding. clientsCache was already scoped to the active org
+        // by the clients query above, so we piggy-back on it here.
+        const outreachScopeOrg = drillInOrg || await getUserOrg();
+        if (outreachScopeOrg) {
           if (clientsCache.length === 0) {
             // Empty org — no outreach is possible. Render an empty
             // state and skip the network call entirely.
