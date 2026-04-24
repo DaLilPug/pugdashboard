@@ -165,7 +165,7 @@
           <h2>Templates</h2>
           <p class="page-sub">
             Reusable messages for initial outreach and retargeting — distinct from the cadence follow-up sequence.
-            Up to 10. Supports <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
+            Up to 10. Use Copy to paste into LinkedIn.
           </p>
         </div>
         <div id="tmpl-list" class="tmpl-list-d">
@@ -2195,7 +2195,7 @@
                   <button type="button" class="tmpl-remove-d" data-idx="${i}" title="Remove template">×</button>
                 </div>
                 <textarea class="tmpl-body-d" rows="3" data-idx="${i}"
-                          placeholder="Hey {{first_name}}, ...">${esc(t.body || "")}</textarea>
+                          placeholder="Template message body…">${esc(t.body || "")}</textarea>
               </div>
             `).join("");
           }
