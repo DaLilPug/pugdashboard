@@ -2757,6 +2757,38 @@ body.login-body {
 #member-table tbody tr:hover,
 #invite-table tbody tr:hover { background: transparent; }
 
+/* Explanatory copy that sits between a section head and its table.
+   Used on team.html to spell out the admin/member access rule so
+   the "Manage access" button doesn't feel mysteriously absent on
+   admin rows. */
+.section-blurb {
+  margin: 8px 0 12px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--gray-100);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-600);
+}
+.section-blurb strong { color: var(--navy-dark); }
+.section-blurb em { font-style: italic; color: var(--navy); }
+
+/* Footnote that sits UNDER a section's table. Used for conditional
+   hints like "everyone on this team is an admin — here's how to
+   narrow visibility". Slightly lighter visual weight than
+   .section-blurb so it doesn't compete with the primary copy. */
+.section-footnote {
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-600);
+  background: transparent;
+  border-left: 3px solid var(--gray-200);
+}
+.section-footnote strong { color: var(--navy-dark); }
+
 /* ---------- Team: client access modal ---------- */
 /* Opens from the "Manage access" button on a non-admin member row.
    Backdrop + centered card; closed by clicking the backdrop, the ×,

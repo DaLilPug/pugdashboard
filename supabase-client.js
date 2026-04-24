@@ -87,11 +87,23 @@
       },
       body: JSON.stringify(body),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(
-        data.error_description || data.msg || data.error || "Sign-up failed"
-      );
+      // Dump the full response into the console so the operator can see
+      // what actually went wrong even if our fallback chain didn't
+      // catch the field name GoTrue used. The message shown to the
+      // user is built from whichever known field is populated; if
+      // none are, we include the HTTP status + error_code so the
+      // signal isn't just "Sign-up failed".
+      console.error("signUp failed:", { status: res.status, body: data });
+      const msg =
+        data.msg ||
+        data.message ||
+        data.error_description ||
+        data.error ||
+        data.error_code ||
+        `Sign-up failed (HTTP ${res.status})`;
+      throw new Error(msg);
     }
     // Newer GoTrue nests tokens under `session`; older versions return
     // them at the top level. Handle both.

@@ -82,6 +82,11 @@
         <h2>Members</h2>
         <span id="member-count" class="section-meta"></span>
       </div>
+      <div class="section-blurb">
+        <strong>Admins</strong> see every account in this organization automatically.
+        <strong>Members</strong> only see accounts you explicitly assign to them — click
+        <em>Manage access</em> on a member's row to pick which accounts they can see.
+      </div>
       <div class="table-wrap">
         <table class="client-table" id="member-table">
           <thead>
@@ -97,6 +102,13 @@
             <tr><td colspan="5" class="loading">Loading…</td></tr>
           </tbody>
         </table>
+      </div>
+      <!-- Shown when everyone on the team is an admin — a common state
+           early on. Reminds Austin that per-account assignment only
+           exists for Member-role users, so he doesn't go hunting for it. -->
+      <div id="all-admins-note" class="section-footnote hidden">
+        Everyone on this team is an admin, so they all see every account automatically.
+        Invite someone as <strong>Member</strong> if you want to restrict their visibility to specific accounts.
       </div>
     </section>
 
@@ -348,14 +360,21 @@
       function renderMembers() {
         const tb = document.getElementById("member-tbody");
         const countEl = document.getElementById("member-count");
+        const noteEl  = document.getElementById("all-admins-note");
         if (!members.length) {
           tb.innerHTML = `<tr><td colspan="5" class="loading">Nobody here yet.</td></tr>`;
           countEl.textContent = "";
+          noteEl?.classList.add("hidden");
           return;
         }
         countEl.textContent = `— ${members.length} member${members.length === 1 ? '' : 's'}`;
         tb.innerHTML = members.map(renderMemberRow).join("");
         wireMemberRowHandlers();
+        // Surface the "everyone's an admin" hint when there are no
+        // member-role rows. Hidden otherwise so we don't nag the admin
+        // on a mixed team.
+        const hasMemberRole = members.some(m => m.role === "member");
+        noteEl?.classList.toggle("hidden", hasMemberRole);
       }
 
       function renderMemberRow(m) {
@@ -365,7 +384,7 @@
           : `<span class="role-badge role-member">Member</span>`;
         const accessBtn = m.role === "member"
           ? `<button type="button" class="btn-row-action btn-manage-access" data-op="${esc(m.operator_id)}">Manage access</button>`
-          : `<span class="row-action-note" title="Admins see every client in the org automatically.">Sees all</span>`;
+          : `<span class="row-action-note" title="Admins see every account in the org automatically. No per-account assignment needed.">Sees all accounts</span>`;
         // Self-rows get the role+remove actions disabled — otherwise an
         // admin could lock themselves out by demoting or removing themselves.
         // (Technically the RPC doesn't block it; UI does.)
