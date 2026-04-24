@@ -2430,3 +2430,121 @@ body.login-body {
   transition: background .15s;
 }
 .client-table td.editable-name.editing { padding: 6px 8px; }
+
+/* ==============================================================
+   Platform admin: nav link + drill-in banner + listing table
+   ============================================================== */
+
+/* Nav link in the dashboard header. Sits between user-email and
+   sign-out, styled as a pill with a translucent white fill to read as
+   a secondary action (sign-out is the primary white-on-dark action).
+   Hidden by default via .hidden; revealed at runtime by JS when the
+   isPlatformAdmin() probe returns true. */
+.btn-platform-admin {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.85);
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn-platform-admin:hover {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.24);
+  color: #fff;
+}
+
+/* Drill-in banner: sits directly below the sticky header on the
+   dashboard when ?as_org=<id> is active. Amber/gold palette to
+   distinguish from red error banners (the extension's no-account
+   banner) and from green success. "You're viewing someone else's
+   data — don't forget it's not yours." is the feeling. */
+.drill-in-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #fff8e1;         /* pale amber */
+  color: #7a5300;
+  border-bottom: 1px solid #f0d79a;
+  padding: 10px 32px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.drill-in-banner strong {
+  color: #5a3b00;
+  font-weight: 700;
+}
+.drill-in-banner .drill-in-exit {
+  color: #5a3b00;
+  text-decoration: underline;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.drill-in-banner .drill-in-exit:hover { color: #3a2600; }
+
+/* Seats-used/paid cell on platform-admin.html. Clickable to edit the
+   cap; the whole cell acts as an editable zone, matching the .editable
+   cells in dashboard.html. */
+.client-table td.editable-seats {
+  cursor: pointer;
+  position: relative;
+}
+.client-table td.editable-seats:hover .editable-value { background: var(--navy-light); }
+.client-table td.editable-seats .editable-value {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background .15s;
+}
+.client-table td.editable-seats.editing {
+  padding: 6px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+.seats-used-prefix {
+  color: var(--gray-400);
+  margin-right: 4px;
+}
+.editable-input-seats {
+  width: 70px;
+  min-width: 0;
+  text-align: right;
+}
+
+/* Colorize the "used / paid" chip when the org is at or near cap, so
+   Austin can scan the listing and spot who's about to run out of
+   seats. Mirrors the .seat-usage chip on the main dashboard. */
+.client-table td.seats-near-cap .seats-used { color: #b46a00; font-weight: 600; }
+.client-table td.seats-at-cap   .seats-used { color: #c01111; font-weight: 700; }
+
+/* "View as org" row-action link. Re-uses .btn-row-action for the
+   pill shape; overrides text-decoration (a tag) and uses the navy
+   palette to signal that this is the primary drill-in action. */
+.btn-row-action.btn-drill-in {
+  text-decoration: none;
+  color: var(--navy);
+  border-color: var(--navy);
+}
+.btn-row-action.btn-drill-in:hover:not(:disabled) {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+
+/* Platform-admin rows aren't click-navigable (no row-level anchor),
+   so unset the cursor:pointer that .client-table tbody tr applies by
+   default. The inline edit cell and "View as org" link set their
+   own cursors (text and pointer respectively). */
+#org-table tbody tr { cursor: default; }
+#org-table tbody tr:hover { background: transparent; }
+#org-table tbody tr:hover td.editable-seats .editable-value { background: var(--navy-light); }

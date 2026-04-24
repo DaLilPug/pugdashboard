@@ -29,6 +29,11 @@
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
+      <!-- Platform admin nav: hidden by default; revealed via JS when
+           isPlatformAdmin() returns true. Mirrors dashboard.html so a
+           platform admin on an account drill-down can jump back to
+           cross-tenant view without bouncing through Dashboard first. -->
+      <a id="platform-admin-link" href="platform-admin.html" class="btn-platform-admin hidden">Platform admin</a>
       <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
     </div>
   </header>
@@ -231,6 +236,12 @@
       const session = await Auth.requireAuth();
       Auth.wireSignOut();
       Auth.wireUserEmail(session);
+
+      // Reveal the Platform admin nav link for platform admins. Same
+      // pattern as dashboard.html — probe async, don't block rendering.
+      Auth.isPlatformAdmin().then(isPA => {
+        if (isPA) document.getElementById("platform-admin-link")?.classList.remove("hidden");
+      });
 
       const clientId = new URLSearchParams(window.location.search).get("id");
       if (!clientId) {

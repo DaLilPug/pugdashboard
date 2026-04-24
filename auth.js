@@ -45,10 +45,40 @@
     if (el && session?.user?.email) el.textContent = session.user.email;
   }
 
+  // Is the signed-in operator a platform admin? Pages call this to
+  // decide whether to render the "Platform admin" nav link and gate
+  // drill-in mode. Cached for the tab's lifetime — platform admin
+  // status doesn't change mid-session in normal use, and a stale
+  // `true` is caught by server-side RLS on every write anyway.
+  //
+  // Implemented as a tiny RPC (see add_platform_admin_rpcs.sql) so
+  // the client doesn't need to parse an empty-rows-from-platform_admins
+  // response as "not an admin".
+  let _platformAdminCache;          // undefined = not resolved
+  async function isPlatformAdmin() {
+    if (_platformAdminCache !== undefined) return _platformAdminCache;
+    try {
+      const res = await sb.sbFetch("/rest/v1/rpc/am_i_platform_admin", {
+        method: "POST",
+        body:   JSON.stringify({}),
+      });
+      // PostgREST returns the scalar directly (true/false).
+      _platformAdminCache = res === true;
+    } catch (err) {
+      // Don't block the page on a probe failure — just treat as
+      // not-an-admin. The nav link stays hidden; if someone tried
+      // to hit platform-admin.html directly, its own guard fires.
+      console.warn("isPlatformAdmin probe failed:", err);
+      _platformAdminCache = false;
+    }
+    return _platformAdminCache;
+  }
+
   window.Auth = {
     requireAuth,
     signOutAndRedirect,
     wireSignOut,
     wireUserEmail,
+    isPlatformAdmin,
   };
 })();

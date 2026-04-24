@@ -27,9 +27,24 @@
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
+      <!-- Platform admin nav: hidden by default; revealed via JS when
+           isPlatformAdmin() returns true. Keeps the link invisible
+           (and the list of orgs private) for regular customer admins. -->
+      <a id="platform-admin-link" href="platform-admin.html" class="btn-platform-admin hidden">Platform admin</a>
       <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
     </div>
   </header>
+
+  <!-- Drill-in banner: only rendered when ?as_org=<id> is in the URL
+       and the caller has platform-admin access. Scoped outside the
+       header so it's non-sticky — scrolls off with the page content.
+       Style lives in app.css (.drill-in-banner). -->
+  <div id="drill-in-banner" class="drill-in-banner hidden" role="status" aria-live="polite">
+    <span class="drill-in-text">
+      Viewing as <strong id="drill-in-org-name"></strong>
+    </span>
+    <a href="platform-admin.html" class="drill-in-exit">Exit to platform admin</a>
+  </div>
 
   <!--
     Filter bar layout: filters on the left (Accounts, Companies, Status),
@@ -172,6 +187,77 @@
       const session = await Auth.requireAuth();
       Auth.wireSignOut();
       Auth.wireUserEmail(session);
+
+      // ---- platform admin plumbing -------------------------------------
+      //
+      // Two related features, both gated on is_platform_admin:
+      //
+      //   1. Nav link to platform-admin.html. Revealed here (post-auth)
+      //      only for admins, so regular customer operators never see
+      //      that it exists.
+      //
+      //   2. Drill-in mode via ?as_org=<uuid>. A platform admin opening
+      //      dashboard.html?as_org=X sees that org's data instead of
+      //      their own. Server-side RLS already lets them read every org;
+      //      the client-side scope ensures the dashboard view matches
+      //      what a member of org X would see, so support can reproduce
+      //      what a customer is actually looking at.
+      //
+      // Platform admins who navigate here without ?as_org continue to
+      // see their own org's data (unchanged behavior).
+
+      const urlParams     = new URLSearchParams(window.location.search);
+      const requestedOrg  = urlParams.get("as_org");
+      let   drillInOrg    = null;  // { id, name, seats_paid } or null when not in drill-in mode
+
+      // Kick off the platform-admin probe early so we don't block the
+      // page on it in the common non-admin path. await'd below before
+      // we act on the result.
+      const isPlatformAdminPromise = Auth.isPlatformAdmin();
+
+      if (requestedOrg) {
+        const isPA = await isPlatformAdminPromise;
+        if (!isPA) {
+          alert("Platform admin access is required to view another organization. Opening your own dashboard instead.");
+          // Strip the param and reload cleanly — anything that depended
+          // on ?as_org would be wrong for a non-admin.
+          window.location.replace("dashboard.html");
+          return;
+        }
+        try {
+          const rows = await sb.sbFetch(
+            `/rest/v1/organizations?select=id,name,seats_paid&id=eq.${encodeURIComponent(requestedOrg)}`
+          );
+          if (!rows || !rows.length) {
+            alert("That organization wasn't found. It may have been deleted.");
+            window.location.replace("platform-admin.html");
+            return;
+          }
+          drillInOrg = { id: rows[0].id, name: rows[0].name, seats_paid: rows[0].seats_paid };
+        } catch (err) {
+          alert(`Couldn't load that organization: ${err.message}`);
+          window.location.replace("platform-admin.html");
+          return;
+        }
+        // Render the banner. The #drill-in-banner element was rendered
+        // hidden in the HTML; we toggle the class and fill in the name.
+        const banner     = document.getElementById("drill-in-banner");
+        const nameEl     = document.getElementById("drill-in-org-name");
+        if (banner && nameEl) {
+          nameEl.textContent = drillInOrg.name;
+          banner.classList.remove("hidden");
+        }
+        // Also update <title> so browser tabs make the drill-in context
+        // obvious at a glance — matters when Austin has 5 support tabs open.
+        document.title = `${drillInOrg.name} (as org) — Uptown`;
+      }
+
+      // Reveal the Platform admin nav link for platform admins.
+      isPlatformAdminPromise.then(isPA => {
+        if (isPA) {
+          document.getElementById("platform-admin-link")?.classList.remove("hidden");
+        }
+      });
 
       const pillsEl    = document.getElementById("timeframe-pills");
       const dateFromEl = document.getElementById("date-from");
@@ -352,6 +438,11 @@
       // so we don't need a second fetch for seats_paid.
       let userOrg = undefined;  // undefined = unresolved, null = resolved-as-none
       async function getUserOrg() {
+        // In drill-in mode, the platform admin is acting AS the target
+        // org — "+ Add new account" should create in that org, the seat
+        // usage chip should show that org's cap, etc. Return the drill-in
+        // org and skip the membership lookup entirely.
+        if (drillInOrg) return drillInOrg;
         if (userOrg !== undefined) return userOrg;
         try {
           const rows = await sb.sbFetch(
@@ -511,9 +602,17 @@
         // showArchived is on we drop that filter so archived rows
         // reappear (rendered greyed-out with an Unarchive action).
         const archivedFilter = showArchived ? "" : "&archived_at=is.null";
+        // In drill-in mode, scope the clients query to the target org.
+        // Server-side RLS lets a platform admin SELECT every client, so
+        // without this filter the drill-in view would leak clients from
+        // other tenants into this org's dashboard.
+        const orgFilter = drillInOrg
+          ? `&org_id=eq.${encodeURIComponent(drillInOrg.id)}`
+          : "";
         try {
           clientsCache = await sb.sbFetch(
             "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at" +
+            orgFilter +
             archivedFilter +
             "&order=name.asc"
           );
@@ -560,6 +659,22 @@
         const parts = [];
         if (since) parts.push(`occurred_at=gte.${encodeURIComponent(since)}`);
         if (until) parts.push(`occurred_at=lte.${encodeURIComponent(until)}`);
+        // In drill-in mode, scope outreach to this org's clients.
+        // RLS lets a platform admin read every outreach row in the
+        // system, so without this filter the drill-in view would pull
+        // megabytes of unrelated data just for the JS KPI strip to
+        // ignore it. UUIDs are URL-safe characters so no encoding.
+        if (drillInOrg) {
+          if (clientsCache.length === 0) {
+            // Empty org — no outreach is possible. Render an empty
+            // state and skip the network call entirely.
+            enrichedCache = [];
+            renderKpiStrip(kpiEl, 0, metricsFor([]));
+            renderTable();
+            return;
+          }
+          parts.push(`client_id=in.(${clientsCache.map(c => c.id).join(',')})`);
+        }
         const qs = parts.length ? `&${parts.join('&')}` : '';
 
         let rows = [];

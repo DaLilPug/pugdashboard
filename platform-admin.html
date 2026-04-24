@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Platform admin — Uptown</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">
+        <img src="assets/logo-white.png" alt="Uptown" />
+        <div class="header-wordmark">
+          <div class="header-wordmark-top">UPTOWN</div>
+          <div class="header-wordmark-bot">Operator Console</div>
+        </div>
+      </div>
+      <div class="header-pipe"></div>
+      <a href="dashboard.html" class="header-breadcrumb">← Dashboard</a>
+    </div>
+    <div class="header-right">
+      <div id="user-email" class="header-user"></div>
+      <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <!--
+    Re-uses the account-titlebar style from account.html for the page
+    heading + subtitle, so platform-admin.html reads as a sibling page
+    rather than a bolt-on. The subtitle copy reminds Austin (and future
+    platform admins) what this view is actually showing.
+  -->
+  <div class="account-titlebar">
+    <h1>Platform admin</h1>
+    <div class="account-meta">Every organization, every seat. Edit seat caps and drill into any tenant.</div>
+  </div>
+
+  <main class="main main-wide">
+    <section class="table-section">
+      <div class="section-head">
+        <h2>Organizations</h2>
+        <span id="org-count" class="section-meta"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="client-table" id="org-table">
+          <thead>
+            <tr>
+              <th>Organization</th>
+              <th>Admin contact</th>
+              <th class="num">Seats used / paid</th>
+              <th class="num">Total clients</th>
+              <th class="num">Outreach</th>
+              <th>Created</th>
+              <th class="col-actions" aria-label="Row actions"></th>
+            </tr>
+          </thead>
+          <tbody id="org-tbody">
+            <tr><td colspan="7" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async function main() {
+      const session = await Auth.requireAuth();
+      Auth.wireSignOut();
+      Auth.wireUserEmail(session);
+
+      const tbodyEl = document.getElementById("org-tbody");
+      const countEl = document.getElementById("org-count");
+      const colspan = 7;
+
+      // Gate the whole page on platform-admin status. Non-admins shouldn't
+      // be on this URL at all, but the RPC still returns zero rows for
+      // them — so without this check they'd see an empty table with no
+      // explanation. Redirect them back to the main dashboard, which is
+      // the view they actually have access to.
+      const isPA = await Auth.isPlatformAdmin();
+      if (!isPA) {
+        // Use replace() so the back button doesn't trap them here.
+        window.location.replace("dashboard.html");
+        return;
+      }
+
+      await load();
+
+      async function load() {
+        tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
+
+        let orgs = [];
+        try {
+          // POST-only RPC — calling it as GET would need the function
+          // annotated IMMUTABLE/STABLE with volatile=stable, which it is
+          // (language sql / stable), but PostgREST still defaults to POST
+          // for function calls that don't have read-only URL semantics
+          // set up, so we stick with POST for predictability.
+          orgs = await sb.sbFetch("/rest/v1/rpc/platform_admin_org_summary", {
+            method: "POST",
+            body:   JSON.stringify({}),
+          });
+        } catch (err) {
+          tbodyEl.innerHTML =
+            `<tr><td colspan="${colspan}" class="loading">Couldn't load organizations: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+
+        if (!Array.isArray(orgs) || orgs.length === 0) {
+          tbodyEl.innerHTML =
+            `<tr><td colspan="${colspan}" class="loading">No organizations yet.</td></tr>`;
+          countEl.textContent = "";
+          return;
+        }
+
+        countEl.textContent = `— ${orgs.length} org${orgs.length === 1 ? '' : 's'}`;
+        tbodyEl.innerHTML = orgs.map(renderRow).join("");
+        wireRowHandlers(orgs);
+      }
+
+      function renderRow(org) {
+        const seatsUsed  = Number(org.seats_used)     || 0;
+        const seatsPaid  = Number(org.seats_paid)     || 0;
+        const clientCnt  = Number(org.client_count)   || 0;
+        const outreachCt = Number(org.outreach_count) || 0;
+        const atCap      = seatsUsed >= seatsPaid;
+        const nearCap    = !atCap && seatsUsed >= seatsPaid * 0.9 && seatsPaid > 0;
+        const seatClass  = atCap ? "seats-at-cap" : nearCap ? "seats-near-cap" : "";
+
+        return `
+          <tr data-org-id="${esc(org.id)}">
+            <td class="client-cell">
+              <span class="client-name">${esc(org.name)}</span>
+            </td>
+            <td>${org.admin_email ? esc(org.admin_email) : `<span class="editable-empty">— none —</span>`}</td>
+            <td class="num editable-seats ${seatClass}" data-field="seats_paid" title="Click to edit the seat cap">
+              <span class="editable-value"><span class="seats-used">${fmtInt(seatsUsed)}</span> / <span class="seats-paid">${fmtInt(seatsPaid)}</span></span>
+            </td>
+            <td class="num">${fmtInt(clientCnt)}</td>
+            <td class="num">${fmtInt(outreachCt)}</td>
+            <td>${fmtDateTime(org.created_at)}</td>
+            <td class="col-actions">
+              <a class="btn-row-action btn-drill-in" href="dashboard.html?as_org=${encodeURIComponent(org.id)}" title="Open the dashboard scoped to this organization">View as org</a>
+            </td>
+          </tr>
+        `;
+      }
+
+      function wireRowHandlers(orgs) {
+        // Map of id → the live row object so the inline edit handler
+        // can mutate it in place after saving without re-running load().
+        const byId = new Map(orgs.map(o => [o.id, o]));
+
+        tbodyEl.querySelectorAll("td.editable-seats").forEach(td => {
+          td.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (td.classList.contains("editing")) return;
+            const tr    = td.closest("tr");
+            const orgId = tr.dataset.orgId;
+            const org   = byId.get(orgId);
+            if (!org) return;
+
+            const currentCap = Number(org.seats_paid) || 0;
+            const seatsUsed  = Number(org.seats_used) || 0;
+
+            td.classList.add("editing");
+
+            // Small inline editor: the number, nothing else. Keep the
+            // "used /" prefix visible so the admin sees the floor they
+            // can't go below.
+            const input = document.createElement("input");
+            input.type  = "number";
+            input.min   = String(seatsUsed);
+            input.step  = "1";
+            input.value = String(currentCap);
+            input.className = "editable-input editable-input-seats";
+
+            td.innerHTML = "";
+            const prefix = document.createElement("span");
+            prefix.textContent = `${fmtInt(seatsUsed)} / `;
+            prefix.className = "seats-used-prefix";
+            td.appendChild(prefix);
+            td.appendChild(input);
+            input.focus();
+            input.select();
+
+            let done = false;
+            const restore = () => {
+              td.classList.remove("editing");
+              const newCap    = Number(org.seats_paid) || 0;
+              const newUsed   = Number(org.seats_used) || 0;
+              const atCap     = newUsed >= newCap;
+              const nearCap   = !atCap && newUsed >= newCap * 0.9 && newCap > 0;
+              td.classList.toggle("seats-at-cap",   atCap);
+              td.classList.toggle("seats-near-cap", nearCap);
+              td.innerHTML =
+                `<span class="editable-value"><span class="seats-used">${fmtInt(newUsed)}</span> / <span class="seats-paid">${fmtInt(newCap)}</span></span>`;
+            };
+
+            const commit = async () => {
+              if (done) return;
+              done = true;
+              const raw = input.value.trim();
+              if (raw === "" || !Number.isFinite(Number(raw))) {
+                restore();
+                return;
+              }
+              const nextCap = Math.floor(Number(raw));
+              if (nextCap === currentCap) { restore(); return; }
+
+              try {
+                const res = await sb.sbFetch("/rest/v1/rpc/update_seats_paid", {
+                  method: "POST",
+                  body:   JSON.stringify({ target_org_id: orgId, new_cap: nextCap }),
+                });
+                // RPC returns the updated organizations row (or an array
+                // wrapping one row, depending on PostgREST version).
+                const updated = Array.isArray(res) ? res[0] : res;
+                if (updated && updated.seats_paid != null) {
+                  org.seats_paid = Number(updated.seats_paid);
+                }
+                restore();
+              } catch (err) {
+                const m = err.message || "";
+                let msg;
+                if (/insufficient_privilege|Only platform admins/i.test(m)) {
+                  msg = "Only platform admins can change seat caps. (This page shouldn't even be visible to you — something's off; try reloading.)";
+                } else if (/below active seats/i.test(m)) {
+                  msg = m; // Server message is already user-readable.
+                } else if (/non-negative/i.test(m)) {
+                  msg = "Seat cap must be a non-negative whole number.";
+                } else {
+                  msg = `Couldn't update seats: ${m}`;
+                }
+                alert(msg);
+                restore();
+              }
+            };
+            const cancel = () => {
+              if (done) return;
+              done = true;
+              restore();
+            };
+
+            input.addEventListener("blur", commit);
+            input.addEventListener("keydown", (ev) => {
+              if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
+              if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
+            });
+          });
+        });
+      }
+
+      // ---- formatters ----------------------------------------------------
+
+      function fmtInt(n) {
+        return n == null ? "—" : Number(n).toLocaleString();
+      }
+      function fmtDateTime(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return esc(String(iso));
+        // "Nov 4, 2025" — human-readable, locale-aware.
+        return d.toLocaleDateString(undefined, {
+          year: "numeric", month: "short", day: "numeric",
+        });
+      }
+
+      function esc(s) {
+        return String(s ?? "").replace(/[&<>"']/g, c =>
+          ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
+        );
+      }
+    })();
+  </script>
+</body>
+</html>
