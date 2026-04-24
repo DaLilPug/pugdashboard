@@ -716,6 +716,232 @@ body.login-body {
   vertical-align: middle;
 }
 
+/* ---------- dashboard: extended filter bar ---------- */
+/* Accounts + Companies multiselect, Status select, and the date range
+   inputs that sit to the right of the Timeframe pills. filter-group is
+   a small inline cluster of a label + control. filter-spacer pushes
+   timeframe + date-range to the right edge. */
+
+.filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-spacer { flex: 1 1 auto; }
+
+.filter-select {
+  height: 32px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  padding: 0 10px;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+  cursor: pointer;
+}
+.filter-select:hover { border-color: var(--navy-light, #cfd9e2); }
+
+.filter-daterange {
+  gap: 4px;
+}
+.filter-date {
+  height: 32px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  padding: 0 10px;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+  min-width: 130px;
+}
+.filter-date:focus { border-color: var(--navy); outline: none; }
+.filter-range-sep {
+  font-size: 11px;
+  color: var(--gray-400);
+  padding: 0 2px;
+}
+.filter-date-clear {
+  width: 22px; height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--gray-400);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.filter-date-clear:hover { color: var(--navy); }
+
+/* ---------- multiselect popover (Accounts / Companies) ---------- */
+
+.ms-wrap { position: relative; }
+
+.ms-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--r-pill);
+  background: var(--bg);
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+  cursor: pointer;
+  min-width: 120px;
+  max-width: 220px;
+}
+.ms-button:hover { border-color: var(--navy-light, #cfd9e2); }
+.ms-button[aria-expanded="true"] { border-color: var(--navy); }
+.ms-label {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-caret { color: var(--gray-400); font-size: 10px; }
+
+.ms-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 340px;
+  overflow-y: auto;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 4px 16px rgba(1, 58, 82, 0.12);
+  padding: 6px;
+}
+.ms-popover.hidden { display: none; }
+
+.ms-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px 6px;
+  border-bottom: 1px solid var(--border-2, var(--border));
+  margin-bottom: 4px;
+}
+.ms-link {
+  background: none;
+  border: none;
+  color: var(--navy);
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.ms-link:hover { text-decoration: underline; }
+
+.ms-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ms-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+}
+.ms-option:hover { background: var(--navy-light); }
+.ms-option input[type="checkbox"] { margin: 0; accent-color: var(--navy); cursor: pointer; }
+
+.ms-empty {
+  color: var(--gray-400);
+  font-size: 11px;
+  font-style: italic;
+  padding: 8px 6px;
+}
+
+/* ---------- account table: new columns + in-place editing ---------- */
+
+/* Editable cells (Company / Start Date / End Date). Empty state shows
+   an italic placeholder "— set —" so operators know the cell is
+   editable without a distracting pencil icon on every row. */
+.client-table td.editable {
+  cursor: text;
+  position: relative;
+}
+.client-table td.editable:hover .editable-value { background: var(--navy-light); }
+.client-table td.editable .editable-value {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background .15s;
+}
+.client-table td.editable .editable-empty {
+  color: var(--gray-400);
+  font-style: italic;
+}
+.client-table td.editing { padding: 6px 8px; }
+.editable-input {
+  width: 100%;
+  min-width: 110px;
+  border: 1.5px solid var(--navy);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+  background: var(--bg);
+  outline: none;
+}
+
+/* Status column: colored dot + text. Green = active, grey = inactive. */
+.status-cell {
+  white-space: nowrap;
+}
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.status-active   { background: #1EB683; box-shadow: 0 0 0 3px rgba(30, 182, 131, 0.15); }
+.status-inactive { background: #8899a6; box-shadow: 0 0 0 3px rgba(136, 153, 166, 0.15); }
+.status-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--navy);
+  vertical-align: middle;
+}
+
+/* Sortable column headers: cursor + caret indicator. Caret is empty
+   when unsorted, ▲ when ascending, ▼ when descending. */
+.client-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.client-table th.sortable:hover { color: var(--navy); }
+.client-table th.sortable .sort-caret {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--navy);
+  min-width: 9px;
+}
+.client-table th.sorted-asc,
+.client-table th.sorted-desc {
+  color: var(--navy);
+}
+
 /* ==============================================================
    Account drill-down page
    ============================================================== */

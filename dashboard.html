@@ -23,7 +23,7 @@
         </div>
       </div>
       <div class="header-pipe"></div>
-      <div class="header-sub">Client dashboard</div>
+      <div class="header-sub">Account dashboard</div>
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
@@ -31,16 +31,75 @@
     </div>
   </header>
 
+  <!--
+    Filter bar layout: filters on the left (Accounts, Companies, Status),
+    then a flex spacer, then Timeframe pills + date range on the right.
+    Mirrors the placement Austin sketched in image 1.
+  -->
   <div class="filter-bar">
-    <span class="filter-label">Timeframe</span>
-    <div class="timeframe-pills" id="timeframe-pills">
-      <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
-      <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
-      <button class="timeframe-pill" data-tf="3w" type="button">3W</button>
-      <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
-      <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
-      <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
-      <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+    <div class="filter-group">
+      <span class="filter-label">Accounts</span>
+      <div class="ms-wrap" data-filter="accounts">
+        <button class="ms-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span class="ms-label">All</span>
+          <span class="ms-caret">▾</span>
+        </button>
+        <div class="ms-popover hidden" role="listbox" aria-label="Accounts filter">
+          <div class="ms-head">
+            <button type="button" class="ms-link" data-ms-action="all">Select all</button>
+            <button type="button" class="ms-link" data-ms-action="none">Clear</button>
+          </div>
+          <div class="ms-options" data-ms-target="accounts"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">Companies</span>
+      <div class="ms-wrap" data-filter="companies">
+        <button class="ms-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span class="ms-label">All</span>
+          <span class="ms-caret">▾</span>
+        </button>
+        <div class="ms-popover hidden" role="listbox" aria-label="Companies filter">
+          <div class="ms-head">
+            <button type="button" class="ms-link" data-ms-action="all">Select all</button>
+            <button type="button" class="ms-link" data-ms-action="none">Clear</button>
+          </div>
+          <div class="ms-options" data-ms-target="companies"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="filter-label">Status</span>
+      <select id="status-filter" class="filter-select">
+        <option value="all">All</option>
+        <option value="active">Active only</option>
+        <option value="inactive">Inactive only</option>
+      </select>
+    </div>
+
+    <div class="filter-spacer"></div>
+
+    <div class="filter-group">
+      <span class="filter-label">Timeframe</span>
+      <div class="timeframe-pills" id="timeframe-pills">
+        <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
+        <button class="timeframe-pill" data-tf="2w" type="button">2W</button>
+        <button class="timeframe-pill" data-tf="3w" type="button">3W</button>
+        <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
+        <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
+        <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
+        <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+      </div>
+    </div>
+
+    <div class="filter-group filter-daterange">
+      <input type="date" id="date-from" class="filter-date" aria-label="From date" />
+      <span class="filter-range-sep">to</span>
+      <input type="date" id="date-to"   class="filter-date" aria-label="To date" />
+      <button type="button" id="date-clear" class="filter-date-clear" title="Clear date range">✕</button>
     </div>
   </div>
 
@@ -51,26 +110,32 @@
 
     <section class="table-section">
       <div class="section-head">
-        <h2>Client performance</h2>
+        <h2>Account performance</h2>
         <span id="client-count" class="section-meta"></span>
       </div>
       <div class="table-wrap">
-        <table class="client-table">
+        <table class="client-table" id="client-table">
           <thead>
             <tr>
-              <th>Client</th>
-              <th class="num">Connections</th>
-              <th class="num">Messages</th>
-              <th class="num">Acc. rate</th>
-              <th class="num">Responses</th>
-              <th class="num">Resp. rate</th>
-              <th class="num">Meetings</th>
-              <th class="num">Booking rate</th>
+              <!-- Non-numeric columns don't sort in this release. Numeric +
+                   date columns carry data-sort + the sort caret span. -->
+              <th>Account</th>
+              <th>Company</th>
+              <th class="sortable" data-sort="startDate">Start Date<span class="sort-caret"></span></th>
+              <th class="sortable" data-sort="endDate">End Date<span class="sort-caret"></span></th>
+              <th>Status</th>
+              <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="responses">Responses<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="meetings">Meetings<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="bookRate">Booking rate<span class="sort-caret"></span></th>
               <th class="trend">Trend</th>
             </tr>
           </thead>
           <tbody id="client-tbody">
-            <tr><td colspan="9" class="loading">Loading…</td></tr>
+            <tr><td colspan="13" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -86,86 +151,558 @@
       Auth.wireSignOut();
       Auth.wireUserEmail(session);
 
-      const pillsEl = document.getElementById("timeframe-pills");
-      const kpiEl   = document.getElementById("kpi-strip");
-      const tbodyEl = document.getElementById("client-tbody");
-      const countEl = document.getElementById("client-count");
+      const pillsEl    = document.getElementById("timeframe-pills");
+      const dateFromEl = document.getElementById("date-from");
+      const dateToEl   = document.getElementById("date-to");
+      const dateClrEl  = document.getElementById("date-clear");
+      const statusEl   = document.getElementById("status-filter");
+      const kpiEl      = document.getElementById("kpi-strip");
+      const tableEl    = document.getElementById("client-table");
+      const tbodyEl    = document.getElementById("client-tbody");
+      const countEl    = document.getElementById("client-count");
+      const colspan    = 13;
 
-      const LAST_TF = "dashboard_last_timeframe";
-      let tf = localStorage.getItem(LAST_TF) || "all";
+      // ---- persisted filter state ---------------------------------------
+
+      const LS_TF        = "dashboard_last_timeframe";
+      const LS_FROM      = "dashboard_last_from";
+      const LS_TO        = "dashboard_last_to";
+      const LS_STATUS    = "dashboard_last_status";
+      const LS_SORT_KEY  = "dashboard_sort_key";
+      const LS_SORT_DIR  = "dashboard_sort_dir";
+      const LS_SEL_ACCTS = "dashboard_sel_accts";
+      const LS_SEL_COS   = "dashboard_sel_cos";
+
+      let tf         = localStorage.getItem(LS_TF)     || "all";
+      let statusVal  = localStorage.getItem(LS_STATUS) || "all";
+      let dateFrom   = localStorage.getItem(LS_FROM)   || "";
+      let dateTo     = localStorage.getItem(LS_TO)     || "";
+      let sortKey    = localStorage.getItem(LS_SORT_KEY) || "connections";
+      let sortDir    = localStorage.getItem(LS_SORT_DIR) || "desc";
+      // Multiselect state: either null (meaning "all") or a Set of string IDs.
+      // Stored in localStorage as a JSON array of ids; null = absent.
+      let selectedAccountIds = parseStoredSet(localStorage.getItem(LS_SEL_ACCTS));
+      let selectedCompanies  = parseStoredSet(localStorage.getItem(LS_SEL_COS));
+
       activatePill(tf);
+      statusEl.value       = statusVal;
+      dateFromEl.value     = dateFrom;
+      dateToEl.value       = dateTo;
+
+      // ---- listeners -----------------------------------------------------
 
       pillsEl.addEventListener("click", (e) => {
         const btn = e.target.closest(".timeframe-pill");
         if (!btn) return;
         tf = btn.dataset.tf;
-        localStorage.setItem(LAST_TF, tf);
+        localStorage.setItem(LS_TF, tf);
         activatePill(tf);
-        load();
+        // Changing timeframe clears any explicit date range so the two
+        // don't silently fight each other.
+        dateFrom = ""; dateTo = "";
+        dateFromEl.value = ""; dateToEl.value = "";
+        localStorage.setItem(LS_FROM, ""); localStorage.setItem(LS_TO, "");
+        rerender();
       });
+
+      statusEl.addEventListener("change", () => {
+        statusVal = statusEl.value;
+        localStorage.setItem(LS_STATUS, statusVal);
+        rerender();
+      });
+
+      dateFromEl.addEventListener("change", () => { dateFrom = dateFromEl.value; localStorage.setItem(LS_FROM, dateFrom); onDateRangeChanged(); });
+      dateToEl  .addEventListener("change", () => { dateTo   = dateToEl  .value; localStorage.setItem(LS_TO,   dateTo);   onDateRangeChanged(); });
+      dateClrEl .addEventListener("click",  () => {
+        dateFrom = ""; dateTo = "";
+        dateFromEl.value = ""; dateToEl.value = "";
+        localStorage.setItem(LS_FROM, ""); localStorage.setItem(LS_TO, "");
+        rerender();
+      });
+
+      function onDateRangeChanged() {
+        // Setting an explicit range overrides the timeframe pill — clear
+        // the pill's active state visually to avoid two sources of truth.
+        if (dateFrom || dateTo) {
+          tf = "custom";
+          activatePill(tf);
+        } else if (tf === "custom") {
+          tf = "all";
+          localStorage.setItem(LS_TF, tf);
+          activatePill(tf);
+        }
+        rerender();
+      }
+
+      // Click-to-sort on numeric + date column headers. Three-state cycle:
+      // first click on a new column → desc. Click same column → asc. Third
+      // click on same column → clear (fall back to default connections desc).
+      tableEl.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.sort;
+          if (sortKey === key) {
+            if (sortDir === "desc")      sortDir = "asc";
+            else if (sortDir === "asc") { sortKey = "connections"; sortDir = "desc"; }
+            else                         sortDir = "desc";
+          } else {
+            sortKey = key;
+            sortDir = "desc";
+          }
+          localStorage.setItem(LS_SORT_KEY, sortKey);
+          localStorage.setItem(LS_SORT_DIR, sortDir);
+          updateSortCarets();
+          renderTable();
+        });
+      });
+      updateSortCarets();
+
+      // Multiselect popovers (Accounts + Companies). Outside-click closes.
+      document.addEventListener("click", (e) => {
+        document.querySelectorAll(".ms-wrap").forEach(w => {
+          const btn = w.querySelector(".ms-button");
+          const pop = w.querySelector(".ms-popover");
+          if (w.contains(e.target)) {
+            if (btn.contains(e.target)) {
+              const isOpen = !pop.classList.contains("hidden");
+              // Close other popovers before opening this one.
+              document.querySelectorAll(".ms-popover").forEach(p => p.classList.add("hidden"));
+              document.querySelectorAll(".ms-button").forEach(b => b.setAttribute("aria-expanded", "false"));
+              if (!isOpen) {
+                pop.classList.remove("hidden");
+                btn.setAttribute("aria-expanded", "true");
+              }
+            }
+            // clicks inside the popover (checkboxes + select all/clear) are
+            // handled by their own listeners below
+          } else {
+            pop.classList.add("hidden");
+            btn.setAttribute("aria-expanded", "false");
+          }
+        });
+      });
+
+      // ---- data load + render loop --------------------------------------
+      //
+      // Load flow:
+      //   1. fetchClients() — fresh copy of all accessible clients +
+      //      metadata (name, company, start_date, end_date).
+      //   2. fetchOutreach() — outreach rows scoped by the currently
+      //      effective time window (tf OR custom From/To).
+      //   3. compute metrics per client, render KPI strip + table.
+      //
+      // rerender() re-runs the whole thing. For UX responsiveness we could
+      // split metrics-only vs. full reload — but the pilot is small enough
+      // (a handful of clients, a few thousand rows) that a full reload on
+      // every filter tick is fine.
+
+      let clientsCache = [];
 
       load();
 
       async function load() {
-        tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Loading…</td></tr>`;
+        tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
         kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
 
-        let clients = [];
         try {
-          clients = await sb.sbFetch(
-            "/rest/v1/clients?select=id,name&order=name.asc"
+          clientsCache = await sb.sbFetch(
+            "/rest/v1/clients?select=id,name,company,start_date,end_date&order=name.asc"
           );
         } catch (err) {
-          tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Couldn't load accounts: ${esc(err.message)}</td></tr>`;
+          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load accounts: ${esc(err.message)}</td></tr>`;
           return;
         }
 
-        // Pull every outreach row for the timeframe. RLS scopes to the
-        // operator's accessible clients. We aggregate client-side — fine
-        // for pilot-scale data; add a server-side view later if this gets
-        // slow.
-        const since  = cutoffFor(tf);
-        const filter = since ? `&occurred_at=gte.${encodeURIComponent(since)}` : '';
+        renderMultiselects();
+        await rerender();
+      }
+
+      async function rerender() {
+        tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
+        kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
+
+        const [since, until] = effectiveRange();
+        const parts = [];
+        if (since) parts.push(`occurred_at=gte.${encodeURIComponent(since)}`);
+        if (until) parts.push(`occurred_at=lte.${encodeURIComponent(until)}`);
+        const qs = parts.length ? `&${parts.join('&')}` : '';
+
         let rows = [];
         try {
-          // sbFetchAll to bypass PostgREST's 1000-row cap. This query spans
-          // every client the operator can see — a single accessible client
-          // with a long history (matt-roush-style) blows past 1000 on its
-          // own, so plain sbFetch silently truncates the KPI strip and
-          // client table.
           rows = await sb.sbFetchAll(
-            `/rest/v1/outreach?select=client_id,type,occurred_at${filter}`
+            `/rest/v1/outreach?select=client_id,type,occurred_at${qs}`
           );
         } catch (err) {
-          tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">Couldn't load outreach: ${esc(err.message)}</td></tr>`;
+          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load outreach: ${esc(err.message)}</td></tr>`;
           return;
         }
 
         const byClient = {};
         for (const r of rows) (byClient[r.client_id] ??= []).push(r);
 
-        const clientMetrics = clients.map(c => ({ ...c, ...metricsFor(byClient[c.id] || []) }));
-        renderKpiStrip(kpiEl, clients.length, metricsFor(rows));
+        // Attach metrics to each client + derive status from end_date.
+        // Mirror start_date/end_date under camelCase keys so the sort
+        // comparator can read a single column name regardless of where
+        // the value originated (DB row vs. metricsFor output).
+        const today = new Date().toISOString().slice(0, 10);
+        const enriched = clientsCache.map(c => {
+          const m = metricsFor(byClient[c.id] || []);
+          return {
+            ...c,
+            ...m,
+            _status:   deriveStatus(c.end_date, today),
+            startDate: c.start_date || null,
+            endDate:   c.end_date   || null,
+          };
+        });
+        // Stash for renderTable / re-sort without re-fetching.
+        enrichedCache = enriched;
+        renderKpiStrip(kpiEl, filteredEnriched().length, metricsFor(filteredOutreach(rows)));
+        renderTable();
+      }
 
-        countEl.textContent = `— ${clients.length} client${clients.length === 1 ? '' : 's'}`;
-        if (!clientMetrics.length) {
-          tbodyEl.innerHTML = `<tr><td colspan="9" class="loading">No accounts linked to your operator profile.</td></tr>`;
+      // Compute status from end_date. If end_date is null / undefined / in
+      // the future → Active. Otherwise Inactive.
+      function deriveStatus(endDate, today) {
+        if (!endDate) return "active";
+        return endDate < today ? "inactive" : "active";
+      }
+
+      function filteredEnriched() {
+        const accOK = !selectedAccountIds || selectedAccountIds.size === 0
+          ? (_ => true)
+          : (c => selectedAccountIds.has(c.id));
+        const coOK  = !selectedCompanies  || selectedCompanies.size === 0
+          ? (_ => true)
+          : (c => selectedCompanies.has((c.company || "").trim().toLowerCase()));
+        const stOK  = statusVal === "all"
+          ? (_ => true)
+          : (c => c._status === statusVal);
+        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c));
+      }
+
+      function filteredOutreach(rows) {
+        // KPI strip reflects only accounts that passed the filter. We map
+        // over filteredEnriched()'s ids, then filter rows by client_id.
+        const ok = new Set(filteredEnriched().map(c => c.id));
+        return rows.filter(r => ok.has(r.client_id));
+      }
+
+      let enrichedCache = [];
+
+      function renderTable() {
+        const filtered = filteredEnriched();
+        countEl.textContent = `— ${filtered.length} account${filtered.length === 1 ? '' : 's'}`;
+
+        if (!filtered.length) {
+          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">No accounts match the current filters.</td></tr>`;
           return;
         }
 
-        // Sort: most connections first (rough "most active" proxy). You
-        // can click-sort later; for the pilot one client this doesn't matter.
-        clientMetrics.sort((a, b) => b.connections - a.connections);
+        const sorted = [...filtered].sort(sortComparator(sortKey, sortDir));
+        tbodyEl.innerHTML = sorted.map(renderRow).join("");
+        wireRowHandlers();
+      }
 
-        tbodyEl.innerHTML = clientMetrics.map(renderRow).join("");
+      // ---- multiselects --------------------------------------------------
 
-        // Whole row is clickable → account page.
-        tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
-          tr.addEventListener("click", () => {
-            window.location.href = `account.html?id=${encodeURIComponent(tr.dataset.clientId)}`;
+      function renderMultiselects() {
+        const accEl = document.querySelector('[data-ms-target="accounts"]');
+        const coEl  = document.querySelector('[data-ms-target="companies"]');
+
+        // Accounts list: one checkbox per client, identified by id.
+        accEl.innerHTML = clientsCache.map(c => {
+          const checked = selectedAccountIds == null || selectedAccountIds.size === 0
+            ? true
+            : selectedAccountIds.has(c.id);
+          return `
+            <label class="ms-option">
+              <input type="checkbox" data-ms-kind="account" value="${esc(c.id)}" ${checked ? "checked" : ""}/>
+              <span>${esc(c.name || "Unnamed")}</span>
+            </label>
+          `;
+        }).join("") || `<div class="ms-empty">No accounts.</div>`;
+
+        // Companies list: distinct non-empty company values, lowercased
+        // for match key, displayed in original case.
+        const seen = new Map(); // key = lowercase, value = original
+        for (const c of clientsCache) {
+          const raw = (c.company || "").trim();
+          if (!raw) continue;
+          const k = raw.toLowerCase();
+          if (!seen.has(k)) seen.set(k, raw);
+        }
+        const coOptions = [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+        coEl.innerHTML = coOptions.map(([k, label]) => {
+          const checked = selectedCompanies == null || selectedCompanies.size === 0
+            ? true
+            : selectedCompanies.has(k);
+          return `
+            <label class="ms-option">
+              <input type="checkbox" data-ms-kind="company" value="${esc(k)}" ${checked ? "checked" : ""}/>
+              <span>${esc(label)}</span>
+            </label>
+          `;
+        }).join("") || `<div class="ms-empty">No companies set yet.</div>`;
+
+        refreshMsLabels();
+      }
+
+      // One-time wiring for the multiselect popovers. Listeners live on the
+      // stable parent containers (ms-options + ms-popover), so renderMultiselects
+      // can replace the inner checkbox HTML on re-render without us leaking
+      // duplicate listeners.
+      function wireMultiselectsOnce() {
+        const accEl = document.querySelector('[data-ms-target="accounts"]');
+        const coEl  = document.querySelector('[data-ms-target="companies"]');
+        accEl.addEventListener("change", onAccountMsChange);
+        coEl .addEventListener("change", onCompanyMsChange);
+
+        // "Select all" / "Clear" buttons inside both popovers.
+        document.querySelectorAll(".ms-popover").forEach(pop => {
+          pop.addEventListener("click", (e) => {
+            const link = e.target.closest(".ms-link");
+            if (!link) return;
+            const wrap = pop.closest(".ms-wrap");
+            const kind = wrap.dataset.filter; // "accounts" | "companies"
+            const boxes = pop.querySelectorAll('input[type="checkbox"]');
+            if (link.dataset.msAction === "all") {
+              boxes.forEach(b => b.checked = true);
+            } else {
+              boxes.forEach(b => b.checked = false);
+            }
+            if (kind === "accounts") onAccountMsChange();
+            else                     onCompanyMsChange();
           });
         });
       }
+      wireMultiselectsOnce();
+
+      function onAccountMsChange() {
+        const boxes = document.querySelectorAll('[data-ms-kind="account"]');
+        const checked = [...boxes].filter(b => b.checked).map(b => b.value);
+        // If everything's checked (or nothing is — ambiguous; treat as "all")
+        // we store null so the filter is a no-op. Otherwise we store the
+        // exact set of ids.
+        if (checked.length === boxes.length || checked.length === 0) {
+          selectedAccountIds = null;
+          localStorage.removeItem(LS_SEL_ACCTS);
+        } else {
+          selectedAccountIds = new Set(checked);
+          localStorage.setItem(LS_SEL_ACCTS, JSON.stringify(checked));
+        }
+        refreshMsLabels();
+        rerender();
+      }
+
+      function onCompanyMsChange() {
+        const boxes = document.querySelectorAll('[data-ms-kind="company"]');
+        const checked = [...boxes].filter(b => b.checked).map(b => b.value);
+        if (checked.length === boxes.length || checked.length === 0) {
+          selectedCompanies = null;
+          localStorage.removeItem(LS_SEL_COS);
+        } else {
+          selectedCompanies = new Set(checked);
+          localStorage.setItem(LS_SEL_COS, JSON.stringify(checked));
+        }
+        refreshMsLabels();
+        rerender();
+      }
+
+      function refreshMsLabels() {
+        const accLabelEl = document.querySelector('[data-filter="accounts"] .ms-label');
+        const coLabelEl  = document.querySelector('[data-filter="companies"] .ms-label');
+        if (accLabelEl) accLabelEl.textContent = labelForSet(selectedAccountIds, "All", (id) => {
+          const c = clientsCache.find(x => x.id === id);
+          return c ? (c.name || "Unnamed") : id;
+        });
+        if (coLabelEl)  coLabelEl .textContent = labelForSet(selectedCompanies,  "All", (k) => k);
+      }
+
+      // Compact label for the filter button: "All" when nothing (or
+      // everything) is selected, the single item's display name when
+      // exactly one is selected, or "N selected" otherwise. `labeler`
+      // maps a stored key to its display string (account id → name,
+      // company lowercase key → original casing).
+      function labelForSet(set, allLabel, labeler = (k) => k) {
+        if (!set || set.size === 0) return allLabel;
+        if (set.size === 1) {
+          const only = labeler([...set][0]);
+          return only.length > 24 ? "1 selected" : only;
+        }
+        return `${set.size} selected`;
+      }
+
+      // ---- sorting -------------------------------------------------------
+
+      function sortComparator(key, dir) {
+        const sign = dir === "asc" ? 1 : -1;
+        return (a, b) => {
+          const av = a[key], bv = b[key];
+          // Nulls go to the bottom regardless of direction — the operator
+          // doesn't want rows with no data pushing signal off-screen.
+          if (av == null && bv == null) return 0;
+          if (av == null) return 1;
+          if (bv == null) return -1;
+          if (key === "startDate" || key === "endDate") {
+            return sign * (new Date(av) - new Date(bv));
+          }
+          return sign * (av - bv);
+        };
+      }
+
+      function updateSortCarets() {
+        tableEl.querySelectorAll("th.sortable").forEach(th => {
+          const caret = th.querySelector(".sort-caret");
+          th.classList.remove("sorted-asc", "sorted-desc");
+          if (caret) caret.textContent = "";
+          if (th.dataset.sort === sortKey) {
+            if (sortDir === "asc")  { th.classList.add("sorted-asc");  if (caret) caret.textContent = "▲"; }
+            if (sortDir === "desc") { th.classList.add("sorted-desc"); if (caret) caret.textContent = "▼"; }
+          }
+        });
+      }
+
+      // ---- row render + inline edit -------------------------------------
+
+      function renderRow(c) {
+        const statusHtml = c._status === "inactive"
+          ? `<span class="status-dot status-inactive" title="Inactive (end date passed)"></span><span class="status-text">Inactive</span>`
+          : `<span class="status-dot status-active"   title="Active"></span><span class="status-text">Active</span>`;
+
+        return `
+          <tr data-client-id="${esc(c.id)}">
+            <td class="client-cell"><div class="client-name">${esc(c.name)}</div></td>
+            <td class="editable" data-field="company">
+              <span class="editable-value">${c.company ? esc(c.company) : `<span class="editable-empty">— set —</span>`}</span>
+            </td>
+            <td class="editable" data-field="start_date">
+              <span class="editable-value">${c.startDate ? esc(fmtDate(c.startDate)) : `<span class="editable-empty">— set —</span>`}</span>
+            </td>
+            <td class="editable" data-field="end_date">
+              <span class="editable-value">${c.endDate ? esc(fmtDate(c.endDate)) : `<span class="editable-empty">— set —</span>`}</span>
+            </td>
+            <td class="status-cell">${statusHtml}</td>
+            <td class="num">${fmtInt(c.connections)}</td>
+            <td class="num">${fmtInt(c.messages)}</td>
+            <td class="num ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
+            <td class="num">${fmtInt(c.responses)}</td>
+            <td class="num ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
+            <td class="num">${fmtInt(c.meetings)}</td>
+            <td class="num ${rateClass(c.bookRate)}">${fmtPct(c.bookRate)}</td>
+            <td class="trend">${sparkline(c.trend)}</td>
+          </tr>
+        `;
+      }
+
+      function wireRowHandlers() {
+        // Row click → account page. The three editable cells stop-propagate
+        // in their own listener so editing doesn't also navigate.
+        tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
+          tr.addEventListener("click", (e) => {
+            // Skip navigation if the click originated inside an editable
+            // cell (it was handled by wireEditable below).
+            if (e.target.closest(".editable")) return;
+            window.location.href = `account.html?id=${encodeURIComponent(tr.dataset.clientId)}`;
+          });
+        });
+        tbodyEl.querySelectorAll(".editable").forEach(wireEditable);
+      }
+
+      // In-place editing for Company / Start Date / End Date. Clicking the
+      // cell swaps the display span for an <input>; blur or Enter saves,
+      // Escape cancels. PATCH to /rest/v1/clients?id=eq.X with just the
+      // changed column — RLS + column-level GRANTs enforce the scope.
+      function wireEditable(td) {
+        td.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (td.classList.contains("editing")) return;
+          const tr       = td.closest("tr");
+          const clientId = tr.dataset.clientId;
+          const field    = td.dataset.field;
+          const client   = clientsCache.find(c => c.id === clientId);
+          if (!client) return;
+
+          td.classList.add("editing");
+          const currentVal = client[camelify(field)] ?? client[field] ?? "";
+
+          const input = document.createElement("input");
+          if (field === "company") {
+            input.type = "text";
+            input.value = currentVal || "";
+            input.placeholder = "Company";
+          } else {
+            input.type = "date";
+            input.value = currentVal || "";
+          }
+          input.className = "editable-input";
+          td.innerHTML = "";
+          td.appendChild(input);
+          input.focus();
+          if (input.type === "text") input.select();
+
+          let savedOrCancelled = false;
+          const commit = async () => {
+            if (savedOrCancelled) return;
+            savedOrCancelled = true;
+            const raw = input.value.trim();
+            const nextVal = raw === "" ? null : raw;
+            const prevVal = currentVal || null;
+            if (nextVal === prevVal) {
+              restoreDisplay(td, field, prevVal);
+              return;
+            }
+            try {
+              await sb.sbFetch(
+                `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+                {
+                  method:  "PATCH",
+                  body:    JSON.stringify({ [field]: nextVal }),
+                  headers: { Prefer: "return=minimal" },
+                }
+              );
+              // Update cache in place so we don't have to refetch.
+              client[field] = nextVal;
+              client[camelify(field)] = nextVal;
+              // Company or end_date changing means the multiselect /
+              // status filter may need refreshing. Full rerender is
+              // cheap at pilot scale.
+              renderMultiselects();
+              rerender();
+            } catch (err) {
+              alert(`Couldn't save: ${err.message}`);
+              restoreDisplay(td, field, prevVal);
+            }
+          };
+          const cancel = () => {
+            if (savedOrCancelled) return;
+            savedOrCancelled = true;
+            restoreDisplay(td, field, currentVal || null);
+          };
+
+          input.addEventListener("blur", commit);
+          input.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
+            if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
+          });
+        });
+      }
+
+      function restoreDisplay(td, field, val) {
+        td.classList.remove("editing");
+        const html = val
+          ? (field === "company" ? esc(val) : esc(fmtDate(val)))
+          : `<span class="editable-empty">— set —</span>`;
+        td.innerHTML = `<span class="editable-value">${html}</span>`;
+      }
+
+      // field names come from the DB (snake_case: start_date, end_date).
+      // Client objects also carry the same key — but metricsFor() returns
+      // camelCase fields. We keep a tolerant lookup in wireEditable.
+      function camelify(s) {
+        return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+      }
+
+      // ---- metrics + helpers --------------------------------------------
 
       function metricsFor(rs) {
         const counts = { connection: 0, message: 0, response: 0, meeting_booked: 0 };
@@ -194,7 +731,7 @@
 
       function renderKpiStrip(root, nClients, t) {
         const cards = [
-          ["Clients",         String(nClients)],
+          ["Accounts",        String(nClients)],
           ["Connections",     fmtInt(t.connections)],
           ["Messages",        fmtInt(t.messages)],
           ["Acceptance rate", fmtPct(t.accRate)],
@@ -209,22 +746,6 @@
             <div class="kpi-value">${esc(value)}</div>
           </div>
         `).join("");
-      }
-
-      function renderRow(c) {
-        return `
-          <tr data-client-id="${esc(c.id)}">
-            <td class="client-cell"><div class="client-name">${esc(c.name)}</div></td>
-            <td class="num">${fmtInt(c.connections)}</td>
-            <td class="num">${fmtInt(c.messages)}</td>
-            <td class="num ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
-            <td class="num">${fmtInt(c.responses)}</td>
-            <td class="num ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
-            <td class="num">${fmtInt(c.meetings)}</td>
-            <td class="num ${rateClass(c.bookRate)}">${fmtPct(c.bookRate)}</td>
-            <td class="trend">${sparkline(c.trend)}</td>
-          </tr>
-        `;
       }
 
       function sparkline(values, width = 80, height = 22) {
@@ -243,32 +764,62 @@
         });
       }
 
-      function cutoffFor(tf) {
-        if (tf === 'all') return null;
+      function effectiveRange() {
+        // If the operator set a custom date range, it wins. Otherwise we
+        // derive from the timeframe pill. Returns [sinceIso, untilIso];
+        // either end can be null.
+        if (dateFrom || dateTo) {
+          const since = dateFrom ? new Date(dateFrom + "T00:00:00").toISOString() : null;
+          // End-of-day on the "to" boundary so "2024-11-20" includes rows
+          // logged at 11:59pm that day.
+          const until = dateTo   ? new Date(dateTo   + "T23:59:59.999").toISOString() : null;
+          return [since, until];
+        }
+        if (tf === "all" || tf === "custom") return [null, null];
         const days = { '1w':7, '2w':14, '3w':21, '1m':30, '2m':60, '3m':90 }[tf];
-        if (!days) return null;
+        if (!days) return [null, null];
         const d = new Date();
         d.setDate(d.getDate() - days);
-        return d.toISOString();
+        return [d.toISOString(), null];
       }
+
+      // ---- value formatters ---------------------------------------------
 
       function fmtInt(n) { return n == null ? "—" : n.toLocaleString(); }
       function fmtPct(r) { return r == null ? "—" : (r * 100).toFixed(1) + "%"; }
+      function fmtDate(d) {
+        // DB gives YYYY-MM-DD; render as US MM/DD/YYYY.
+        if (!d) return "";
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));
+        if (!m) return String(d);
+        return `${m[2]}/${m[3]}/${m[1]}`;
+      }
 
       function rateClass(r) {
-        // Loose rate-quality heuristics for pilot. Tune once we have real
-        // benchmark data from historical sheets.
         if (r == null) return "";
         if (r >= 0.30) return "rate-good";
         if (r >= 0.15) return "rate-ok";
         return "rate-bad";
       }
 
+      // ---- storage helpers ----------------------------------------------
+
+      function parseStoredSet(raw) {
+        if (!raw) return null;
+        try {
+          const arr = JSON.parse(raw);
+          return Array.isArray(arr) && arr.length ? new Set(arr) : null;
+        } catch (_) { return null; }
+      }
+
+      // ---- escape -------------------------------------------------------
+
       function esc(s) {
         return String(s ?? "").replace(/[&<>"']/g, c =>
           ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
         );
       }
+
     })();
   </script>
 </body>

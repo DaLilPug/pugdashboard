@@ -432,7 +432,24 @@
                 tooltip: { titleFont: { family: "Montserrat" }, bodyFont: { family: "Inter" } },
               },
               scales: {
-                x: { ticks: { font: { family: "Inter", size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } },
+                x: {
+                  ticks: {
+                    font: { family: "Inter", size: 10 },
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 10,
+                    // Labels come in as YYYY-MM-DD (from dayKey). Render as
+                    // US MM/DD/YYYY — Austin's team reads dates in US format
+                    // and the ISO shape looks like a system string next to
+                    // the dashboard's friendlier chrome.
+                    callback: function(value) {
+                      const raw = this.getLabelForValue(value);
+                      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw));
+                      return m ? `${m[2]}/${m[3]}/${m[1]}` : raw;
+                    },
+                  },
+                  grid: { display: false },
+                },
                 y: { beginAtZero: true, ticks: { font: { family: "Inter", size: 10 } }, grid: { color: "rgba(1,58,82,.06)" } },
               },
             },
