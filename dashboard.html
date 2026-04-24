@@ -114,6 +114,19 @@
       <div class="section-head">
         <h2>Account performance</h2>
         <span id="client-count" class="section-meta"></span>
+        <!-- Seat usage chip: "181 of 200 seats" for org admins.
+             Hidden for members (no seats_paid to show) and also when
+             the user isn't an admin of any org we can resolve. The
+             .at-cap modifier flips it red once active === seats_paid. -->
+        <span id="seat-usage" class="seat-usage" hidden></span>
+        <div class="section-head-spacer"></div>
+        <!-- "Show archived" toggle: when on, load() drops the
+             archived_at=is.null filter so archived seats reappear in
+             the table (greyed out, with an Unarchive button). -->
+        <label class="show-archived">
+          <input id="show-archived" type="checkbox" />
+          <span>Show archived</span>
+        </label>
         <button id="add-account-btn" class="btn-add-account" type="button">+ Add new account</button>
       </div>
       <div class="table-wrap">
@@ -135,10 +148,11 @@
               <th class="num sortable" data-sort="meetings">Meetings<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="bookRate">Booking rate<span class="sort-caret"></span></th>
               <th class="trend">Trend</th>
+              <th class="col-actions" aria-label="Row actions"></th>
             </tr>
           </thead>
           <tbody id="client-tbody">
-            <tr><td colspan="13" class="loading">Loading…</td></tr>
+            <tr><td colspan="14" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -163,7 +177,10 @@
       const tableEl    = document.getElementById("client-table");
       const tbodyEl    = document.getElementById("client-tbody");
       const countEl    = document.getElementById("client-count");
-      const colspan    = 13;
+      const seatUsageEl    = document.getElementById("seat-usage");
+      const showArchivedEl = document.getElementById("show-archived");
+      // 13 data columns + the trailing row-actions column = 14.
+      const colspan    = 14;
 
       // ---- persisted filter state ---------------------------------------
 
@@ -176,6 +193,7 @@
       const LS_SEL_ACCTS = "dashboard_sel_accts";
       const LS_SEL_COS   = "dashboard_sel_cos";
       const LS_SORT_VER  = "dashboard_sort_version";
+      const LS_SHOW_ARCH = "dashboard_show_archived";
 
       // v2: default sort changed from connections desc → startDate desc
       // (empties first, then newest start date). Bumping this key wipes
@@ -194,6 +212,7 @@
       let dateTo     = localStorage.getItem(LS_TO)     || "";
       let sortKey    = localStorage.getItem(LS_SORT_KEY) || "startDate";
       let sortDir    = localStorage.getItem(LS_SORT_DIR) || "desc";
+      let showArchived = localStorage.getItem(LS_SHOW_ARCH) === "1";
       // Multiselect state: either null (meaning "all") or a Set of string IDs.
       // Stored in localStorage as a JSON array of ids; null = absent.
       let selectedAccountIds = parseStoredSet(localStorage.getItem(LS_SEL_ACCTS));
@@ -203,6 +222,7 @@
       statusEl.value       = statusVal;
       dateFromEl.value     = dateFrom;
       dateToEl.value       = dateTo;
+      showArchivedEl.checked = showArchived;
 
       // ---- listeners -----------------------------------------------------
 
@@ -224,6 +244,16 @@
         statusVal = statusEl.value;
         localStorage.setItem(LS_STATUS, statusVal);
         rerender();
+      });
+
+      // Show archived toggles whether the clients query includes rows
+      // with archived_at set. Requires a reload (not just rerender())
+      // because the data itself changes — the clients cache needs a
+      // fresh fetch with/without the archived filter.
+      showArchivedEl.addEventListener("change", () => {
+        showArchived = showArchivedEl.checked;
+        localStorage.setItem(LS_SHOW_ARCH, showArchived ? "1" : "0");
+        load();
       });
 
       dateFromEl.addEventListener("change", () => { dateFrom = dateFromEl.value; localStorage.setItem(LS_FROM, dateFrom); onDateRangeChanged(); });
@@ -282,20 +312,47 @@
       const addBtnEl = document.getElementById("add-account-btn");
       if (addBtnEl) addBtnEl.addEventListener("click", onAddAccount);
 
-      // Lazily resolved on first add-account click. Most users belong to
-      // one org; if they're admin of multiple, we pick the first row and
-      // (later) surface a picker. Cached for the tab's lifetime.
-      let userOrgId = null;
-      async function getUserOrgId() {
-        if (userOrgId) return userOrgId;
-        const rows = await sb.sbFetch(
-          "/rest/v1/organization_members?select=org_id,role&role=eq.admin&limit=1"
-        );
-        if (!rows || !rows.length) {
-          throw new Error("not_admin");
+      // Lazily resolved on first use. Most users belong to one org; if
+      // they're admin of multiple, we pick the first row and (later)
+      // surface a picker. Cached for the tab's lifetime.
+      //
+      // Returns:
+      //   { id, name, seats_paid }   admin of an org → used for seat
+      //                              usage chip + add-account
+      //   null                       not an admin of any org (member
+      //                              only). Seat chip hides; add-account
+      //                              still runs and surfaces not_admin.
+      //
+      // PostgREST embed: asking for organizations(...) inside the
+      // organization_members select returns the joined row in one call,
+      // so we don't need a second fetch for seats_paid.
+      let userOrg = undefined;  // undefined = unresolved, null = resolved-as-none
+      async function getUserOrg() {
+        if (userOrg !== undefined) return userOrg;
+        try {
+          const rows = await sb.sbFetch(
+            "/rest/v1/organization_members?select=org_id,role,organizations(id,name,seats_paid)&role=eq.admin&limit=1"
+          );
+          if (!rows || !rows.length || !rows[0].organizations) {
+            userOrg = null;
+            return null;
+          }
+          const org = rows[0].organizations;
+          userOrg = { id: org.id, name: org.name, seats_paid: org.seats_paid };
+          return userOrg;
+        } catch (err) {
+          console.warn("getUserOrg failed:", err);
+          userOrg = null;
+          return null;
         }
-        userOrgId = rows[0].org_id;
-        return userOrgId;
+      }
+
+      // Thin wrapper for legacy call sites (onAddAccount) that only
+      // need the org id and should throw "not_admin" when absent.
+      async function getUserOrgId() {
+        const org = await getUserOrg();
+        if (!org) throw new Error("not_admin");
+        return org.id;
       }
 
       async function onAddAccount() {
@@ -424,13 +481,17 @@
         tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
         kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
 
+        // archived_at=is.null filters out soft-deleted seats so they
+        // drop off the default dashboard but stay available for
+        // "show archived" views + historical reporting. When
+        // showArchived is on we drop that filter so archived rows
+        // reappear (rendered greyed-out with an Unarchive action).
+        const archivedFilter = showArchived ? "" : "&archived_at=is.null";
         try {
-          // archived_at=is.null filters out soft-deleted seats so they
-          // drop off the default dashboard but stay available for
-          // "show archived" views + historical reporting. org_id is
-          // fetched so admins can show a seat count per org.
           clientsCache = await sb.sbFetch(
-            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at&archived_at=is.null&order=name.asc"
+            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at" +
+            archivedFilter +
+            "&order=name.asc"
           );
         } catch (err) {
           tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load accounts: ${esc(err.message)}</td></tr>`;
@@ -438,7 +499,33 @@
         }
 
         renderMultiselects();
+        // Fire and forget — we don't block the table render on the
+        // seat-usage chip (which needs an extra round-trip to resolve
+        // the user's org on first load).
+        renderSeatUsage();
         await rerender();
+      }
+
+      // Seat usage chip: "X of Y seats" for the signed-in user's org
+      // (if they're an admin of one). Uses clientsCache for the active
+      // count so it stays consistent with whatever's on screen. When
+      // "Show archived" is on, clientsCache includes archived rows —
+      // we exclude those from the usage count to match what the DB
+      // trigger counts (active/non-archived only).
+      async function renderSeatUsage() {
+        const org = await getUserOrg();
+        if (!org) {
+          seatUsageEl.hidden = true;
+          seatUsageEl.textContent = "";
+          return;
+        }
+        const active = clientsCache.filter(
+          c => c.org_id === org.id && !c.archived_at
+        ).length;
+        seatUsageEl.hidden = false;
+        seatUsageEl.textContent = `— ${active} of ${org.seats_paid} seats used`;
+        seatUsageEl.classList.toggle("at-cap",   active >= org.seats_paid);
+        seatUsageEl.classList.toggle("near-cap", active < org.seats_paid && active >= org.seats_paid * 0.9);
       }
 
       async function rerender() {
@@ -714,13 +801,31 @@
       // ---- row render + inline edit -------------------------------------
 
       function renderRow(c) {
-        const statusHtml = c._status === "inactive"
-          ? `<span class="status-dot status-inactive" title="Inactive (end date passed)"></span><span class="status-text">Inactive</span>`
-          : `<span class="status-dot status-active"   title="Active"></span><span class="status-text">Active</span>`;
+        const isArchived = !!c.archived_at;
+        // Archived rows show "Archived" instead of Active/Inactive —
+        // the end-date-derived status becomes irrelevant once a seat
+        // is soft-deleted, and we don't want two competing signals.
+        let statusHtml;
+        if (isArchived) {
+          statusHtml = `<span class="status-dot status-archived" title="Archived"></span><span class="status-text">Archived</span>`;
+        } else if (c._status === "inactive") {
+          statusHtml = `<span class="status-dot status-inactive" title="Inactive (end date passed)"></span><span class="status-text">Inactive</span>`;
+        } else {
+          statusHtml = `<span class="status-dot status-active" title="Active"></span><span class="status-text">Active</span>`;
+        }
+
+        // Row action: Archive on active rows, Unarchive on archived.
+        // Both pipe through SECURITY DEFINER RPCs that enforce admin
+        // perms server-side; non-admins get a translated error toast.
+        const actionsHtml = isArchived
+          ? `<button type="button" class="btn-row-action btn-unarchive" data-action="unarchive" title="Restore this seat — it'll count against your cap again.">Unarchive</button>`
+          : `<button type="button" class="btn-row-action btn-archive"   data-action="archive"   title="Archive this seat — frees a slot against your cap; data is preserved.">Archive</button>`;
 
         return `
-          <tr data-client-id="${esc(c.id)}">
-            <td class="client-cell"><div class="client-name">${esc(c.name)}</div></td>
+          <tr data-client-id="${esc(c.id)}"${isArchived ? ' class="is-archived"' : ''}>
+            <td class="client-cell editable-name" data-field="name">
+              <span class="editable-value client-name">${esc(c.name)}</span>
+            </td>
             <td class="editable" data-field="company">
               <span class="editable-value">${c.company ? esc(c.company) : `<span class="editable-empty">— set —</span>`}</span>
             </td>
@@ -739,22 +844,163 @@
             <td class="num">${fmtInt(c.meetings)}</td>
             <td class="num ${rateClass(c.bookRate)}">${fmtPct(c.bookRate)}</td>
             <td class="trend">${sparkline(c.trend)}</td>
+            <td class="col-actions">${actionsHtml}</td>
           </tr>
         `;
       }
 
       function wireRowHandlers() {
-        // Row click → account page. The three editable cells stop-propagate
-        // in their own listener so editing doesn't also navigate.
+        // Row click → account page. The interactive cells (inline-edit
+        // columns, inline-rename on the name, and the row-action button
+        // column) all stopPropagation in their own listeners — the
+        // closest() check here is defence-in-depth so a future cell
+        // with a missing stopPropagation doesn't silently navigate.
         tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
           tr.addEventListener("click", (e) => {
-            // Skip navigation if the click originated inside an editable
-            // cell (it was handled by wireEditable below).
-            if (e.target.closest(".editable")) return;
+            if (e.target.closest(".editable, .editable-name, .col-actions")) return;
             window.location.href = `account.html?id=${encodeURIComponent(tr.dataset.clientId)}`;
           });
         });
         tbodyEl.querySelectorAll(".editable").forEach(wireEditable);
+        tbodyEl.querySelectorAll(".editable-name").forEach(wireRenameSeat);
+        tbodyEl.querySelectorAll(".btn-row-action").forEach(wireRowAction);
+      }
+
+      // Inline rename on the Account cell. Unlike the other editable
+      // cells (which PATCH /rest/v1/clients directly with column-level
+      // GRANTs), rename goes through the rename_seat SECURITY DEFINER
+      // RPC. That's deliberate: only admins can rename, and routing
+      // through a SECURITY DEFINER function means there's no writable
+      // column grant on clients.name that a buggy/malicious client
+      // could exploit to rename rows they shouldn't touch.
+      function wireRenameSeat(td) {
+        td.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (td.classList.contains("editing")) return;
+          const tr       = td.closest("tr");
+          const clientId = tr.dataset.clientId;
+          const client   = clientsCache.find(c => c.id === clientId);
+          if (!client) return;
+
+          const currentName = client.name || "";
+          td.classList.add("editing");
+
+          const input = document.createElement("input");
+          input.type        = "text";
+          input.value       = currentName;
+          input.placeholder = "Account name";
+          input.className   = "editable-input";
+          td.innerHTML = "";
+          td.appendChild(input);
+          input.focus();
+          input.select();
+
+          let done = false;
+          const commit = async () => {
+            if (done) return;
+            done = true;
+            const nextName = input.value.trim();
+            if (!nextName) {
+              alert("Account name can't be empty.");
+              restoreName(td, currentName);
+              return;
+            }
+            if (nextName === currentName) {
+              restoreName(td, currentName);
+              return;
+            }
+            try {
+              await sb.sbFetch("/rest/v1/rpc/rename_seat", {
+                method: "POST",
+                body:   JSON.stringify({ seat_id: clientId, new_name: nextName }),
+              });
+              // Mirror into cache so downstream renders see the new name
+              // without a fresh fetch. Multiselect labels and KPI strip
+              // pick up the change on the follow-up rerender.
+              client.name = nextName;
+              restoreName(td, nextName);
+              renderMultiselects();
+            } catch (err) {
+              const m = err.message || "";
+              let msg;
+              if (/insufficient_privilege|Only admins/i.test(m)) {
+                msg = "Only organization admins can rename accounts.";
+              } else if (/cannot be empty/i.test(m)) {
+                msg = "Account name can't be empty.";
+              } else {
+                msg = `Couldn't rename: ${m}`;
+              }
+              alert(msg);
+              restoreName(td, currentName);
+            }
+          };
+          const cancel = () => {
+            if (done) return;
+            done = true;
+            restoreName(td, currentName);
+          };
+
+          input.addEventListener("blur", commit);
+          input.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
+            if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
+          });
+        });
+      }
+
+      function restoreName(td, name) {
+        td.classList.remove("editing");
+        td.innerHTML = `<span class="editable-value client-name">${esc(name)}</span>`;
+      }
+
+      // Archive / unarchive button handler. Both go through SECURITY
+      // DEFINER RPCs; server-side checks enforce admin-of-org and the
+      // seat-cap trigger fires on unarchive (we translate the resulting
+      // "Seat cap reached" error into a friendlier message).
+      //
+      // On success we full-reload so the cache reflects the new state
+      // (the row may disappear from view if showArchived is off) and
+      // the seat-usage chip updates.
+      function wireRowAction(btn) {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const tr       = btn.closest("tr");
+          const clientId = tr.dataset.clientId;
+          const action   = btn.dataset.action;  // "archive" | "unarchive"
+          const client   = clientsCache.find(c => c.id === clientId);
+          if (!client) return;
+
+          const displayName = client.name || "this account";
+          const confirmMsg = action === "archive"
+            ? `Archive "${displayName}"?\n\nThe seat will be hidden from the main view and its slot freed against your paid-seat cap. Historical data is preserved — you can unarchive it later from "Show archived".`
+            : `Unarchive "${displayName}"?\n\nThe seat will reappear in the main view and count against your paid-seat cap.`;
+          if (!window.confirm(confirmMsg)) return;
+
+          btn.disabled = true;
+          const prevLabel = btn.textContent;
+          btn.textContent = action === "archive" ? "Archiving…" : "Unarchiving…";
+          try {
+            const rpc = action === "archive" ? "archive_seat" : "unarchive_seat";
+            await sb.sbFetch(`/rest/v1/rpc/${rpc}`, {
+              method: "POST",
+              body:   JSON.stringify({ seat_id: clientId }),
+            });
+            await load();
+          } catch (err) {
+            const m = err.message || "";
+            let msg;
+            if (/Seat cap reached/i.test(m)) {
+              msg = "Can't unarchive — you've reached your paid seat limit. Archive another seat first, or upgrade.";
+            } else if (/insufficient_privilege|Only admins/i.test(m)) {
+              msg = "Only organization admins can archive or unarchive accounts.";
+            } else {
+              msg = `Couldn't ${action}: ${m}`;
+            }
+            alert(msg);
+            btn.disabled   = false;
+            btn.textContent = prevLabel;
+          }
+        });
       }
 
       // In-place editing for Company / Start Date / End Date. Clicking the

@@ -2313,3 +2313,120 @@ body.login-body {
   .pr-filter-row { flex-direction: column; gap: 10px; }
   .pr-table td.pr-company, .pr-table td.pr-title { max-width: 160px; }
 }
+
+
+/* =============================================================
+   Phase A: admin affordances on the account table
+   ============================================================= */
+
+/* ---------- seat usage chip ---------- */
+/* Sits alongside the "— 181 accounts" count in the section header.
+   Neutral colour by default; warms to amber near cap (>= 90%), flips
+   red + bold at cap so admins notice when "+ Add new account" will
+   fail before they click it. */
+.seat-usage {
+  font-size: 11px;
+  color: var(--gray-400);
+  transition: color .15s;
+}
+.seat-usage.near-cap { color: #b46a00; font-weight: 600; }
+.seat-usage.at-cap   { color: #c01111; font-weight: 700; }
+
+/* ---------- section head layout ---------- */
+/* Spacer pushes the "Show archived" toggle + add-account button to
+   the right edge while leaving h2 + counts + seat chip clustered
+   on the left. The existing .btn-add-account margin-left:auto is a
+   no-op once the spacer absorbs all free space — kept as-is so the
+   button still right-aligns on pages that don't use a spacer. */
+.section-head-spacer { flex: 1 1 auto; }
+
+/* "Show archived" label is a compact inline toggle styled to sit
+   comfortably next to the Add button. Muted grey text so it reads
+   as a secondary control. */
+.show-archived {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-400);
+  cursor: pointer;
+  user-select: none;
+}
+.show-archived input[type="checkbox"] {
+  accent-color: var(--navy);
+  margin: 0;
+  cursor: pointer;
+}
+
+/* ---------- trailing row-actions column ---------- */
+.client-table th.col-actions,
+.client-table td.col-actions {
+  width: 96px;
+  text-align: right;
+  white-space: nowrap;
+  padding-right: 14px;
+}
+
+/* Compact, secondary-styled row action button. Archive is a muted
+   grey outline (destructive-ish but reversible, so not red). When
+   the row is archived, the button becomes "Unarchive" in the filled
+   navy style to emphasise the restore action. */
+.btn-row-action {
+  display: inline-block;
+  padding: 4px 10px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  background: transparent;
+  color: var(--gray-400);
+  border: 1px solid var(--gray-200);
+  transition: background .15s, color .15s, border-color .15s, transform .1s;
+}
+.btn-row-action:hover:not(:disabled) {
+  color: var(--navy);
+  border-color: var(--navy);
+  background: var(--navy-light);
+}
+.btn-row-action.btn-unarchive {
+  color: var(--navy);
+  border-color: var(--navy);
+}
+.btn-row-action.btn-unarchive:hover:not(:disabled) {
+  background: var(--navy);
+  color: #fff;
+}
+.btn-row-action:active:not(:disabled) { transform: translateY(1px); }
+.btn-row-action:disabled { opacity: .6; cursor: progress; }
+
+/* ---------- archived row visual ---------- */
+/* Mute all data cells except the action column so the Unarchive
+   button stays fully legible. Row becomes nearly-normal on hover
+   so data is still readable when the admin reaches for the restore. */
+.client-table tbody tr.is-archived td:not(.col-actions)       { opacity: .55; }
+.client-table tbody tr.is-archived:hover td:not(.col-actions) { opacity: .85; }
+
+/* Amber-gold dot for the Archived status. Neither success nor
+   failure — archival is a deliberate admin action, not an error. */
+.status-archived { background: #c89b3c; box-shadow: 0 0 0 3px rgba(200, 155, 60, 0.15); }
+
+/* ---------- inline rename on Account cell ---------- */
+/* Mirror the .editable cell affordance (hover highlight, click swaps
+   to input). Separate from .editable because rename goes through the
+   rename_seat RPC, not a direct PATCH. */
+.client-table td.editable-name {
+  cursor: text;
+  position: relative;
+}
+.client-table td.editable-name:hover .editable-value { background: var(--navy-light); }
+.client-table td.editable-name .editable-value {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background .15s;
+}
+.client-table td.editable-name.editing { padding: 6px 8px; }
