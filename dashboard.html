@@ -51,6 +51,13 @@
     <a href="platform-admin.html" class="drill-in-exit">Exit to platform admin</a>
   </div>
 
+  <!-- Pending invite banner: rendered for anyone who has an open
+       pending_invites row with target_operator_id = their auth.uid().
+       Populated by JS below — stays hidden otherwise. One card per
+       outstanding invite. Accept/Decline hit SECURITY DEFINER RPCs
+       so we can drop the card as soon as the RPC returns. -->
+  <div id="pending-invites-banner" class="pending-invites-banner hidden" role="status" aria-live="polite"></div>
+
   <!--
     Filter bar layout: filters on the left (Accounts, Companies, Status),
     then a flex spacer, then Timeframe pills + date range on the right.
@@ -296,6 +303,126 @@
           }
         } catch (err) {
           console.warn("team-link reveal probe failed:", err);
+        }
+      })();
+
+      // Pending invites banner. Post-add_invite_consent.sql, an admin
+      // inviting an existing Uptown user no longer silently adds them
+      // to the admin's org — the user has to Accept here first. We
+      // query pending_invites for rows targeting the signed-in operator
+      // and render one card per outstanding invite. The organizations
+      // embed pulls in the org name so the card can say "join Acme"
+      // rather than a bare uuid.
+      //
+      // Runs in the background. If the probe fails (target_operator_id
+      // column doesn't exist because the migration hasn't been applied
+      // yet) the banner just stays hidden — harmless degraded state.
+      (async () => {
+        const bannerEl = document.getElementById("pending-invites-banner");
+        if (!bannerEl) return;
+        let rows = [];
+        try {
+          rows = await sb.sbFetch(
+            "/rest/v1/pending_invites" +
+            "?select=id,role,invited_at,organizations(id,name)" +
+            `&target_operator_id=eq.${encodeURIComponent(session.user.id)}` +
+            "&order=invited_at.asc"
+          );
+        } catch (err) {
+          console.warn("pending invites probe failed:", err);
+          return;
+        }
+        if (!rows || !rows.length) return;
+
+        bannerEl.innerHTML = rows.map(renderInviteCard).join("");
+        bannerEl.classList.remove("hidden");
+        bannerEl.querySelectorAll(".invite-card-accept").forEach(btn => {
+          btn.addEventListener("click", () => onAcceptInvite(btn));
+        });
+        bannerEl.querySelectorAll(".invite-card-decline").forEach(btn => {
+          btn.addEventListener("click", () => onDeclineInvite(btn));
+        });
+
+        function renderInviteCard(inv) {
+          const orgName = inv.organizations?.name || "another organization";
+          const role    = inv.role === "admin" ? "admin" : "member";
+          return `
+            <div class="invite-card" data-invite="${esc(inv.id)}">
+              <div class="invite-card-body">
+                <div class="invite-card-title">
+                  You've been invited to join <strong>${esc(orgName)}</strong> as <strong>${esc(role)}</strong>.
+                </div>
+                <div class="invite-card-sub">
+                  Accepting gives you access to this organization's accounts on your next dashboard reload.
+                </div>
+              </div>
+              <div class="invite-card-actions">
+                <button type="button" class="btn-row-action invite-card-decline">Decline</button>
+                <button type="button" class="btn-primary invite-card-accept">Accept</button>
+              </div>
+            </div>
+          `;
+        }
+
+        async function onAcceptInvite(btn) {
+          const card     = btn.closest(".invite-card");
+          const inviteId = card?.dataset.invite;
+          if (!inviteId) return;
+          setCardBusy(card, true, "Accepting…");
+          try {
+            await sb.sbFetch("/rest/v1/rpc/accept_invite", {
+              method: "POST",
+              body:   JSON.stringify({ invite_id: inviteId }),
+            });
+            // New org membership changes what RLS lets us see, so the
+            // cleanest way to re-sync every downstream cache (clients,
+            // multiselects, seat usage, etc.) is a full reload. Also
+            // resets userOrg resolution.
+            window.location.reload();
+          } catch (err) {
+            setCardBusy(card, false);
+            alert(`Couldn't accept invite: ${err.message}`);
+          }
+        }
+
+        async function onDeclineInvite(btn) {
+          const card     = btn.closest(".invite-card");
+          const inviteId = card?.dataset.invite;
+          if (!inviteId) return;
+          if (!confirm("Decline this invite? The admin will have to send it again if you change your mind.")) return;
+          setCardBusy(card, true, "Declining…");
+          try {
+            await sb.sbFetch("/rest/v1/rpc/decline_invite", {
+              method: "POST",
+              body:   JSON.stringify({ invite_id: inviteId }),
+            });
+            card.remove();
+            if (!bannerEl.querySelector(".invite-card")) {
+              bannerEl.classList.add("hidden");
+            }
+          } catch (err) {
+            setCardBusy(card, false);
+            alert(`Couldn't decline invite: ${err.message}`);
+          }
+        }
+
+        // Lock the two buttons while an RPC is in flight so a double-
+        // click doesn't fire two accepts / two declines. Label is the
+        // pending label to show under the buttons; null hides it.
+        function setCardBusy(card, busy, label) {
+          if (!card) return;
+          card.querySelectorAll("button").forEach(b => { b.disabled = busy; });
+          let pending = card.querySelector(".invite-card-pending");
+          if (busy && label) {
+            if (!pending) {
+              pending = document.createElement("div");
+              pending.className = "invite-card-pending";
+              card.querySelector(".invite-card-body")?.appendChild(pending);
+            }
+            pending.textContent = label;
+          } else if (pending) {
+            pending.remove();
+          }
         }
       })();
 

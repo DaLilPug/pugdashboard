@@ -2492,6 +2492,62 @@ body.login-body {
 }
 .drill-in-banner .drill-in-exit:hover { color: #3a2600; }
 
+/* Pending-invite banner on dashboard.html. One card per open invite
+   that targets the signed-in operator. Stacked vertically so multiple
+   invites read cleanly; each card is a flex row with body on the left
+   and Accept / Decline on the right.
+
+   Visually distinct from the drill-in banner (amber): uses a pale
+   navy tint so it reads as "informational, action available" instead
+   of "caution, you're in someone else's data". Sits outside the
+   sticky header so it scrolls off once the user has dealt with it. */
+.pending-invites-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 32px;
+  background: #eef3f9;
+  border-bottom: 1px solid #cfdbea;
+}
+.pending-invites-banner.hidden { display: none; }
+.invite-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #cfdbea;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.invite-card-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.invite-card-title {
+  font-size: 13px;
+  color: var(--navy-dark);
+  font-weight: 500;
+}
+.invite-card-title strong { font-weight: 700; }
+.invite-card-sub {
+  font-size: 11px;
+  color: var(--gray-600);
+  margin-top: 2px;
+}
+.invite-card-pending {
+  font-size: 11px;
+  color: var(--gray-600);
+  font-style: italic;
+  margin-top: 4px;
+}
+.invite-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
 /* Seats-used/paid cell on platform-admin.html. Clickable to edit the
    cap; the whole cell acts as an editable zone, matching the .editable
    cells in dashboard.html. */
@@ -2893,4 +2949,43 @@ body.login-body {
   font-style: italic;
   white-space: nowrap;
   margin-left: 10px;
+}
+
+/* Toolbar sitting above the account checklist inside the modal.
+   Holds Select all / Clear all + a live status that reports how many
+   rows changed when a bulk action ran. */
+.access-grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gray-100);
+  margin-bottom: 0;
+}
+.access-grid-bulk-status {
+  font-size: 11px;
+  color: var(--gray-600);
+  font-style: italic;
+  margin-left: auto;
+  min-height: 1em;
+}
+
+/* Access count column on the members table. Admins show a muted
+   "All N" to signal the org-wide default; members show "N of M"
+   with a subtle warning tint when N=0 so a zero-access member
+   doesn't hide in plain sight. */
+.access-count-cell {
+  white-space: nowrap;
+}
+.access-count {
+  font-size: 12px;
+  color: var(--gray-600);
+}
+.access-count-all {
+  color: var(--navy);
+  font-weight: 600;
+}
+.access-count-none {
+  color: var(--gray-400);
+  font-style: italic;
 }

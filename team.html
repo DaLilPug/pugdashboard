@@ -45,7 +45,7 @@
   <div class="account-titlebar">
     <h1>Team</h1>
     <div class="account-meta">
-      <span id="team-subtitle">Invite admins and members, revoke access, and assign client visibility.</span>
+      <span id="team-subtitle">Invite admins and members, revoke access, and assign account visibility.</span>
     </div>
   </div>
 
@@ -95,11 +95,12 @@
               <th>Email</th>
               <th>Role</th>
               <th>Added</th>
+              <th>Access</th>
               <th class="col-actions" aria-label="Row actions"></th>
             </tr>
           </thead>
           <tbody id="member-tbody">
-            <tr><td colspan="5" class="loading">Loading…</td></tr>
+            <tr><td colspan="6" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -144,7 +145,7 @@
     <div class="access-modal-card">
       <div class="access-modal-head">
         <div>
-          <h3 id="access-modal-title">Client access</h3>
+          <h3 id="access-modal-title">Account access</h3>
           <div id="access-modal-sub" class="access-modal-sub"></div>
         </div>
         <button type="button" class="access-modal-close" data-close="1" aria-label="Close">×</button>
@@ -257,7 +258,7 @@
       }
 
       document.getElementById("team-subtitle").textContent =
-        `Managing team for ${org.name}. Invite admins and members, revoke access, and assign client visibility.`;
+        `Managing team for ${org.name}. Invite admins and members, revoke access, and assign account visibility.`;
 
       // ---- state -------------------------------------------------------
       //
@@ -289,11 +290,16 @@
 
       async function loadAll() {
         await Promise.all([loadMembers(), loadInvites(), loadClientsAndAccess()]);
+        // loadMembers renders as soon as membership rows arrive, but the
+        // Access column depends on clients + accessMap which come from
+        // loadClientsAndAccess. Re-render once everything's settled so
+        // the counts are accurate.
+        if (members.length) renderMembers();
       }
 
       async function loadMembers() {
         const tb = document.getElementById("member-tbody");
-        tb.innerHTML = `<tr><td colspan="5" class="loading">Loading…</td></tr>`;
+        tb.innerHTML = `<tr><td colspan="6" class="loading">Loading…</td></tr>`;
         try {
           // Embed operator fields via a PostgREST foreign-key expansion
           // so we can show name + email without a second round-trip.
@@ -317,8 +323,12 @@
         const tb = document.getElementById("invite-tbody");
         tb.innerHTML = `<tr><td colspan="4" class="loading">Loading…</td></tr>`;
         try {
+          // target_operator_id tells us whether this is a new-user
+          // invite (null, signup link is useful) or an existing-user
+          // invite (uuid, target must accept from their own dashboard).
+          // Renderer branches on it to pick the right row actions.
           const rows = await sb.sbFetch(
-            `/rest/v1/pending_invites?select=id,email,role,invited_at&org_id=eq.${encodeURIComponent(org.id)}&order=invited_at.desc`
+            `/rest/v1/pending_invites?select=id,email,role,invited_at,target_operator_id&org_id=eq.${encodeURIComponent(org.id)}&order=invited_at.desc`
           );
           invites = rows || [];
           renderInvites();
@@ -395,18 +405,38 @@
           ? ""
           : `<button type="button" class="btn-row-action btn-row-action-danger btn-remove-member" data-op="${esc(m.operator_id)}" data-name="${esc(m.name)}">Remove</button>`;
 
+        // Access count column. Admins see everything in the org (no per-account
+        // grant needed), so we show a dash + "all" affordance. Members show
+        // "N of M" where M = total org accounts.
+        const accessCount = renderAccessCount(m);
+
         return `
           <tr data-op="${esc(m.operator_id)}">
             <td class="client-cell"><span class="client-name">${esc(m.name)}</span></td>
             <td>${esc(m.email)}</td>
             <td>${roleCell}</td>
             <td>${fmtDate(m.added_at)}</td>
+            <td class="access-count-cell">${accessCount}</td>
             <td class="col-actions">
               ${accessBtn}
               ${removeBtn}
             </td>
           </tr>
         `;
+      }
+
+      // Access count text for a given member row. Depends on accessMap
+      // + clients being loaded; if loadClientsAndAccess hasn't finished
+      // yet the member row will re-render with the real value once it does.
+      function renderAccessCount(m) {
+        if (m.role === "admin") {
+          return `<span class="access-count access-count-all" title="Admins automatically see every account in the org.">All ${clients.length}</span>`;
+        }
+        const granted = accessMap.get(m.operator_id);
+        const n = granted ? granted.size : 0;
+        const total = clients.length;
+        const cls = n === 0 ? "access-count access-count-none" : "access-count";
+        return `<span class="${cls}" title="Member can see ${n} of ${total} accounts.">${n} of ${total}</span>`;
       }
 
       function wireMemberRowHandlers() {
@@ -436,6 +466,16 @@
       }
 
       function renderInviteRow(inv) {
+        // Existing-user invites can't be resolved by sharing a signup
+        // link — the target already has an account and has to accept
+        // from their own dashboard. Show an "awaiting acceptance" note
+        // in place of the Copy link button so the admin isn't misled
+        // into forwarding a link that won't work.
+        const isExistingUser = !!inv.target_operator_id;
+        const primaryAction = isExistingUser
+          ? `<span class="row-action-note" title="They'll see an Accept / Decline prompt on their dashboard the next time they sign in.">Awaiting their acceptance</span>`
+          : `<button type="button" class="btn-row-action btn-copy-link" data-email="${esc(inv.email)}">Copy signup link</button>`;
+
         return `
           <tr data-invite="${esc(inv.id)}">
             <td>${esc(inv.email)}</td>
@@ -446,7 +486,7 @@
             </td>
             <td>${fmtDate(inv.invited_at)}</td>
             <td class="col-actions">
-              <button type="button" class="btn-row-action btn-copy-link" data-email="${esc(inv.email)}">Copy signup link</button>
+              ${primaryAction}
               <button type="button" class="btn-row-action btn-row-action-danger btn-revoke-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}">Revoke</button>
             </td>
           </tr>
@@ -495,7 +535,22 @@
             resultEl.innerHTML = `<div class="invite-result-info">
               ${esc(email)} is already a ${esc(outcome.current_role || "member")} of this org. You can change their role in the members list.
             </div>`;
+          } else if (outcome.status === "invited_existing") {
+            // Existing Uptown user. Post-add_invite_consent.sql they no
+            // longer get silently added to the org — they see an
+            // Accept / Decline banner on their own dashboard next time
+            // they sign in. UI surfaces the pending state so the admin
+            // knows why nobody showed up in the members list yet.
+            resultEl.innerHTML = `<div class="invite-result-ok">
+              ${esc(email)} already has an Uptown account. We'll show them an Accept / Decline prompt on their dashboard the next time they sign in. They'll appear in Members here once they accept.
+            </div>`;
+            emailEl.value = "";
+            await loadInvites();
           } else if (outcome.status === "added_existing") {
+            // Legacy path — only returned if add_invite_consent.sql
+            // hasn't been run yet. Left in place so the UI doesn't
+            // fall through to the generic "Invite submitted" message
+            // during the migration window.
             resultEl.innerHTML = `<div class="invite-result-ok">
               ${esc(email)} already had an Uptown account — added as ${esc(outcome.role)}. They'll see the org next time they refresh the dashboard.
             </div>`;
@@ -622,6 +677,11 @@
             <div class="access-grid-head">
               Check the accounts ${esc(m.name)} should be able to see. Changes save immediately.
             </div>
+            <div class="access-grid-toolbar">
+              <button type="button" class="btn-row-action btn-access-select-all">Select all</button>
+              <button type="button" class="btn-row-action btn-access-clear-all">Clear all</button>
+              <span class="access-grid-bulk-status" aria-live="polite"></span>
+            </div>
             <ul class="access-grid-list">
               ${clients.map(c => `
                 <li class="access-grid-row">
@@ -639,8 +699,86 @@
           body.querySelectorAll(".access-grid-check").forEach(cb => {
             cb.addEventListener("change", () => onToggleAccess(operatorId, cb));
           });
+          body.querySelector(".btn-access-select-all")
+              ?.addEventListener("click", () => onBulkAccess(operatorId, true));
+          body.querySelector(".btn-access-clear-all")
+              ?.addEventListener("click", () => onBulkAccess(operatorId, false));
         }
         modal.classList.remove("hidden");
+      }
+
+      // Bulk grant (grantAll=true) or bulk revoke (grantAll=false) every
+      // client in the current org for one member. We only fire RPCs for
+      // rows that actually need changing (no-ops skipped) and run them
+      // in parallel via Promise.all. On partial failure we surface how
+      // many rows couldn't be updated and leave the checkbox state for
+      // those rows rolled back.
+      async function onBulkAccess(operatorId, grantAll) {
+        const modal  = document.getElementById("access-modal");
+        const body   = document.getElementById("access-modal-body");
+        const statusEl = body.querySelector(".access-grid-bulk-status");
+        const checks   = [...body.querySelectorAll(".access-grid-check")];
+        if (!checks.length) return;
+
+        // Only hit the network for rows where the desired state differs
+        // from the current state.
+        const toChange = checks.filter(cb => cb.checked !== grantAll);
+        if (!toChange.length) {
+          if (statusEl) {
+            statusEl.textContent = grantAll ? "Already granted access to all." : "Already had no access.";
+            setTimeout(() => { statusEl.textContent = ""; }, 1600);
+          }
+          return;
+        }
+
+        const verb = grantAll ? "Granting" : "Clearing";
+        if (statusEl) statusEl.textContent = `${verb} ${toChange.length} account${toChange.length === 1 ? "" : "s"}…`;
+
+        // Disable every checkbox + both toolbar buttons for the duration
+        // so the user can't interleave single-toggle actions.
+        checks.forEach(cb => { cb.disabled = true; });
+        const btnSelect = body.querySelector(".btn-access-select-all");
+        const btnClear  = body.querySelector(".btn-access-clear-all");
+        if (btnSelect) btnSelect.disabled = true;
+        if (btnClear)  btnClear.disabled  = true;
+
+        const rpc = grantAll ? "grant_client_access" : "revoke_client_access";
+        const results = await Promise.all(toChange.map(async (cb) => {
+          const clientId = cb.dataset.client;
+          try {
+            await sb.sbFetch(`/rest/v1/rpc/${rpc}`, {
+              method: "POST",
+              body:   JSON.stringify({
+                target_client_id:   clientId,
+                target_operator_id: operatorId,
+              }),
+            });
+            cb.checked = grantAll;
+            if (!accessMap.has(operatorId)) accessMap.set(operatorId, new Set());
+            if (grantAll) accessMap.get(operatorId).add(clientId);
+            else          accessMap.get(operatorId).delete(clientId);
+            return { ok: true };
+          } catch (err) {
+            // Leave this checkbox in its pre-bulk state so the UI matches
+            // what's actually in the database.
+            return { ok: false, err };
+          }
+        }));
+
+        checks.forEach(cb => { cb.disabled = false; });
+        if (btnSelect) btnSelect.disabled = false;
+        if (btnClear)  btnClear.disabled  = false;
+
+        const failed = results.filter(r => !r.ok);
+        if (statusEl) {
+          if (failed.length === 0) {
+            statusEl.textContent = grantAll ? "All accounts granted." : "All access cleared.";
+          } else {
+            statusEl.textContent = `${results.length - failed.length} updated, ${failed.length} failed.`;
+          }
+          setTimeout(() => { statusEl.textContent = ""; }, 2400);
+        }
+        updateMemberRowAccessCount(operatorId);
       }
 
       function closeAccessModal() {
@@ -680,6 +818,9 @@
             statusEl.textContent = "Saved";
             setTimeout(() => { if (statusEl.textContent === "Saved") statusEl.textContent = ""; }, 1500);
           }
+          // Access count in the underlying members table is now stale —
+          // re-render so "N of M" reflects the just-toggled grant.
+          updateMemberRowAccessCount(operatorId);
         } catch (err) {
           cb.checked = !wantGrant;  // roll back the UI state
           if (statusEl) statusEl.textContent = "";
@@ -687,6 +828,18 @@
         } finally {
           cb.disabled = false;
         }
+      }
+
+      // Patches just the access-count cell for one row rather than
+      // re-rendering the whole members table — cheaper and keeps any
+      // in-flight hover / focus state on other rows untouched.
+      function updateMemberRowAccessCount(operatorId) {
+        const m = members.find(x => x.operator_id === operatorId);
+        if (!m) return;
+        const row = document.querySelector(`#member-tbody tr[data-op="${CSS.escape(operatorId)}"]`);
+        if (!row) return;
+        const cell = row.querySelector(".access-count-cell");
+        if (cell) cell.innerHTML = renderAccessCount(m);
       }
 
       // ---- clipboard ---------------------------------------------------
