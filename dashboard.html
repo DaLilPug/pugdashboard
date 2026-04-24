@@ -272,12 +272,31 @@
       updateSortCarets();
 
       // "+ Add new account" → prompt for the name, slug it, POST to clients.
-      // The SECURITY DEFINER trigger on public.clients will insert the
-      // matching operator_client_access row so we can see the new client
-      // immediately. On success we reload; on failure we alert the
-      // Postgres error (usually "slug already taken").
+      // Post-org-model changes:
+      //   - clients.org_id is now required by the INSERT RLS policy, so
+      //     we fetch and cache the admin's org_id on first click.
+      //   - The seat-cap trigger fails loudly when the org's paid seats
+      //     are used up. We translate that to a user-friendly prompt.
+      //   - Non-admin members can't create at all; that surfaces as an
+      //     "insufficient_privilege" Postgres error, also translated.
       const addBtnEl = document.getElementById("add-account-btn");
       if (addBtnEl) addBtnEl.addEventListener("click", onAddAccount);
+
+      // Lazily resolved on first add-account click. Most users belong to
+      // one org; if they're admin of multiple, we pick the first row and
+      // (later) surface a picker. Cached for the tab's lifetime.
+      let userOrgId = null;
+      async function getUserOrgId() {
+        if (userOrgId) return userOrgId;
+        const rows = await sb.sbFetch(
+          "/rest/v1/organization_members?select=org_id,role&role=eq.admin&limit=1"
+        );
+        if (!rows || !rows.length) {
+          throw new Error("not_admin");
+        }
+        userOrgId = rows[0].org_id;
+        return userOrgId;
+      }
 
       async function onAddAccount() {
         const raw = window.prompt("New account name:");
@@ -300,18 +319,29 @@
         const prevLabel = addBtnEl.textContent;
         addBtnEl.textContent = "Creating…";
         try {
+          const orgId = await getUserOrgId();
           await sb.sbFetch("/rest/v1/clients", {
             method:  "POST",
-            body:    JSON.stringify({ name, slug }),
+            body:    JSON.stringify({ name, slug, org_id: orgId }),
             headers: { Prefer: "return=minimal" },
           });
           await load();
         } catch (err) {
-          // Uniqueness collisions surface as a Postgres 23505 — translate
-          // the common case to plain English; fall back to raw for the rest.
-          const msg = /duplicate key|23505/i.test(err.message)
-            ? `An account with that slug ("${slug}") already exists. Try a more specific name.`
-            : `Couldn't create account: ${err.message}`;
+          // Translate known failure modes to plain English. Fall through to
+          // the raw error for anything unexpected so we still learn about it.
+          const m = err.message || "";
+          let msg;
+          if (m === "not_admin") {
+            msg = "Only organization admins can create new accounts. Contact your admin to get access.";
+          } else if (/duplicate key|23505/i.test(m)) {
+            msg = `An account with that slug ("${slug}") already exists. Try a more specific name.`;
+          } else if (/Seat cap reached/i.test(m)) {
+            msg = "You've reached your paid seat limit. Archive an existing seat to free a slot, or upgrade to add more seats.";
+          } else if (/insufficient_privilege|row-level security/i.test(m)) {
+            msg = "You don't have permission to create accounts here. Contact your admin.";
+          } else {
+            msg = `Couldn't create account: ${m}`;
+          }
           alert(msg);
         } finally {
           addBtnEl.disabled = false;
@@ -395,8 +425,12 @@
         kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
 
         try {
+          // archived_at=is.null filters out soft-deleted seats so they
+          // drop off the default dashboard but stay available for
+          // "show archived" views + historical reporting. org_id is
+          // fetched so admins can show a seat count per org.
           clientsCache = await sb.sbFetch(
-            "/rest/v1/clients?select=id,name,company,start_date,end_date&order=name.asc"
+            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at&archived_at=is.null&order=name.asc"
           );
         } catch (err) {
           tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load accounts: ${esc(err.message)}</td></tr>`;
