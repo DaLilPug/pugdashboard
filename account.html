@@ -1628,6 +1628,19 @@
       // Inline SVG bar chart. Values are rates (0..1) or counts — isRate
       // toggles label formatting. Each bar uses the sequential palette,
       // value label above each bar colored to match.
+      //
+      // Layout inside the viewBox (top→bottom):
+      //   [0 .. padT)             room for the value label above the bar
+      //   [padT .. H)             bar body (max bar height = H - padT)
+      //   [H .. H + padB)         x-axis label ("1W", "All", …)
+      //
+      // Earlier versions let the bar fill the full H and positioned the
+      // value label at y = H - bh - 5. When every period shared the same
+      // value (e.g. a demo account where all bars hit max), bh == H and
+      // the label landed at y = -5 — above the SVG's box. Combined with
+      // `overflow: visible` on .trend-svg, the label escaped upward and
+      // collided with the "All Time" subheader + main %. Reserving padT
+      // at the top keeps every label inside the viewBox.
       function barChartSVG(vals, labels, isRate) {
         const rawVals = vals.map(v => {
           if (v == null) return 0;
@@ -1635,11 +1648,12 @@
         });
         const max = Math.max(...rawVals, 1);
 
-        const bW = 34, gap = 8, H = 76, padB = 18;
+        const bW = 34, gap = 8, H = 76, padT = 14, padB = 18;
+        const barMaxH = H - padT;
         const W  = labels.length * (bW + gap) - gap;
 
         const bars = rawVals.map((v, i) => {
-          const bh = Math.max(3, Math.round(v / max * H));
+          const bh = Math.max(3, Math.round(v / max * barMaxH));
           const x  = i * (bW + gap);
           const color = PERIOD_COLORS[i] || "#8899a6";
           let label = "";
