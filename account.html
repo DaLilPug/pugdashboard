@@ -220,47 +220,60 @@
 
     <!-- =================== CADENCE ==================== -->
     <section id="panel-cadence" class="sub-panel hidden">
-      <!-- Two cadences per account:
-           1. Follow-up Cadence — kicked off by the initial 'message'
-              event, fires steps until response / meeting / cancel.
-           2. Positive Response Cadence — kicked off when a response
-              with sentiment='positive' is logged. Goal: book a
-              meeting. Exits on meeting_booked / cadence_cancelled.
-           Both share the same editor UI; data lives in different
-           clients columns (cadence_days / cadence_templates vs
-           positive_cadence_days / positive_cadence_templates). -->
-      <div class="cad-editor">
-        <div class="cad-head">
-          <h2>Follow-up Cadence</h2>
-          <p class="page-sub">
-            Steps fire after the initial message. Templates support <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
-            Changes apply only to this account.
-          </p>
+      <!-- Two cadences per account, side-by-side on desktop and
+           stacked on mobile. Each has its own ON/OFF toggle in the
+           header — when OFF, no NEW prospects are enrolled, but
+           prospects already mid-cadence keep getting their next
+           steps (snapshot-at-anchor model, see
+           add_cadence_toggles.sql). -->
+      <div class="cad-grid">
+        <div class="cad-editor">
+          <div class="cad-head">
+            <div class="cad-head-row">
+              <h2>Follow-up Cadence</h2>
+              <label class="cad-toggle" title="When OFF, new prospects aren't enrolled. Existing tasks keep flowing.">
+                <input id="cad-enabled" class="cad-toggle-input" type="checkbox" checked />
+                <span class="cad-toggle-track" aria-hidden="true"><span class="cad-toggle-thumb"></span></span>
+                <span class="cad-toggle-label">On</span>
+              </label>
+            </div>
+            <p class="page-sub">
+              Steps fire after the initial message. Templates support <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
+              Changes apply only to this account.
+            </p>
+          </div>
+          <div id="cad-steps" class="cad-steps">
+            <div class="loading">Loading cadence…</div>
+          </div>
+          <button id="cad-add"  class="cad-add"  type="button">+ Add step</button>
+          <div class="cad-actions">
+            <button id="cad-save" class="cad-save" type="button" disabled>Save</button>
+            <span   id="cad-feedback" class="cad-feedback"></span>
+          </div>
         </div>
-        <div id="cad-steps" class="cad-steps">
-          <div class="loading">Loading cadence…</div>
-        </div>
-        <button id="cad-add"  class="cad-add"  type="button">+ Add step</button>
-        <div class="cad-actions">
-          <button id="cad-save" class="cad-save" type="button" disabled>Save</button>
-          <span   id="cad-feedback" class="cad-feedback"></span>
-        </div>
-      </div>
 
-      <div class="cad-editor cad-editor-positive">
-        <div class="cad-head">
-          <h2>Positive Response Cadence</h2>
-          <p class="page-sub">
-            Steps fire after a positive response, aiming to book a meeting. Days are counted from the positive response, not the original message.
-          </p>
-        </div>
-        <div id="cad-steps-positive" class="cad-steps">
-          <div class="loading">Loading cadence…</div>
-        </div>
-        <button id="cad-add-positive"  class="cad-add"  type="button">+ Add step</button>
-        <div class="cad-actions">
-          <button id="cad-save-positive" class="cad-save" type="button" disabled>Save</button>
-          <span   id="cad-feedback-positive" class="cad-feedback"></span>
+        <div class="cad-editor cad-editor-positive">
+          <div class="cad-head">
+            <div class="cad-head-row">
+              <h2>Positive Response Cadence</h2>
+              <label class="cad-toggle" title="When OFF, positive responses won't enroll prospects. Existing tasks keep flowing.">
+                <input id="cad-enabled-positive" class="cad-toggle-input" type="checkbox" checked />
+                <span class="cad-toggle-track" aria-hidden="true"><span class="cad-toggle-thumb"></span></span>
+                <span class="cad-toggle-label">On</span>
+              </label>
+            </div>
+            <p class="page-sub">
+              Steps fire after a positive response, aiming to book a meeting. Days are counted from the positive response, not the original message.
+            </p>
+          </div>
+          <div id="cad-steps-positive" class="cad-steps">
+            <div class="loading">Loading cadence…</div>
+          </div>
+          <button id="cad-add-positive"  class="cad-add"  type="button">+ Add step</button>
+          <div class="cad-actions">
+            <button id="cad-save-positive" class="cad-save" type="button" disabled>Save</button>
+            <span   id="cad-feedback-positive" class="cad-feedback"></span>
+          </div>
         </div>
       </div>
     </section>
@@ -318,7 +331,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates,positive_cadence_days,positive_cadence_templates,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -4294,16 +4307,20 @@
           addId:      "cad-add",
           saveId:     "cad-save",
           feedbackId: "cad-feedback",
+          enabledId:  "cad-enabled",
           daysCol:    "cadence_days",
           tplCol:     "cadence_templates",
+          enabledCol: "cadence_enabled",
         });
         mountCadenceEditor({
           stepsId:    "cad-steps-positive",
           addId:      "cad-add-positive",
           saveId:     "cad-save-positive",
           feedbackId: "cad-feedback-positive",
+          enabledId:  "cad-enabled-positive",
           daysCol:    "positive_cadence_days",
           tplCol:     "positive_cadence_templates",
+          enabledCol: "positive_cadence_enabled",
         });
       }
 
@@ -4312,6 +4329,46 @@
         const addBtn     = document.getElementById(cfg.addId);
         const saveBtn    = document.getElementById(cfg.saveId);
         const feedbackEl = document.getElementById(cfg.feedbackId);
+        const enabledEl  = document.getElementById(cfg.enabledId);
+
+        // ON/OFF toggle. Default ON for new accounts (column default
+        // in the DB matches). Operator-flipped state PATCHes the
+        // clients table immediately — no Save button on the toggle
+        // because the side effect is "stop enrolling new prospects",
+        // which should be instant.
+        const initialEnabled = client[cfg.enabledCol] !== false; // default true if undefined
+        if (enabledEl) {
+          enabledEl.checked = initialEnabled;
+          updateToggleVisual();
+          enabledEl.addEventListener("change", async () => {
+            const v = enabledEl.checked;
+            updateToggleVisual();
+            try {
+              const patch = {};
+              patch[cfg.enabledCol] = v;
+              await sb.sbFetch(
+                `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+                {
+                  method: "PATCH",
+                  body:   JSON.stringify(patch),
+                  headers:{ Prefer: "return=minimal" },
+                }
+              );
+              client[cfg.enabledCol] = v;
+            } catch (err) {
+              // Revert on error so visual matches DB state.
+              enabledEl.checked = !v;
+              updateToggleVisual();
+              alert(`Couldn't ${v ? "enable" : "disable"} cadence: ${err.message || err}`);
+            }
+          });
+        }
+        function updateToggleVisual() {
+          if (!enabledEl) return;
+          const wrap = enabledEl.closest(".cad-toggle");
+          const lbl  = wrap?.querySelector(".cad-toggle-label");
+          if (lbl) lbl.textContent = enabledEl.checked ? "On" : "Off";
+        }
 
         // Mutable working copy of (day, template) pairs. Save flushes
         // back to the configured clients columns.

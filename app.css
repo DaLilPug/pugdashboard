@@ -1530,10 +1530,104 @@ body.login-body {
   color: rgba(255, 255, 255, 0.92);
 }
 
-/* ---- Positive cadence editor header (green accent) ------------- */
+/* ---- Cadence tab — side-by-side editors on desktop, stacked on
+   mobile. .cad-grid wraps the two .cad-editor cards. */
+.cad-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.cad-grid > .cad-editor {
+  /* Override the existing max-width: 720px cap so each card fills
+     its column on desktop. */
+  max-width: none;
+}
+@media (max-width: 1100px) {
+  .cad-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Positive editor accent — green top border. */
 .cad-editor-positive {
-  margin-top: 18px;
   border-top: 3px solid rgba(30, 182, 131, 0.4);
+}
+
+/* Header row inside each editor — title on the left, ON/OFF toggle
+   pinned to the right. */
+.cad-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cad-head-row h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+/* ---- Slider toggle (.cad-toggle) ------------------------------- */
+/* Layout: hidden checkbox + visual track/thumb + adjacent text label.
+   Green when ON (checked), grey when OFF. The text changes between
+   "On" / "Off" via JS so we don't need separate label nodes. */
+.cad-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cad-toggle-input {
+  /* Hide the native checkbox but keep it focusable + keyboard-toggleable. */
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.cad-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  background: var(--gray-300);
+  border-radius: 999px;
+  transition: background 120ms ease;
+  flex-shrink: 0;
+}
+.cad-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: left 120ms ease;
+}
+.cad-toggle-input:checked ~ .cad-toggle-track {
+  background: #1EB683;
+}
+.cad-toggle-input:checked ~ .cad-toggle-track .cad-toggle-thumb {
+  left: 18px;
+}
+.cad-toggle-input:focus-visible ~ .cad-toggle-track {
+  box-shadow: 0 0 0 3px rgba(30, 182, 131, 0.25);
+}
+.cad-toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-400);
+  font-variant-numeric: tabular-nums; /* keeps "On"/"Off" widths stable */
+  min-width: 22px;
+}
+.cad-toggle-input:checked ~ .cad-toggle-label {
+  color: #107a3e;
 }
 
 /* ====================================================================
