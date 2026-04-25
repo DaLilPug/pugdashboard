@@ -184,7 +184,7 @@
         <div class="cad-head">
           <h2>Templates</h2>
           <p class="page-sub">
-            Reusable messages for initial outreach and retargeting — distinct from the cadence follow-up sequence.
+            Reusable messages for initial outreach and retargeting — distinct from the follow-up cadence.
             Up to 10. Use Copy to paste into LinkedIn.
           </p>
         </div>
@@ -3545,7 +3545,7 @@
             <div class="placeholder">
               <strong>${fuState.sourceFilter === "all" ? "No follow-ups queued" : "No follow-ups match this filter"}</strong>
               ${fuState.sourceFilter === "all"
-                  ? "Log a <b>Message</b> in the extension to start a sequence."
+                  ? "Log a <b>Message</b> in the extension to start a cadence."
                   : "Switch to All to see everything queued."}
             </div>`;
           wireFollowupRoot();
@@ -3625,7 +3625,7 @@
         // The handler dispatches based on r.source.
         const isoDue = (r.due_at || "").slice(0, 10);
         const dueHtml = (r.anchor_id || isManual)
-          ? `<button class="fu-due fu-due-editable" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole sequence forward"}">${esc(due)}</button>`
+          ? `<button class="fu-due fu-due-editable" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole cadence forward"}">${esc(due)}</button>`
           : `<div class="fu-due">${esc(due)}</div>`;
         // Small badge so operators can tell at a glance whether a task
         // comes from the regular cadence, the positive response cadence,
@@ -3642,7 +3642,7 @@
               <div class="fu-name">${esc(r.prospect_name)} ${badge}</div>
               <div class="fu-row-head-right">
                 ${dueHtml}
-                <button class="fu-cancel" data-action="cancel" data-idx="${idx}" type="button" title="${isManual ? "Delete this scheduled task" : "Cancel this follow-up sequence (this prospect won't get any more follow-ups)"}" aria-label="${isManual ? "Delete scheduled task" : "Cancel follow-up sequence"}">×</button>
+                <button class="fu-cancel" data-action="cancel" data-idx="${idx}" type="button" title="${isManual ? "Delete this scheduled task" : "Cancel this follow-up cadence (this prospect won't get any more follow-ups)"}" aria-label="${isManual ? "Delete scheduled task" : "Cancel follow-up cadence"}">×</button>
               </div>
             </div>
             <div class="fu-meta">${esc(meta)}</div>
@@ -3703,9 +3703,9 @@
         const isChecked = fuState.selected.has(key);
         const isoDue = (r.due_at || "").slice(0, 10);
         const dueHtml = (r.anchor_id || isManual)
-          ? `<button class="fu-due-editable fu-due-list-btn" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole sequence forward"}">${esc(due)}</button>`
+          ? `<button class="fu-due-editable fu-due-list-btn" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole cadence forward"}">${esc(due)}</button>`
           : esc(due);
-        const cancelTitle = isManual ? "Delete this scheduled task" : "Cancel this follow-up sequence";
+        const cancelTitle = isManual ? "Delete this scheduled task" : "Cancel this follow-up cadence";
         const rowClass = isManual ? "fu-row-manual" : isPositive ? "fu-row-positive" : "";
         const inlineBadge = isManual
           ? ` <span class="fu-source-badge fu-source-manual">Manual</span>`
@@ -3929,7 +3929,7 @@
             }
 
             // Cadence-derived: existing cancel flow.
-            if (!confirm(`Cancel the follow-up sequence for ${name}?\n\nThey won't get any more follow-ups. You can undo this from the Prospects tab by deleting the cadence_cancelled event.`)) return;
+            if (!confirm(`Cancel the follow-up cadence for ${name}?\n\nThey won't get any more follow-ups. You can undo this from the Prospects tab by deleting the cadence_cancelled event.`)) return;
             btn.disabled = true;
             try {
               await logFollowupAction(row, "cadence_cancelled");
@@ -3986,7 +3986,7 @@
             <button type="button" class="fu-modal-meeting" data-action="modal-meeting">
               ✓ Meeting booked
             </button>
-            <div class="fu-modal-hint">Exits the follow-up sequence.</div>
+            <div class="fu-modal-hint">Exits the follow-up cadence.</div>
 
             <div class="fu-modal-divider"><span>or log a response</span></div>
 
@@ -4008,7 +4008,7 @@
             </div>
 
             <button type="button" class="fu-modal-log-response" data-action="modal-log-response" disabled>Log response</button>
-            <div class="fu-modal-hint">Logs as a response and exits the follow-up sequence.</div>
+            <div class="fu-modal-hint">Logs as a response and exits the follow-up cadence.</div>
 
             <div class="fu-modal-divider"><span>or schedule a follow-up</span></div>
 
@@ -4331,7 +4331,7 @@
         const cadenceCount = targets.filter(r => r.source !== "manual").length;
         const manualCount  = targets.filter(r => r.source === "manual").length;
         const desc = [
-          cadenceCount ? `${cadenceCount} sequence${cadenceCount === 1 ? "" : "s"}` : "",
+          cadenceCount ? `${cadenceCount} cadence${cadenceCount === 1 ? "" : "s"}` : "",
           manualCount  ? `${manualCount} manual task${manualCount === 1 ? "" : "s"}`  : "",
         ].filter(Boolean).join(" + ");
         if (!confirm(`Cancel ${desc}? Selected prospects won't receive any more follow-ups for these.`)) return;
