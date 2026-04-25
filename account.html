@@ -2126,14 +2126,14 @@
           }
         }
 
-        // Logs a manually-scheduled follow-up. Per Austin's design
-        // (Option A): create a future-dated `followup` outreach row
-        // with the chosen date + optional message. For prospects in
-        // cadence this counts as a completed step and shifts the next
-        // computed step forward (rare case — Austin: "this will likely
-        // be used for people not already in cadence"). For prospects
-        // without an anchor it's just a future-dated event in the
-        // timeline.
+        // Add a manually-scheduled follow-up TASK (not a logged event).
+        // Per Austin's design (Option A): inserts into the new
+        // scheduled_followups table so the row appears in the
+        // Follow-ups tab as a queued task — same look as cadence-
+        // derived ones, with Open thread / Mark sent / X / Edit-due
+        // affordances. Marking it sent later logs a real `followup`
+        // outreach event AND deletes the scheduled row (see
+        // wireFollowupRoot's "sent" branch).
         async function handleAddFollowup(form) {
           const timelineRow = form.closest(".pr-timeline-row");
           const idx = Number(timelineRow.dataset.idx);
@@ -2144,34 +2144,48 @@
           const msg  = (form.querySelector("textarea[name='pr_followup_message']")?.value || "").trim();
           if (!date) return;
 
-          // Convert YYYY-MM-DD to a timestamptz at noon local. Noon
-          // (rather than midnight) keeps the date displayed-as-picked
-          // across most timezones — midnight would risk drifting back
-          // a day in negative-UTC zones.
-          const occurredAt = `${date}T12:00:00`;
+          // Noon local so the date displays as-picked across most
+          // timezones (midnight risks drifting back a day in
+          // negative-UTC zones).
+          const dueAt = `${date}T12:00:00`;
 
           const submitBtn = form.querySelector("button[type='submit']");
           const prevLabel = submitBtn ? submitBtn.textContent : "";
           if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving…"; }
 
           try {
-            const payload = buildOutreachPayload(prospect, {
-              type:         "followup",
-              occurred_at:  occurredAt,
-              message_sent: msg || null,
-            });
-            const created = await sb.sbFetch("/rest/v1/outreach", {
+            const payload = {
+              client_id:     clientId,
+              operator_id:   session.user.id,
+              prospect_name: prospect.name || "",
+              company:       prospect.company       || null,
+              title:         prospect.title         || null,
+              linkedin_id:   prospect.linkedin_id   || null,
+              profile_url:   prospect.profile_url   || null,
+              sales_nav_url: prospect.sales_nav_url || null,
+              due_at:        dueAt,
+              template:      msg || null,
+            };
+            await sb.sbFetch("/rest/v1/scheduled_followups", {
               method:  "POST",
               body:    JSON.stringify([payload]),
-              headers: { Prefer: "return=representation" },
+              headers: { Prefer: "return=minimal" },
             });
-            applyNewEvents(prospect, created);
-            // Clear the form for next use, then re-render the timeline.
+            // Clear the form for next use, hide it, reset the date to
+            // a fresh +7 default. Don't re-render the prospect timeline
+            // — scheduled_followups doesn't surface there (it's a
+            // separate table, lives in the Follow-ups tab queue).
             form.classList.add("hidden");
             form.reset();
             const dateInput = form.querySelector("input[type='date']");
             if (dateInput) dateInput.value = defaultFollowupDate();
-            reopenAfterMutation(prospect);
+            // Tiny inline confirmation since we're not re-rendering.
+            const note = document.createElement("div");
+            note.className   = "pr-info-note";
+            note.style.color = "#107a3e";
+            note.textContent = "Saved — see the Follow-ups tab to manage it.";
+            form.parentNode.insertBefore(note, form);
+            setTimeout(() => note.remove(), 2400);
           } catch (err) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = prevLabel; }
             alert("Couldn't add follow-up: " + (err.message || err));
@@ -3334,8 +3348,11 @@
 
         let rows = [];
         try {
+          // tasks_due unions cadence-derived followups (source='cadence')
+          // with manually-scheduled tasks (source='manual'), so we render
+          // them together. See add_scheduled_followups.sql.
           rows = await sb.sbFetch(
-            `/rest/v1/followups_due?client_id=eq.${encodeURIComponent(clientId)}&order=due_at.asc`
+            `/rest/v1/tasks_due?client_id=eq.${encodeURIComponent(clientId)}&order=due_at.asc`
           );
         } catch (err) {
           root.innerHTML = `<div class="placeholder"><strong>Couldn't load follow-ups</strong>${esc(err.message || "")}</div>`;
@@ -3346,13 +3363,23 @@
 
         // Drop selection keys that no longer match any row (e.g. the
         // operator just cancelled them). Avoids "Delete 3 selected"
-        // when only 1 visible target remains.
-        const visibleIds = new Set(fuState.rows.map(r => r.linkedin_id).filter(Boolean));
+        // when only 1 visible target remains. Uses composite rowKey
+        // so cadence + manual tasks don't collide on linkedin_id alone.
+        const visibleKeys = new Set(fuState.rows.map(fuRowKey));
         for (const k of [...fuState.selected]) {
-          if (!visibleIds.has(k)) fuState.selected.delete(k);
+          if (!visibleKeys.has(k)) fuState.selected.delete(k);
         }
 
         renderFollowups();
+      }
+
+      // Composite key for tasks_due rows. Cadence-derived rows use
+      // linkedin_id (always present per the followups_due WHERE);
+      // manually-scheduled rows use task_id (uuid PK on
+      // scheduled_followups). Source prefix prevents accidental
+      // collisions if linkedin_id ever overlaps a uuid-shaped string.
+      function fuRowKey(r) {
+        return `${r.source}:${r.task_id || r.linkedin_id || ""}`;
       }
 
       function renderFollowups() {
@@ -3418,28 +3445,41 @@
       function renderFollowupCard(r, idx) {
         const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
         const due   = formatDueLabel(r.due_at);
-        const step  = `Step ${r.step_index} · day ${r.step_day}`;
+        const isManual = r.source === "manual";
+        const stepText = isManual
+          ? "Manual task"
+          : `Step ${r.step_index} · day ${r.step_day}`;
         const tpl   = r.template
           ? esc(truncate(renderTemplate(r.template, r), 180))
-          : `<span class="fu-notemplate">No template set for this step.</span>`;
-        // Click-to-edit due date when we have the anchor id (every
-        // followups_due row should). data-iso is the YYYY-MM-DD format
-        // expected by <input type="date">.
+          : (isManual
+              ? `<span class="fu-notemplate">No message drafted yet.</span>`
+              : `<span class="fu-notemplate">No template set for this step.</span>`);
+        // Click-to-edit due date — works on BOTH cadence and manual
+        // tasks but with different semantics:
+        //   cadence: PATCH anchor's cadence_snooze_days (cascades to
+        //            every later step in the sequence)
+        //   manual:  UPDATE scheduled_followups.due_at directly
+        // The handler dispatches based on r.source.
         const isoDue = (r.due_at || "").slice(0, 10);
-        const dueHtml = r.anchor_id
-          ? `<button class="fu-due fu-due-editable" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="Click to push the whole sequence forward">${esc(due)}</button>`
+        const dueHtml = (r.anchor_id || isManual)
+          ? `<button class="fu-due fu-due-editable" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole sequence forward"}">${esc(due)}</button>`
           : `<div class="fu-due">${esc(due)}</div>`;
+        // Small "manual" badge so operators can tell at a glance which
+        // tasks come from the cadence vs. ones they scheduled by hand.
+        const badge = isManual
+          ? `<span class="fu-source-badge fu-source-manual" title="Manually scheduled task (not from cadence)">Manual</span>`
+          : "";
         return `
-          <article class="fu-row">
+          <article class="fu-row${isManual ? " fu-row-manual" : ""}">
             <div class="fu-row-head">
-              <div class="fu-name">${esc(r.prospect_name)}</div>
+              <div class="fu-name">${esc(r.prospect_name)} ${badge}</div>
               <div class="fu-row-head-right">
                 ${dueHtml}
-                <button class="fu-cancel" data-action="cancel" data-idx="${idx}" type="button" title="Cancel this follow-up sequence (this prospect won't get any more follow-ups)" aria-label="Cancel follow-up sequence">×</button>
+                <button class="fu-cancel" data-action="cancel" data-idx="${idx}" type="button" title="${isManual ? "Delete this scheduled task" : "Cancel this follow-up sequence (this prospect won't get any more follow-ups)"}" aria-label="${isManual ? "Delete scheduled task" : "Cancel follow-up sequence"}">×</button>
               </div>
             </div>
             <div class="fu-meta">${esc(meta)}</div>
-            <div class="fu-step">${esc(step)}</div>
+            <div class="fu-step">${esc(stepText)}</div>
             <div class="fu-preview">${tpl}</div>
             <div class="fu-actions">
               <button class="fu-btn fu-btn-primary" data-action="open"    data-idx="${idx}" type="button">Open thread</button>
@@ -3453,11 +3493,11 @@
 
       // List view — same data, denser table layout, with a checkbox
       // column for bulk selection. Bulk delete fans out cancellation
-      // RPCs to drop multiple sequences at once.
+      // RPCs / DELETEs to drop multiple sequences/tasks at once.
       function renderFollowupListView(rows) {
-        const visibleIds = rows.map(r => r.linkedin_id).filter(Boolean);
-        const allSel = visibleIds.length > 0 && visibleIds.every(k => fuState.selected.has(k));
-        const someSel = !allSel && visibleIds.some(k => fuState.selected.has(k));
+        const visibleKeys = rows.map(fuRowKey);
+        const allSel = visibleKeys.length > 0 && visibleKeys.every(k => fuState.selected.has(k));
+        const someSel = !allSel && visibleKeys.some(k => fuState.selected.has(k));
         const body = rows.map((r, idx) => renderFollowupListRow(r, idx)).join("");
         return `
           <div class="fu-list-wrap">
@@ -3487,25 +3527,28 @@
       function renderFollowupListRow(r, idx) {
         const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
         const due   = formatDueLabel(r.due_at);
-        const step  = `Step ${r.step_index} · day ${r.step_day}`;
-        const isChecked = fuState.selected.has(r.linkedin_id);
+        const isManual = r.source === "manual";
+        const step  = isManual ? "Manual" : `Step ${r.step_index} · day ${r.step_day}`;
+        const key = fuRowKey(r);
+        const isChecked = fuState.selected.has(key);
         const isoDue = (r.due_at || "").slice(0, 10);
-        const dueHtml = r.anchor_id
-          ? `<button class="fu-due-editable fu-due-list-btn" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="Click to push the whole sequence forward">${esc(due)}</button>`
+        const dueHtml = (r.anchor_id || isManual)
+          ? `<button class="fu-due-editable fu-due-list-btn" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole sequence forward"}">${esc(due)}</button>`
           : esc(due);
+        const cancelTitle = isManual ? "Delete this scheduled task" : "Cancel this follow-up sequence";
         return `
-          <tr class="fu-list-row${isChecked ? " selected" : ""}" data-key="${esc(r.linkedin_id || "")}">
-            <td class="fu-col-check" data-action="toggle-fu-row" data-idx="${idx}" data-key="${esc(r.linkedin_id || "")}">
+          <tr class="fu-list-row${isChecked ? " selected" : ""}${isManual ? " fu-row-manual" : ""}" data-key="${esc(key)}">
+            <td class="fu-col-check" data-action="toggle-fu-row" data-idx="${idx}" data-key="${esc(key)}">
               <input type="checkbox" class="fu-check" tabindex="-1" ${isChecked ? "checked" : ""} aria-label="Select ${esc(r.prospect_name || "follow-up")}" />
             </td>
-            <td class="fu-col-name"><strong>${esc(r.prospect_name || "—")}</strong></td>
+            <td class="fu-col-name"><strong>${esc(r.prospect_name || "—")}</strong>${isManual ? ` <span class="fu-source-badge fu-source-manual">Manual</span>` : ""}</td>
             <td class="fu-col-meta">${esc(meta)}</td>
             <td class="fu-col-step">${esc(step)}</td>
             <td class="fu-col-due">${dueHtml}</td>
             <td class="fu-col-actions">
               <button class="fu-btn fu-btn-primary" data-action="open" data-idx="${idx}" type="button">Open</button>
               <button class="fu-btn fu-btn-success" data-action="sent" data-idx="${idx}" type="button">Mark sent</button>
-              <button class="fu-cancel"             data-action="cancel" data-idx="${idx}" type="button" title="Cancel this follow-up sequence" aria-label="Cancel follow-up sequence">×</button>
+              <button class="fu-cancel"             data-action="cancel" data-idx="${idx}" type="button" title="${cancelTitle}" aria-label="${cancelTitle}">×</button>
             </td>
           </tr>
         `;
@@ -3533,9 +3576,9 @@
         // can't express "indeterminate" — has to happen in JS post-render).
         const headCheck = root.querySelector(".fu-check-all");
         if (headCheck && fuState.view === "list") {
-          const visibleIds = fuState.rows.map(r => r.linkedin_id).filter(Boolean);
-          const sel = visibleIds.filter(k => fuState.selected.has(k)).length;
-          headCheck.indeterminate = sel > 0 && sel < visibleIds.length;
+          const visibleKeys = fuState.rows.map(fuRowKey);
+          const sel = visibleKeys.filter(k => fuState.selected.has(k)).length;
+          headCheck.indeterminate = sel > 0 && sel < visibleKeys.length;
         }
 
         root.onclick = async (e) => {
@@ -3569,10 +3612,10 @@
           if (e.target.closest("[data-action='toggle-all-fu']")) {
             // Browser fires this for both label/input. Only respond once.
             if (e.target.tagName !== "INPUT") return;
-            const visibleIds = fuState.rows.map(r => r.linkedin_id).filter(Boolean);
-            const allSel = visibleIds.every(k => fuState.selected.has(k));
-            if (allSel) for (const k of visibleIds) fuState.selected.delete(k);
-            else        for (const k of visibleIds) fuState.selected.add(k);
+            const visibleKeys = fuState.rows.map(fuRowKey);
+            const allSel = visibleKeys.every(k => fuState.selected.has(k));
+            if (allSel) for (const k of visibleKeys) fuState.selected.delete(k);
+            else        for (const k of visibleKeys) fuState.selected.add(k);
             renderFollowups();
             return;
           }
@@ -3615,6 +3658,16 @@
             btn.disabled = true;
             try {
               await logFollowupAction(row, action === "sent" ? "followup" : "meeting_booked");
+              // Manual tasks: also delete the scheduled_followups row
+              // since the task is now done. Cadence tasks: nothing to
+              // delete — the followups_due view recomputes the next
+              // step automatically from the new followup count.
+              if (row.source === "manual" && row.task_id) {
+                await sb.sbFetch(
+                  `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(row.task_id)}`,
+                  { method: "DELETE", headers: { Prefer: "return=minimal" } }
+                );
+              }
               await loadFollowups();
             } catch (err) {
               btn.disabled = false;
@@ -3625,6 +3678,29 @@
           }
           if (action === "cancel") {
             const name = row.prospect_name || "this prospect";
+            // Manual tasks: just delete the row (it's a TODO, no audit
+            // trail needed). Cadence tasks: log a cadence_cancelled
+            // outreach event so the sequence exits cleanly + the audit
+            // log records the operator's intent.
+            if (row.source === "manual") {
+              if (!confirm(`Delete the scheduled follow-up for ${name}?`)) return;
+              btn.disabled = true;
+              try {
+                if (!row.task_id) throw new Error("missing task id");
+                await sb.sbFetch(
+                  `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(row.task_id)}`,
+                  { method: "DELETE", headers: { Prefer: "return=minimal" } }
+                );
+                await loadFollowups();
+              } catch (err) {
+                btn.disabled = false;
+                feedback(btn, "Failed");
+                console.error(err);
+              }
+              return;
+            }
+
+            // Cadence-derived: existing cancel flow.
             if (!confirm(`Cancel the follow-up sequence for ${name}?\n\nThey won't get any more follow-ups. You can undo this from the Prospects tab by deleting the cadence_cancelled event.`)) return;
             btn.disabled = true;
             try {
@@ -3645,15 +3721,17 @@
       }
 
       // Click-to-edit follow-up due date. Swap the date label for an
-      // <input type="date">, focus + open native picker. On change,
-      // compute delta = (new_due - current_due) in days, PATCH the
-      // anchor outreach row's cadence_snooze_days by += delta. The
-      // delta cascades to every later step in the same sequence
-      // because they all read the same anchor's snooze column.
+      // <input type="date">, focus + open native picker. On change:
+      //   cadence: PATCH the anchor outreach row's cadence_snooze_days
+      //            by += delta — cascades to every later step in the
+      //            same sequence.
+      //   manual:  UPDATE the scheduled_followups row's due_at directly
+      //            — no cascade (it's a single TODO).
       function handleEditFollowupDue(btnEl, row) {
         if (btnEl.dataset.editing === "1") return;
         btnEl.dataset.editing = "1";
         const startIso = btnEl.dataset.iso || (row.due_at || "").slice(0, 10);
+        const isManual = row.source === "manual";
 
         const input = document.createElement("input");
         input.type      = "date";
@@ -3668,24 +3746,23 @@
         }
 
         let saving = false;
-        const restore = (freshIso) => {
+        const restoreAfterSave = () => {
           if (input.parentNode) {
-            // Re-render the whole list — easier than rebuilding the
-            // single button, and since we've changed the snooze for
-            // this anchor every other follow-up in the sequence will
-            // also need a fresh due_at.
+            // Reload the list — for cadence rows the whole sequence
+            // shifted, for manual rows just one row changed. Either
+            // way, refetch is cheaper than partial mirroring.
             loadFollowups();
           }
         };
         const cancel = () => {
           if (input.parentNode) {
-            // Just restore the static button without a reload.
+            // Restore the static button without a reload.
             const span = document.createElement("button");
-            span.className = "fu-due fu-due-editable";
+            span.className = btnEl.className;
             span.dataset.action = "edit-due";
             span.dataset.idx    = btnEl.dataset.idx;
             span.dataset.iso    = startIso;
-            span.title          = "Click to push the whole sequence forward";
+            span.title          = btnEl.title;
             span.textContent    = formatDueLabel(row.due_at);
             input.replaceWith(span);
           }
@@ -3698,22 +3775,34 @@
           saving = true;
           input.disabled = true;
 
-          // Compute delta in whole days. Treat both dates as UTC midnight
-          // to avoid DST surprises; we don't care about hour-precision
-          // for cadence snoozing.
-          const startMs = new Date(startIso + "T00:00:00Z").getTime();
-          const nextMs  = new Date(next     + "T00:00:00Z").getTime();
-          const deltaDays = Math.round((nextMs - startMs) / 86400000);
-          const newSnooze = (row.cadence_snooze_days || 0) + deltaDays;
-
           try {
-            await sb.sbFetch("/rest/v1/rpc/update_outreach_event", {
-              method: "POST",
-              body:   JSON.stringify({
-                p_id: row.anchor_id,
-                p_changes: { cadence_snooze_days: newSnooze },
-              }),
-            });
+            if (isManual) {
+              if (!row.task_id) throw new Error("missing task id");
+              // Store at noon local so the date displays correctly across
+              // most timezones (matches the "Add follow-up" insert path).
+              await sb.sbFetch(
+                `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(row.task_id)}`,
+                {
+                  method: "PATCH",
+                  body:   JSON.stringify({ due_at: `${next}T12:00:00` }),
+                  headers: { Prefer: "return=minimal" },
+                }
+              );
+            } else {
+              // Cadence: PATCH the anchor's cadence_snooze_days by the
+              // delta. Compute delta at UTC midnight to avoid DST.
+              const startMs = new Date(startIso + "T00:00:00Z").getTime();
+              const nextMs  = new Date(next     + "T00:00:00Z").getTime();
+              const deltaDays = Math.round((nextMs - startMs) / 86400000);
+              const newSnooze = (row.cadence_snooze_days || 0) + deltaDays;
+              await sb.sbFetch("/rest/v1/rpc/update_outreach_event", {
+                method: "POST",
+                body:   JSON.stringify({
+                  p_id: row.anchor_id,
+                  p_changes: { cadence_snooze_days: newSnooze },
+                }),
+              });
+            }
           } catch (err) {
             saving = false;
             input.disabled = false;
@@ -3721,10 +3810,7 @@
             cancel();
             return;
           }
-
-          // Reload — every follow-up in this sequence has shifted, so
-          // a partial mirror is fragile. Full reload is cheap.
-          restore(next);
+          restoreAfterSave();
         };
 
         input.addEventListener("change", save);
@@ -3733,35 +3819,45 @@
           else if (e.key === "Enter") { e.preventDefault(); save(); }
         });
         input.addEventListener("blur", () => {
-          // Defer so a 'change' triggered by clicking a date in the
-          // native picker has a chance to fire first.
           setTimeout(() => {
             if (input.isConnected) cancel();
           }, 50);
         });
       }
 
-      // Bulk cancel — fan out cadence_cancelled inserts in parallel,
-      // then reload. Uses linkedin_id keys captured from fuState; we
-      // look up the matching row for each to grab the prospect's
-      // identifier set (profile_url, sales_nav_url) for the audit-
-      // friendly insert payload.
+      // Bulk cancel — fans out per-row cancellation in parallel.
+      // Cadence rows: log a cadence_cancelled outreach event.
+      // Manual rows: DELETE the scheduled_followups row.
       async function handleBulkCancelFollowups(btnEl) {
         const keys = Array.from(fuState.selected);
         if (!keys.length) return;
         const targets = keys
-          .map(k => fuState.rows.find(r => r.linkedin_id === k))
+          .map(k => fuState.rows.find(r => fuRowKey(r) === k))
           .filter(Boolean);
         if (!targets.length) return;
 
-        if (!confirm(`Cancel ${targets.length} follow-up sequence${targets.length === 1 ? "" : "s"}? Selected prospects won't receive any more follow-ups.`)) return;
+        const cadenceCount = targets.filter(r => r.source !== "manual").length;
+        const manualCount  = targets.filter(r => r.source === "manual").length;
+        const desc = [
+          cadenceCount ? `${cadenceCount} sequence${cadenceCount === 1 ? "" : "s"}` : "",
+          manualCount  ? `${manualCount} manual task${manualCount === 1 ? "" : "s"}`  : "",
+        ].filter(Boolean).join(" + ");
+        if (!confirm(`Cancel ${desc}? Selected prospects won't receive any more follow-ups for these.`)) return;
 
         btnEl.disabled = true;
         const prevLabel = btnEl.textContent;
         btnEl.textContent = "Cancelling…";
 
         const results = await Promise.allSettled(
-          targets.map(r => logFollowupAction(r, "cadence_cancelled"))
+          targets.map(r => {
+            if (r.source === "manual") {
+              return sb.sbFetch(
+                `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(r.task_id)}`,
+                { method: "DELETE", headers: { Prefer: "return=minimal" } }
+              );
+            }
+            return logFollowupAction(r, "cadence_cancelled");
+          })
         );
 
         const failed = results.filter(r => r.status === "rejected");

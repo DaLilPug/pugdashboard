@@ -1395,11 +1395,12 @@ body.login-body {
   background: var(--red-light);
 }
 
-/* Click-to-edit due-date button on follow-up cards. Looks like the
-   static .fu-due text at rest; hover reveals it as interactive (dashed
-   underline). When clicked, the JS swaps it for a native date picker
-   (.fu-due-input) inline. Editing one follow-up's due cascades to all
-   later steps in the same sequence via cadence_snooze_days. */
+/* Click-to-edit due-date button on follow-up cards. Always shows a
+   dashed underline so the affordance is obvious at rest (operators
+   shouldn't have to discover-by-hover that the date is clickable).
+   Hover lifts to solid + navy color. On manual rows the date edits
+   the row directly; on cadence rows it shifts the whole sequence
+   forward via cadence_snooze_days. */
 .fu-due-editable {
   background: none;
   border: none;
@@ -1409,13 +1410,14 @@ body.login-body {
   font-weight: 600;
   color: var(--gray-400);
   cursor: pointer;
-  border-bottom: 1px dashed transparent;
-  transition: color 80ms ease, border-color 80ms ease;
+  border-bottom: 1px dashed var(--gray-200);
+  transition: color 80ms ease, border-color 80ms ease, border-style 80ms ease;
   white-space: nowrap;
 }
 .fu-due-editable:hover {
   color: var(--navy);
-  border-bottom-color: var(--gray-300);
+  border-bottom-color: var(--navy);
+  border-bottom-style: solid;
 }
 .fu-due-list-btn {
   /* List view variant — same click-to-edit semantics, but lives in a
@@ -1437,6 +1439,35 @@ body.login-body {
 }
 .fu-due-input:focus {
   border-color: var(--navy);
+}
+
+/* "Manual" badge on follow-up rows — distinguishes operator-scheduled
+   one-off tasks from cadence-derived steps. Indigo to match the
+   InMail status pill so the visual language stays consistent across
+   "out-of-band action" indicators. */
+.fu-source-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.fu-source-manual {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4338ca;
+}
+/* Subtle left-border tint on the whole row so it scans as "different
+   from cadence" without being loud. Same indigo family as the badge. */
+.fu-row.fu-row-manual {
+  border-left: 3px solid #6366f1;
+}
+.fu-list-row.fu-row-manual td:first-child {
+  border-left: 3px solid #6366f1;
 }
 
 /* ---- list view ------------------------------------------------- */
