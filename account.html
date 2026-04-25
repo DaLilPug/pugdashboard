@@ -724,12 +724,28 @@
         // cases. handleProspectCheckboxToggle is the boring "add or remove
         // from the Set" path used by both this listener and the toggle-all
         // action.
-        // Per-event split-mode checkbox toggle. The prospect-level
-        // checkbox is handled in the click delegate (it manages its own
-        // state via preventDefault so range-select works correctly);
-        // split-mode checkboxes don't need range-select so the simpler
-        // change-event path is fine here.
+        // Prospect-level checkbox change. The browser fires `change`
+        // after a successful native toggle (plain click that wasn't
+        // preventDefault'd). We just sync state.selected to match
+        // cb.checked. Shift+click goes through the click handler with
+        // preventDefault, which suppresses the native toggle so this
+        // change listener doesn't fire for the shift case (good — the
+        // click handler already updated state.selected for the range).
         wrapEl.addEventListener("change", (e) => {
+          const cb = e.target.closest(".pr-check");
+          if (cb) {
+            const cell = cb.closest("[data-key]");
+            if (cell) {
+              const key = cell.dataset.key;
+              if (cb.checked) state.selected.add(key);
+              else            state.selected.delete(key);
+              state.lastCheckedKey = key;
+              syncSelectionUi();
+            }
+            return;
+          }
+
+          // Per-event split-mode checkbox toggle.
           const splitCb = e.target.closest(".pr-event-split-check input");
           if (splitCb && state.splitMode) {
             const label = splitCb.closest("[data-event-id]");
@@ -1783,26 +1799,33 @@
             return;
           }
           if (action === "toggle-prospect-check") {
-            // Take full control of the toggle here: preventDefault on
-            // the click stops the input's native flip, we update state
-            // directly, syncSelectionUi paints the checkbox to match.
+            // Plain click: let the browser toggle the checkbox natively,
+            // which fires a `change` event that the listener below
+            // catches and uses to update state.selected. We deliberately
+            // do NOT preventDefault here, because preventDefault on a
+            // checkbox click causes the browser to roll the input's
+            // .checked state back to its pre-click value AFTER our
+            // synchronous handler runs. That rollback was overwriting
+            // any cb.checked we set in syncSelectionUi, leaving the
+            // most-recently-clicked checkbox visually unchecked while
+            // state.selected said otherwise.
             //
-            // Why not let the browser toggle and use a change listener?
-            // Earlier version wrapped the input in a <label> and relied
-            // on label→input click synthesis. Browsers preserve modifier
-            // keys inconsistently across that synthesis, and shift+click
-            // on a label is sometimes interpreted as text selection,
-            // either of which broke range-select. Doing it manually
-            // sidesteps both issues.
-            clickEvt.preventDefault();
+            // For clicks that hit padding around the input (not the
+            // input itself), forward the click to the input so it
+            // toggles + fires change. isTrusted guard prevents the
+            // forward from looping back into this handler.
             const key = actionEl.dataset.key;
             if (!key) return;
 
-            // Shift+click range-select: extend from the last anchor to
-            // this row, ALWAYS in the "select" direction (Excel-/Sheets-
-            // like behavior — shift+click adds to the selection, never
-            // deselects).
+            // Shift+click range-select: override the browser's single-
+            // toggle behavior with a range fill. We DO preventDefault
+            // here because we don't want the input to also toggle —
+            // syncSelectionUi paints all the inputs to match state. The
+            // rollback issue from above doesn't bite here because we're
+            // re-painting all inputs, not relying on the just-clicked
+            // one's natural toggle.
             if (clickEvt.shiftKey && state.lastCheckedKey && state.lastCheckedKey !== key) {
+              clickEvt.preventDefault();
               const keys = state.filtered.map(p => p.key);
               const startIdx = keys.indexOf(state.lastCheckedKey);
               const endIdx   = keys.indexOf(key);
@@ -1811,17 +1834,20 @@
                 for (let i = lo; i <= hi; i++) state.selected.add(keys[i]);
                 state.lastCheckedKey = key;
                 syncSelectionUi();
-                return;
               }
+              return;
             }
 
-            // Plain toggle (no shift, no anchor yet, or shift+click on
-            // the row that IS the anchor). Treat it as a regular
-            // single-row toggle.
-            if (state.selected.has(key)) state.selected.delete(key);
-            else                          state.selected.add(key);
-            state.lastCheckedKey = key;
-            syncSelectionUi();
+            // Click on the TD padding (not the input) — forward to the
+            // input so it toggles + fires change naturally.
+            if (clickEvt.isTrusted && clickEvt.target.tagName !== "INPUT") {
+              const cb = actionEl.querySelector(".pr-check");
+              if (cb) cb.click();
+              return;
+            }
+
+            // Click directly on the input — let the browser toggle it,
+            // change listener handles state. Nothing to do here.
             return;
           }
           if (action === "bulk-clear-selection") {
@@ -3283,12 +3309,19 @@
         const tpl   = r.template
           ? esc(truncate(renderTemplate(r.template, r), 180))
           : `<span class="fu-notemplate">No template set for this step.</span>`;
+        // Click-to-edit due date when we have the anchor id (every
+        // followups_due row should). data-iso is the YYYY-MM-DD format
+        // expected by <input type="date">.
+        const isoDue = (r.due_at || "").slice(0, 10);
+        const dueHtml = r.anchor_id
+          ? `<button class="fu-due fu-due-editable" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="Click to push the whole sequence forward">${esc(due)}</button>`
+          : `<div class="fu-due">${esc(due)}</div>`;
         return `
           <article class="fu-row">
             <div class="fu-row-head">
               <div class="fu-name">${esc(r.prospect_name)}</div>
               <div class="fu-row-head-right">
-                <div class="fu-due">${esc(due)}</div>
+                ${dueHtml}
                 <button class="fu-cancel" data-action="cancel" data-idx="${idx}" type="button" title="Cancel this follow-up sequence (this prospect won't get any more follow-ups)" aria-label="Cancel follow-up sequence">×</button>
               </div>
             </div>
@@ -3343,6 +3376,10 @@
         const due   = formatDueLabel(r.due_at);
         const step  = `Step ${r.step_index} · day ${r.step_day}`;
         const isChecked = fuState.selected.has(r.linkedin_id);
+        const isoDue = (r.due_at || "").slice(0, 10);
+        const dueHtml = r.anchor_id
+          ? `<button class="fu-due-editable fu-due-list-btn" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="Click to push the whole sequence forward">${esc(due)}</button>`
+          : esc(due);
         return `
           <tr class="fu-list-row${isChecked ? " selected" : ""}" data-key="${esc(r.linkedin_id || "")}">
             <td class="fu-col-check" data-action="toggle-fu-row" data-idx="${idx}" data-key="${esc(r.linkedin_id || "")}">
@@ -3351,7 +3388,7 @@
             <td class="fu-col-name"><strong>${esc(r.prospect_name || "—")}</strong></td>
             <td class="fu-col-meta">${esc(meta)}</td>
             <td class="fu-col-step">${esc(step)}</td>
-            <td class="fu-col-due">${esc(due)}</td>
+            <td class="fu-col-due">${dueHtml}</td>
             <td class="fu-col-actions">
               <button class="fu-btn fu-btn-primary" data-action="open" data-idx="${idx}" type="button">Open</button>
               <button class="fu-btn fu-btn-success" data-action="sent" data-idx="${idx}" type="button">Mark sent</button>
@@ -3487,7 +3524,108 @@
             }
             return;
           }
+          if (action === "edit-due") {
+            handleEditFollowupDue(btn, row);
+            return;
+          }
         };
+      }
+
+      // Click-to-edit follow-up due date. Swap the date label for an
+      // <input type="date">, focus + open native picker. On change,
+      // compute delta = (new_due - current_due) in days, PATCH the
+      // anchor outreach row's cadence_snooze_days by += delta. The
+      // delta cascades to every later step in the same sequence
+      // because they all read the same anchor's snooze column.
+      function handleEditFollowupDue(btnEl, row) {
+        if (btnEl.dataset.editing === "1") return;
+        btnEl.dataset.editing = "1";
+        const startIso = btnEl.dataset.iso || (row.due_at || "").slice(0, 10);
+
+        const input = document.createElement("input");
+        input.type      = "date";
+        input.className = "fu-due-input";
+        input.value     = startIso;
+        input.setAttribute("aria-label", "Edit follow-up due date");
+
+        btnEl.replaceWith(input);
+        input.focus();
+        if (typeof input.showPicker === "function") {
+          try { input.showPicker(); } catch { /* ignore */ }
+        }
+
+        let saving = false;
+        const restore = (freshIso) => {
+          if (input.parentNode) {
+            // Re-render the whole list — easier than rebuilding the
+            // single button, and since we've changed the snooze for
+            // this anchor every other follow-up in the sequence will
+            // also need a fresh due_at.
+            loadFollowups();
+          }
+        };
+        const cancel = () => {
+          if (input.parentNode) {
+            // Just restore the static button without a reload.
+            const span = document.createElement("button");
+            span.className = "fu-due fu-due-editable";
+            span.dataset.action = "edit-due";
+            span.dataset.idx    = btnEl.dataset.idx;
+            span.dataset.iso    = startIso;
+            span.title          = "Click to push the whole sequence forward";
+            span.textContent    = formatDueLabel(row.due_at);
+            input.replaceWith(span);
+          }
+        };
+
+        const save = async () => {
+          if (saving) return;
+          const next = input.value;
+          if (!next || next === startIso) { cancel(); return; }
+          saving = true;
+          input.disabled = true;
+
+          // Compute delta in whole days. Treat both dates as UTC midnight
+          // to avoid DST surprises; we don't care about hour-precision
+          // for cadence snoozing.
+          const startMs = new Date(startIso + "T00:00:00Z").getTime();
+          const nextMs  = new Date(next     + "T00:00:00Z").getTime();
+          const deltaDays = Math.round((nextMs - startMs) / 86400000);
+          const newSnooze = (row.cadence_snooze_days || 0) + deltaDays;
+
+          try {
+            await sb.sbFetch("/rest/v1/rpc/update_outreach_event", {
+              method: "POST",
+              body:   JSON.stringify({
+                p_id: row.anchor_id,
+                p_changes: { cadence_snooze_days: newSnooze },
+              }),
+            });
+          } catch (err) {
+            saving = false;
+            input.disabled = false;
+            alert("Couldn't update due date: " + (err.message || err));
+            cancel();
+            return;
+          }
+
+          // Reload — every follow-up in this sequence has shifted, so
+          // a partial mirror is fragile. Full reload is cheap.
+          restore(next);
+        };
+
+        input.addEventListener("change", save);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") { e.preventDefault(); cancel(); }
+          else if (e.key === "Enter") { e.preventDefault(); save(); }
+        });
+        input.addEventListener("blur", () => {
+          // Defer so a 'change' triggered by clicking a date in the
+          // native picker has a chance to fire first.
+          setTimeout(() => {
+            if (input.isConnected) cancel();
+          }, 50);
+        });
       }
 
       // Bulk cancel — fan out cadence_cancelled inserts in parallel,

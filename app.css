@@ -1395,6 +1395,50 @@ body.login-body {
   background: var(--red-light);
 }
 
+/* Click-to-edit due-date button on follow-up cards. Looks like the
+   static .fu-due text at rest; hover reveals it as interactive (dashed
+   underline). When clicked, the JS swaps it for a native date picker
+   (.fu-due-input) inline. Editing one follow-up's due cascades to all
+   later steps in the same sequence via cadence_snooze_days. */
+.fu-due-editable {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-400);
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: color 80ms ease, border-color 80ms ease;
+  white-space: nowrap;
+}
+.fu-due-editable:hover {
+  color: var(--navy);
+  border-bottom-color: var(--gray-300);
+}
+.fu-due-list-btn {
+  /* List view variant — same click-to-edit semantics, but lives in a
+     table cell so doesn't need the .fu-due wrapper styling. */
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+}
+.fu-due-input {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--navy);
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: #fff;
+  outline: none;
+}
+.fu-due-input:focus {
+  border-color: var(--navy);
+}
+
 /* ---- list view ------------------------------------------------- */
 
 .fu-list-wrap {
