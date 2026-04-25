@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — Uptown Creation</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Self-contained styles — this page is a public legal doc that
+       should render correctly even if app.css moves or breaks. */
+    :root {
+      --navy:        #0f2138;
+      --navy-soft:   #1c3550;
+      --navy-2:      #4b5b6e;
+      --gray-50:     #f7f8fa;
+      --gray-100:    #eef0f3;
+      --gray-200:    #d8dde3;
+      --gray-300:    #b6bdc6;
+      --gray-400:    #6f7989;
+      --text:        #15212b;
+      --text-soft:   #4a5562;
+      --accent:      #2d7ab8;
+      --max-w:       760px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: #fff;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+      color: #fff;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header img { height: 30px; width: auto; display: block; }
+    .header-wordmark-top {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    .header-wordmark-bot {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.78);
+      margin-top: 2px;
+    }
+    .header-spacer { flex: 1; }
+    .header a {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .header a:hover { color: #fff; text-decoration: underline; }
+
+    .draft-banner {
+      background: #fff7e0;
+      border-bottom: 1px solid #f3d27a;
+      color: #6b4c00;
+      font-size: 13px;
+      padding: 10px 28px;
+      text-align: center;
+    }
+
+    main {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.01em;
+      margin: 0 0 6px;
+    }
+    .effective-date {
+      font-size: 13px;
+      color: var(--gray-400);
+      margin-bottom: 36px;
+    }
+    h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 36px 0 10px;
+      letter-spacing: 0.01em;
+    }
+    h2 .num {
+      display: inline-block;
+      width: 28px;
+      color: var(--gray-300);
+      font-weight: 600;
+    }
+    p, ul, ol { margin: 0 0 14px; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--accent); }
+    strong { color: var(--text); font-weight: 600; }
+
+    .toc {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 40px;
+    }
+    .toc-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 8px;
+    }
+    .toc ol {
+      columns: 2;
+      column-gap: 28px;
+      margin: 0;
+      padding-left: 22px;
+      font-size: 13.5px;
+    }
+    .toc li { margin-bottom: 4px; }
+    .toc a {
+      color: var(--text-soft);
+      text-decoration: none;
+    }
+    .toc a:hover { color: var(--accent); text-decoration: underline; }
+    @media (max-width: 600px) { .toc ol { columns: 1; } }
+
+    footer {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px 56px;
+      border-top: 1px solid var(--gray-100);
+      padding-top: 20px;
+      font-size: 12.5px;
+      color: var(--gray-400);
+    }
+    @media print {
+      .header, .draft-banner, footer a[href^="#"] { display: none; }
+      main { padding: 0; max-width: none; }
+      .toc { background: none; border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <img src="assets/logo-white.png" alt="Uptown" />
+    <div>
+      <div class="header-wordmark-top">UPTOWN</div>
+      <div class="header-wordmark-bot">Creation, LLC</div>
+    </div>
+    <div class="header-spacer"></div>
+    <a href="dashboard.html">← Dashboard</a>
+  </header>
+
+  <div class="draft-banner">
+    <strong>DRAFT.</strong> These Terms are a working draft and have not yet been reviewed by counsel.
+  </div>
+
+  <main>
+    <h1>Terms of Service</h1>
+    <p class="effective-date">Effective date: <strong>April 25, 2026</strong></p>
+
+    <p>These Terms of Service (&ldquo;<strong>Terms</strong>&rdquo;) form a binding agreement between you (&ldquo;<strong>you</strong>&rdquo; or &ldquo;<strong>Customer</strong>&rdquo;) and <strong>Uptown Creation, LLC</strong>, an Iowa limited liability company (&ldquo;<strong>Uptown</strong>,&rdquo; &ldquo;<strong>we</strong>,&rdquo; &ldquo;<strong>us</strong>,&rdquo; or &ldquo;<strong>our</strong>&rdquo;), governing your access to and use of the Uptown Creation platform, including the web dashboard at <a href="https://dashboard.uptown.com">dashboard.uptown.com</a>, the Uptown Outreach Tracker browser extension, and any related services (collectively, the &ldquo;<strong>Service</strong>&rdquo;).</p>
+
+    <p>By accessing or using the Service, you agree to be bound by these Terms. If you do not agree, do not use the Service.</p>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#s1">The Service</a></li>
+        <li><a href="#s2">Eligibility &amp; Accounts</a></li>
+        <li><a href="#s3">Subscriptions &amp; Billing</a></li>
+        <li><a href="#s4">Acceptable Use</a></li>
+        <li><a href="#s5">LinkedIn Compliance</a></li>
+        <li><a href="#s6">Customer Data &amp; Content</a></li>
+        <li><a href="#s7">Intellectual Property</a></li>
+        <li><a href="#s8">Privacy</a></li>
+        <li><a href="#s9">Third-Party Services</a></li>
+        <li><a href="#s10">Term &amp; Termination</a></li>
+        <li><a href="#s11">Disclaimers</a></li>
+        <li><a href="#s12">Limitation of Liability</a></li>
+        <li><a href="#s13">Indemnification</a></li>
+        <li><a href="#s14">Modifications</a></li>
+        <li><a href="#s15">Governing Law</a></li>
+        <li><a href="#s16">Dispute Resolution</a></li>
+        <li><a href="#s17">Miscellaneous</a></li>
+        <li><a href="#s18">Contact</a></li>
+      </ol>
+    </div>
+
+    <h2 id="s1"><span class="num">1.</span>The Service</h2>
+    <p>Uptown provides a multi-tenant software platform that helps sales and business-development teams plan, execute, and analyze outreach campaigns conducted on professional networking platforms, primarily LinkedIn. The Service includes (a) a hosted web dashboard for organizations and their operators, (b) a Chrome browser extension that helps log outreach activity, and (c) automated reporting and analysis features. Uptown may, in its sole discretion, add, change, or remove features at any time.</p>
+
+    <h2 id="s2"><span class="num">2.</span>Eligibility &amp; Accounts</h2>
+    <p>You must be at least 18 years old and able to form a legally binding contract to use the Service. You agree to provide accurate, complete, and current information when creating an account, and to keep that information up to date. You are responsible for maintaining the confidentiality of your account credentials and for any activity occurring under your account. You must notify us promptly at <a href="mailto:austin@uptown.com">austin@uptown.com</a> if you suspect unauthorized use.</p>
+    <p>If you create an account on behalf of an organization, you represent that you have authority to bind that organization to these Terms.</p>
+
+    <h2 id="s3"><span class="num">3.</span>Subscriptions &amp; Billing</h2>
+    <p>Access to certain features of the Service requires a paid subscription. Subscription fees, billing cadence, and seat-based pricing are described in your order or in the dashboard at the time of purchase. Unless otherwise stated:</p>
+    <ul>
+      <li>Subscriptions renew automatically at the end of each billing period at the then-current rate.</li>
+      <li>Fees are non-refundable except where required by law or expressly stated in writing.</li>
+      <li>You may cancel future renewals at any time; cancellation takes effect at the end of the then-current billing period.</li>
+      <li>We may suspend or terminate your access for non-payment after reasonable notice.</li>
+      <li>We may change fees on at least thirty (30) days&rsquo; notice; continued use after the change constitutes acceptance.</li>
+    </ul>
+
+    <h2 id="s4"><span class="num">4.</span>Acceptable Use</h2>
+    <p>You agree not to, and not to permit any third party to:</p>
+    <ul>
+      <li>Use the Service to send spam, harass, defraud, or harm any person;</li>
+      <li>Use the Service to violate any applicable law or regulation, including anti-spam, privacy, and data-protection laws;</li>
+      <li>Reverse engineer, decompile, or attempt to derive the source code of the Service, except to the extent expressly permitted by law;</li>
+      <li>Interfere with or disrupt the integrity or performance of the Service or its underlying infrastructure;</li>
+      <li>Use the Service to build a competing product or to benchmark against the Service for a competing product;</li>
+      <li>Resell or sublicense the Service without our prior written consent;</li>
+      <li>Upload or transmit any malicious code, viruses, or harmful data;</li>
+      <li>Circumvent any technical access controls or rate limits.</li>
+    </ul>
+
+    <h2 id="s5"><span class="num">5.</span>LinkedIn Compliance</h2>
+    <p><strong>Uptown is not affiliated with, endorsed by, or sponsored by LinkedIn Corporation.</strong> The Service interacts with LinkedIn solely on your behalf and at your direction. You are solely responsible for ensuring that your use of LinkedIn through the Service complies with the <a href="https://www.linkedin.com/legal/user-agreement" target="_blank" rel="noopener">LinkedIn User Agreement</a>, the <a href="https://www.linkedin.com/legal/professional-community-policies" target="_blank" rel="noopener">LinkedIn Professional Community Policies</a>, and any other applicable LinkedIn terms.</p>
+    <p>You acknowledge that LinkedIn may, at its discretion: (a) change its product, APIs, or terms in ways that affect the Service; (b) restrict, suspend, or terminate your LinkedIn account; or (c) take other actions that affect your ability to use the Service. Uptown is not responsible for actions taken by LinkedIn against your LinkedIn account.</p>
+
+    <h2 id="s6"><span class="num">6.</span>Customer Data &amp; Content</h2>
+    <p>&ldquo;<strong>Customer Data</strong>&rdquo; means any data, content, or information you submit to or generate within the Service, including outreach records, prospect data, message templates, and analytics. As between you and Uptown, you retain all rights, title, and interest in your Customer Data.</p>
+    <p>You grant Uptown a worldwide, non-exclusive, royalty-free license to host, store, copy, transmit, display, and process Customer Data solely as needed to provide and improve the Service, to enforce these Terms, and to comply with law. We may also use de-identified, aggregated data for analytics and to improve the Service.</p>
+    <p>You represent and warrant that (a) you have all rights necessary to submit Customer Data to the Service, and (b) the Customer Data does not violate any third-party rights or applicable law.</p>
+
+    <h2 id="s7"><span class="num">7.</span>Intellectual Property</h2>
+    <p>The Service, including all software, designs, text, graphics, logos, and trademarks, is owned by Uptown or its licensors and is protected by U.S. and international intellectual property laws. We grant you a limited, non-exclusive, non-transferable, revocable license to access and use the Service for your internal business purposes during your subscription term, subject to these Terms.</p>
+    <p>If you provide feedback, suggestions, or ideas about the Service, you grant Uptown a perpetual, irrevocable, royalty-free license to use them without restriction.</p>
+
+    <h2 id="s8"><span class="num">8.</span>Privacy</h2>
+    <p>Our collection and use of personal information is described in our Privacy Policy, which is incorporated into these Terms by reference. By using the Service, you agree to the practices described in the Privacy Policy.</p>
+
+    <h2 id="s9"><span class="num">9.</span>Third-Party Services</h2>
+    <p>The Service integrates with or relies on third-party services (including, without limitation, LinkedIn, Supabase, Anthropic, and Stripe). Your use of those services is governed by their own terms and privacy policies. Uptown is not responsible for third-party services or their availability, performance, or content.</p>
+
+    <h2 id="s10"><span class="num">10.</span>Term &amp; Termination</h2>
+    <p>These Terms remain in effect while you use the Service. You may stop using the Service at any time. We may suspend or terminate your access at any time, with or without notice, if (a) you breach these Terms, (b) we are required by law, (c) we discontinue the Service, or (d) we have a good-faith reason to do so.</p>
+    <p>Upon termination, your right to access the Service ends. We may, but are not required to, retain Customer Data for a reasonable period after termination. Sections that by their nature should survive termination (including <em>Customer Data &amp; Content</em>, <em>Intellectual Property</em>, <em>Disclaimers</em>, <em>Limitation of Liability</em>, <em>Indemnification</em>, <em>Governing Law</em>, and <em>Miscellaneous</em>) survive.</p>
+
+    <h2 id="s11"><span class="num">11.</span>Disclaimers</h2>
+    <p>THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS AVAILABLE,&rdquo; WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND ANY WARRANTIES ARISING FROM COURSE OF DEALING OR USAGE OF TRADE. UPTOWN DOES NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE, OR THAT ANY DEFECTS WILL BE CORRECTED. UPTOWN DOES NOT WARRANT ANY PARTICULAR OUTCOME OR RESULT FROM USING THE SERVICE, INCLUDING ANY OUTREACH METRIC OR LEAD-GENERATION OUTCOME.</p>
+
+    <h2 id="s12"><span class="num">12.</span>Limitation of Liability</h2>
+    <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, UPTOWN SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, REVENUE, DATA, OR GOODWILL, WHETHER IN CONTRACT, TORT (INCLUDING NEGLIGENCE), OR OTHERWISE, ARISING OUT OF OR IN CONNECTION WITH THESE TERMS OR THE SERVICE, EVEN IF UPTOWN HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+    <p>UPTOWN&rsquo;S TOTAL CUMULATIVE LIABILITY ARISING OUT OF OR RELATED TO THESE TERMS OR THE SERVICE SHALL NOT EXCEED THE GREATER OF (A) THE FEES YOU PAID TO UPTOWN FOR THE SERVICE IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM, OR (B) ONE HUNDRED U.S. DOLLARS ($100).</p>
+    <p>Some jurisdictions do not allow the exclusion of certain warranties or limitations on liability; in those jurisdictions our liability is limited to the maximum extent permitted by law.</p>
+
+    <h2 id="s13"><span class="num">13.</span>Indemnification</h2>
+    <p>You agree to defend, indemnify, and hold harmless Uptown and its officers, directors, employees, and agents from and against any third-party claims, damages, losses, and expenses (including reasonable attorneys&rsquo; fees) arising out of or related to (a) your Customer Data, (b) your use of the Service in violation of these Terms or applicable law, including LinkedIn&rsquo;s terms, or (c) your violation of any third-party right.</p>
+
+    <h2 id="s14"><span class="num">14.</span>Modifications</h2>
+    <p>We may modify these Terms from time to time. If we make material changes, we will provide reasonable notice (for example, by email or via the dashboard). The updated Terms take effect on the date posted unless otherwise stated. Your continued use of the Service after the effective date constitutes acceptance of the updated Terms.</p>
+
+    <h2 id="s15"><span class="num">15.</span>Governing Law</h2>
+    <p>These Terms are governed by the laws of the <strong>State of Iowa</strong>, without regard to its conflict-of-laws principles. The U.N. Convention on Contracts for the International Sale of Goods does not apply.</p>
+
+    <h2 id="s16"><span class="num">16.</span>Dispute Resolution</h2>
+    <p>Any dispute arising out of or related to these Terms or the Service shall be brought exclusively in the state or federal courts located in <strong>Polk County, Iowa</strong>, and you consent to the personal jurisdiction of those courts. Each party waives any objection to venue or any claim that the action has been brought in an inconvenient forum.</p>
+    <p>You and Uptown each waive the right to a trial by jury, to the extent permitted by law.</p>
+
+    <h2 id="s17"><span class="num">17.</span>Miscellaneous</h2>
+    <ul>
+      <li><strong>Entire agreement.</strong> These Terms, together with the Privacy Policy and any order form referencing these Terms, constitute the entire agreement between you and Uptown regarding the Service and supersede any prior agreements.</li>
+      <li><strong>Severability.</strong> If any provision is held unenforceable, the remaining provisions remain in full force and effect.</li>
+      <li><strong>No waiver.</strong> A failure to enforce any right or provision is not a waiver of that right or provision.</li>
+      <li><strong>Assignment.</strong> You may not assign these Terms without our prior written consent. We may assign these Terms freely.</li>
+      <li><strong>Force majeure.</strong> Neither party is liable for delays or failures caused by events beyond its reasonable control.</li>
+      <li><strong>Notices.</strong> Notices to Uptown must be sent to <a href="mailto:austin@uptown.com">austin@uptown.com</a>. Notices to you may be sent to the email associated with your account or posted in the dashboard.</li>
+      <li><strong>Independent contractors.</strong> The parties are independent contractors; nothing creates a partnership, joint venture, or agency relationship.</li>
+    </ul>
+
+    <h2 id="s18"><span class="num">18.</span>Contact</h2>
+    <p>Questions about these Terms? Contact us at:</p>
+    <p>
+      <strong>Uptown Creation, LLC</strong><br />
+      Email: <a href="mailto:austin@uptown.com">austin@uptown.com</a>
+    </p>
+  </main>
+
+  <footer>
+    &copy; 2026 Uptown Creation, LLC · <a href="dashboard.html">Dashboard</a>
+  </footer>
+
+</body>
+</html>
