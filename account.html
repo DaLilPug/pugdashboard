@@ -724,29 +724,12 @@
         // cases. handleProspectCheckboxToggle is the boring "add or remove
         // from the Set" path used by both this listener and the toggle-all
         // action.
+        // Per-event split-mode checkbox toggle. The prospect-level
+        // checkbox is handled in the click delegate (it manages its own
+        // state via preventDefault so range-select works correctly);
+        // split-mode checkboxes don't need range-select so the simpler
+        // change-event path is fine here.
         wrapEl.addEventListener("change", (e) => {
-          // (Existing sentiment-edit change handler below this still runs
-          // because that listener is registered separately on wrapEl —
-          // this listener is additive, browsers fire all matching listeners.)
-          const cb = e.target.closest(".pr-check");
-          if (cb) {
-            const label = cb.closest("[data-key]");
-            if (label) {
-              const key = label.dataset.key;
-              if (cb.checked) state.selected.add(key);
-              else            state.selected.delete(key);
-              state.lastCheckedKey = key;
-              // Re-render only what's needed: bulk bar count + this row's
-              // selected class + the header checkbox. Cheaper than full
-              // rerender, which would also collapse any open timeline.
-              syncSelectionUi();
-            }
-            return;
-          }
-
-          // Per-event split-mode checkbox toggle. Mirrors the prospect-
-          // level pattern but writes into state.splitMode.selectedEventIds
-          // and updates the in-bar count + Split button enabled state.
           const splitCb = e.target.closest(".pr-event-split-check input");
           if (splitCb && state.splitMode) {
             const label = splitCb.closest("[data-event-id]");
@@ -1275,14 +1258,12 @@
 
           return `
             <tr class="pr-row${isChecked ? " selected" : ""}" data-idx="${idx}" data-key="${esc(p.key)}">
-              <td class="pr-col-check pr-check-cell">
-                <label class="pr-check-label" data-action="toggle-prospect-check" data-key="${esc(p.key)}">
-                  <input type="checkbox"
-                         class="pr-check"
-                         ${isChecked ? "checked" : ""}
-                         tabindex="-1"
-                         aria-label="Select ${esc(p.name || "prospect")}" />
-                </label>
+              <td class="pr-col-check pr-check-cell" data-action="toggle-prospect-check" data-key="${esc(p.key)}">
+                <input type="checkbox"
+                       class="pr-check"
+                       ${isChecked ? "checked" : ""}
+                       tabindex="-1"
+                       aria-label="Select ${esc(p.name || "prospect")}" />
               </td>
               <td class="pr-name">
                 <div class="pr-name-main">${esc(p.name || "—")}</div>
@@ -1802,15 +1783,45 @@
             return;
           }
           if (action === "toggle-prospect-check") {
-            // Wraps the checkbox in a <label data-action>. Clicking the
-            // label fires a click on the input (browser-native), and we
-            // also receive the label click here. Drop the label-level
-            // event to avoid double-toggle, and let the input's change
-            // handler (below in the change listener) do the work.
-            // BUT we use this opportunity to detect shift+click for range
-            // select before the change fires.
-            if (clickEvt.target.tagName !== "INPUT") return;
-            handleProspectCheckboxClick(clickEvt.target, clickEvt);
+            // Take full control of the toggle here: preventDefault on
+            // the click stops the input's native flip, we update state
+            // directly, syncSelectionUi paints the checkbox to match.
+            //
+            // Why not let the browser toggle and use a change listener?
+            // Earlier version wrapped the input in a <label> and relied
+            // on label→input click synthesis. Browsers preserve modifier
+            // keys inconsistently across that synthesis, and shift+click
+            // on a label is sometimes interpreted as text selection,
+            // either of which broke range-select. Doing it manually
+            // sidesteps both issues.
+            clickEvt.preventDefault();
+            const key = actionEl.dataset.key;
+            if (!key) return;
+
+            // Shift+click range-select: extend from the last anchor to
+            // this row, ALWAYS in the "select" direction (Excel-/Sheets-
+            // like behavior — shift+click adds to the selection, never
+            // deselects).
+            if (clickEvt.shiftKey && state.lastCheckedKey && state.lastCheckedKey !== key) {
+              const keys = state.filtered.map(p => p.key);
+              const startIdx = keys.indexOf(state.lastCheckedKey);
+              const endIdx   = keys.indexOf(key);
+              if (startIdx >= 0 && endIdx >= 0) {
+                const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+                for (let i = lo; i <= hi; i++) state.selected.add(keys[i]);
+                state.lastCheckedKey = key;
+                syncSelectionUi();
+                return;
+              }
+            }
+
+            // Plain toggle (no shift, no anchor yet, or shift+click on
+            // the row that IS the anchor). Treat it as a regular
+            // single-row toggle.
+            if (state.selected.has(key)) state.selected.delete(key);
+            else                          state.selected.add(key);
+            state.lastCheckedKey = key;
+            syncSelectionUi();
             return;
           }
           if (action === "bulk-clear-selection") {
@@ -2070,40 +2081,6 @@
         // Per-row checkbox click. Detects shift+click for range select
         // BEFORE the browser flips the input's checked state. Range fills
         // include both endpoints.
-        function handleProspectCheckboxClick(inputEl, clickEvt) {
-          const label = inputEl.closest("[data-key]");
-          if (!label) return;
-          const key = label.dataset.key;
-
-          if (clickEvt.shiftKey && state.lastCheckedKey && state.lastCheckedKey !== key) {
-            const keys = state.filtered.map(p => p.key);
-            const startIdx = keys.indexOf(state.lastCheckedKey);
-            const endIdx   = keys.indexOf(key);
-            if (startIdx >= 0 && endIdx >= 0) {
-              const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
-              // The shift-click fills toward the new endpoint with the
-              // STATE the new endpoint will land in (i.e. checked, since
-              // the click flips it from unchecked → checked). Match
-              // Excel-ish behavior: shift+click checks the range.
-              const willBeChecked = !inputEl.checked; // browser hasn't flipped yet
-              for (let i = lo; i <= hi; i++) {
-                if (willBeChecked) state.selected.add(keys[i]);
-                else               state.selected.delete(keys[i]);
-              }
-              state.lastCheckedKey = key;
-              // Don't let the browser also flip THIS input — we already
-              // applied the result. Otherwise the click would invert it.
-              clickEvt.preventDefault();
-              syncSelectionUi();
-              return;
-            }
-          }
-          // No shift: let the change handler (registered separately on
-          // wrapEl) handle the toggle. We just need to remember this as
-          // the new range-anchor.
-          state.lastCheckedKey = key;
-        }
-
         // Re-sync the DOM bits that depend on state.selected without a
         // full rerender (which would collapse open timelines and lose
         // any in-flight edit form state).
@@ -3196,6 +3173,18 @@
 
       // ================= FOLLOW-UPS ===================================
 
+      // Followups state — view toggle (cards | list) + per-row
+      // selection set for bulk actions in list view. Keyed by
+      // linkedin_id, which is the unique identifier within a client
+      // and also what followups_due returns. Persists to localStorage
+      // so an operator's preferred view sticks across reloads.
+      const FU_VIEW_KEY = `account_${clientId}_fu_view`;
+      const fuState = {
+        view:     localStorage.getItem(FU_VIEW_KEY) === "list" ? "list" : "cards",
+        selected: new Set(),
+        rows:     [],
+      };
+
       function initFollowups() {
         loadFollowups();
       }
@@ -3214,16 +3203,54 @@
           return;
         }
 
+        fuState.rows = rows || [];
+
+        // Drop selection keys that no longer match any row (e.g. the
+        // operator just cancelled them). Avoids "Delete 3 selected"
+        // when only 1 visible target remains.
+        const visibleIds = new Set(fuState.rows.map(r => r.linkedin_id).filter(Boolean));
+        for (const k of [...fuState.selected]) {
+          if (!visibleIds.has(k)) fuState.selected.delete(k);
+        }
+
+        renderFollowups();
+      }
+
+      function renderFollowups() {
+        const root = document.getElementById("fu-root");
+        const rows = fuState.rows;
+
+        const toolbar = `
+          <div class="fu-toolbar">
+            <div class="fu-view-toggle" role="group" aria-label="View mode">
+              <button class="fu-view-btn ${fuState.view === "cards" ? "active" : ""}" data-fu-view="cards" type="button">Cards</button>
+              <button class="fu-view-btn ${fuState.view === "list"  ? "active" : ""}" data-fu-view="list"  type="button">List</button>
+            </div>
+            <span class="fu-toolbar-count">${rows.length} follow-up${rows.length === 1 ? "" : "s"} queued</span>
+          </div>
+        `;
+
         if (!rows.length) {
-          root.innerHTML = `
+          root.innerHTML = toolbar + `
             <div class="placeholder">
               <strong>No follow-ups queued</strong>
               Log a <b>Message</b> in the extension to start a sequence.
             </div>`;
+          wireFollowupRoot();
           return;
         }
 
-        const now = Date.now();
+        const bulk = renderFuBulkBar();
+        const body = fuState.view === "list"
+          ? renderFollowupListView(rows)
+          : renderFollowupCardsView(rows);
+
+        root.innerHTML = toolbar + bulk + body;
+        wireFollowupRoot();
+      }
+
+      function renderFollowupCardsView(rows) {
+        const now  = Date.now();
         const tEnd = new Date(); tEnd.setHours(23,59,59,999);
         const overdue  = [];
         const today    = [];
@@ -3240,22 +3267,183 @@
                <div class="fu-section-head fu-section-${tone}">
                  ${esc(title)} <span class="fu-count">${entries.length}</span>
                </div>
-               <div class="fu-list">${entries.map(e => renderFollowupRow(e.r, e.idx)).join("")}</div>
+               <div class="fu-list">${entries.map(e => renderFollowupCard(e.r, e.idx)).join("")}</div>
              </section>`
           : "";
 
-        root.innerHTML =
-          section("Overdue",   overdue,  "overdue") +
-          section("Due today", today,    "today") +
-          section("Upcoming",  upcoming, "upcoming");
+        return section("Overdue",   overdue,  "overdue")
+             + section("Due today", today,    "today")
+             + section("Upcoming",  upcoming, "upcoming");
+      }
 
-        // Delegate button clicks on the whole root.
+      function renderFollowupCard(r, idx) {
+        const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
+        const due   = formatDueLabel(r.due_at);
+        const step  = `Step ${r.step_index} · day ${r.step_day}`;
+        const tpl   = r.template
+          ? esc(truncate(renderTemplate(r.template, r), 180))
+          : `<span class="fu-notemplate">No template set for this step.</span>`;
+        return `
+          <article class="fu-row">
+            <div class="fu-row-head">
+              <div class="fu-name">${esc(r.prospect_name)}</div>
+              <div class="fu-row-head-right">
+                <div class="fu-due">${esc(due)}</div>
+                <button class="fu-cancel" data-action="cancel" data-idx="${idx}" type="button" title="Cancel this follow-up sequence (this prospect won't get any more follow-ups)" aria-label="Cancel follow-up sequence">×</button>
+              </div>
+            </div>
+            <div class="fu-meta">${esc(meta)}</div>
+            <div class="fu-step">${esc(step)}</div>
+            <div class="fu-preview">${tpl}</div>
+            <div class="fu-actions">
+              <button class="fu-btn fu-btn-primary" data-action="open"    data-idx="${idx}" type="button">Open thread</button>
+              <button class="fu-btn"                data-action="copy"    data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
+              <button class="fu-btn fu-btn-success" data-action="sent"    data-idx="${idx}" type="button">Mark sent</button>
+              <button class="fu-btn fu-btn-ghost"   data-action="meeting" data-idx="${idx}" type="button" title="Log meeting booked">📅</button>
+            </div>
+          </article>
+        `;
+      }
+
+      // List view — same data, denser table layout, with a checkbox
+      // column for bulk selection. Bulk delete fans out cancellation
+      // RPCs to drop multiple sequences at once.
+      function renderFollowupListView(rows) {
+        const visibleIds = rows.map(r => r.linkedin_id).filter(Boolean);
+        const allSel = visibleIds.length > 0 && visibleIds.every(k => fuState.selected.has(k));
+        const someSel = !allSel && visibleIds.some(k => fuState.selected.has(k));
+        const body = rows.map((r, idx) => renderFollowupListRow(r, idx)).join("");
+        return `
+          <div class="fu-list-wrap">
+            <table class="fu-table">
+              <thead>
+                <tr>
+                  <th class="fu-col-check">
+                    <input type="checkbox" class="fu-check-all" data-action="toggle-all-fu"
+                           ${allSel ? "checked" : ""} aria-label="Select all visible follow-ups" />
+                  </th>
+                  <th class="fu-col-name">Prospect</th>
+                  <th class="fu-col-meta">Title · Company</th>
+                  <th class="fu-col-step">Step</th>
+                  <th class="fu-col-due">Due</th>
+                  <th class="fu-col-actions"></th>
+                </tr>
+              </thead>
+              <tbody>${body}</tbody>
+            </table>
+          </div>
+        `;
+
+        // Setting the indeterminate flag has to happen after innerHTML —
+        // see wireFollowupRoot below where we apply it.
+      }
+
+      function renderFollowupListRow(r, idx) {
+        const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
+        const due   = formatDueLabel(r.due_at);
+        const step  = `Step ${r.step_index} · day ${r.step_day}`;
+        const isChecked = fuState.selected.has(r.linkedin_id);
+        return `
+          <tr class="fu-list-row${isChecked ? " selected" : ""}" data-key="${esc(r.linkedin_id || "")}">
+            <td class="fu-col-check" data-action="toggle-fu-row" data-idx="${idx}" data-key="${esc(r.linkedin_id || "")}">
+              <input type="checkbox" class="fu-check" tabindex="-1" ${isChecked ? "checked" : ""} aria-label="Select ${esc(r.prospect_name || "follow-up")}" />
+            </td>
+            <td class="fu-col-name"><strong>${esc(r.prospect_name || "—")}</strong></td>
+            <td class="fu-col-meta">${esc(meta)}</td>
+            <td class="fu-col-step">${esc(step)}</td>
+            <td class="fu-col-due">${esc(due)}</td>
+            <td class="fu-col-actions">
+              <button class="fu-btn fu-btn-primary" data-action="open" data-idx="${idx}" type="button">Open</button>
+              <button class="fu-btn fu-btn-success" data-action="sent" data-idx="${idx}" type="button">Mark sent</button>
+              <button class="fu-cancel"             data-action="cancel" data-idx="${idx}" type="button" title="Cancel this follow-up sequence" aria-label="Cancel follow-up sequence">×</button>
+            </td>
+          </tr>
+        `;
+      }
+
+      function renderFuBulkBar() {
+        const count = fuState.selected.size;
+        if (!count) return "";
+        return `
+          <div class="fu-bulk-bar" role="region" aria-label="Bulk actions">
+            <span class="fu-bulk-count">${fmtInt(count)} selected</span>
+            <button class="btn-secondary fu-bulk-action" data-action="bulk-clear-fu"  type="button">Clear</button>
+            <button class="btn-danger fu-bulk-action"    data-action="bulk-cancel-fu" type="button">Cancel ${fmtInt(count)}</button>
+          </div>
+        `;
+      }
+
+      // Bind delegated handlers on the followups root. Called after
+      // every render() since innerHTML replacement wipes prior listeners.
+      function wireFollowupRoot() {
+        const root = document.getElementById("fu-root");
+        if (!root) return;
+
+        // Set the header checkbox's indeterminate state (HTML attribute
+        // can't express "indeterminate" — has to happen in JS post-render).
+        const headCheck = root.querySelector(".fu-check-all");
+        if (headCheck && fuState.view === "list") {
+          const visibleIds = fuState.rows.map(r => r.linkedin_id).filter(Boolean);
+          const sel = visibleIds.filter(k => fuState.selected.has(k)).length;
+          headCheck.indeterminate = sel > 0 && sel < visibleIds.length;
+        }
+
         root.onclick = async (e) => {
-          const btn = e.target.closest(".fu-btn");
+          // View toggle
+          const viewBtn = e.target.closest("[data-fu-view]");
+          if (viewBtn) {
+            fuState.view = viewBtn.dataset.fuView;
+            localStorage.setItem(FU_VIEW_KEY, fuState.view);
+            // Switching views resets selection — list-view selections
+            // don't have a UI surface in cards view (and vice versa
+            // would just confuse).
+            fuState.selected.clear();
+            renderFollowups();
+            return;
+          }
+
+          // List-view: row checkbox toggle
+          const cbCell = e.target.closest("[data-action='toggle-fu-row']");
+          if (cbCell) {
+            e.preventDefault();
+            const key = cbCell.dataset.key;
+            if (key) {
+              if (fuState.selected.has(key)) fuState.selected.delete(key);
+              else                            fuState.selected.add(key);
+              renderFollowups();
+            }
+            return;
+          }
+
+          // List-view: header "select all visible"
+          if (e.target.closest("[data-action='toggle-all-fu']")) {
+            // Browser fires this for both label/input. Only respond once.
+            if (e.target.tagName !== "INPUT") return;
+            const visibleIds = fuState.rows.map(r => r.linkedin_id).filter(Boolean);
+            const allSel = visibleIds.every(k => fuState.selected.has(k));
+            if (allSel) for (const k of visibleIds) fuState.selected.delete(k);
+            else        for (const k of visibleIds) fuState.selected.add(k);
+            renderFollowups();
+            return;
+          }
+
+          // Bulk bar actions
+          if (e.target.closest("[data-action='bulk-clear-fu']")) {
+            fuState.selected.clear();
+            renderFollowups();
+            return;
+          }
+          if (e.target.closest("[data-action='bulk-cancel-fu']")) {
+            await handleBulkCancelFollowups(e.target.closest("[data-action='bulk-cancel-fu']"));
+            return;
+          }
+
+          // Per-row buttons
+          const btn = e.target.closest("[data-action]");
           if (!btn) return;
           const idx = Number(btn.dataset.idx);
           const action = btn.dataset.action;
-          const row = rows[idx];
+          const row = fuState.rows[idx];
           if (!row) return;
 
           if (action === "open") {
@@ -3283,34 +3471,57 @@
               feedback(btn, "Failed");
               console.error(err);
             }
+            return;
+          }
+          if (action === "cancel") {
+            const name = row.prospect_name || "this prospect";
+            if (!confirm(`Cancel the follow-up sequence for ${name}?\n\nThey won't get any more follow-ups. You can undo this from the Prospects tab by deleting the cadence_cancelled event.`)) return;
+            btn.disabled = true;
+            try {
+              await logFollowupAction(row, "cadence_cancelled");
+              await loadFollowups();
+            } catch (err) {
+              btn.disabled = false;
+              feedback(btn, "Failed");
+              console.error(err);
+            }
+            return;
           }
         };
       }
 
-      function renderFollowupRow(r, idx) {
-        const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
-        const due   = formatDueLabel(r.due_at);
-        const step  = `Step ${r.step_index} · day ${r.step_day}`;
-        const tpl   = r.template
-          ? esc(truncate(renderTemplate(r.template, r), 180))
-          : `<span class="fu-notemplate">No template set for this step.</span>`;
-        return `
-          <article class="fu-row">
-            <div class="fu-row-head">
-              <div class="fu-name">${esc(r.prospect_name)}</div>
-              <div class="fu-due">${esc(due)}</div>
-            </div>
-            <div class="fu-meta">${esc(meta)}</div>
-            <div class="fu-step">${esc(step)}</div>
-            <div class="fu-preview">${tpl}</div>
-            <div class="fu-actions">
-              <button class="fu-btn fu-btn-primary" data-action="open"    data-idx="${idx}" type="button">Open thread</button>
-              <button class="fu-btn"                data-action="copy"    data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
-              <button class="fu-btn fu-btn-success" data-action="sent"    data-idx="${idx}" type="button">Mark sent</button>
-              <button class="fu-btn fu-btn-ghost"   data-action="meeting" data-idx="${idx}" type="button" title="Log meeting booked">📅</button>
-            </div>
-          </article>
-        `;
+      // Bulk cancel — fan out cadence_cancelled inserts in parallel,
+      // then reload. Uses linkedin_id keys captured from fuState; we
+      // look up the matching row for each to grab the prospect's
+      // identifier set (profile_url, sales_nav_url) for the audit-
+      // friendly insert payload.
+      async function handleBulkCancelFollowups(btnEl) {
+        const keys = Array.from(fuState.selected);
+        if (!keys.length) return;
+        const targets = keys
+          .map(k => fuState.rows.find(r => r.linkedin_id === k))
+          .filter(Boolean);
+        if (!targets.length) return;
+
+        if (!confirm(`Cancel ${targets.length} follow-up sequence${targets.length === 1 ? "" : "s"}? Selected prospects won't receive any more follow-ups.`)) return;
+
+        btnEl.disabled = true;
+        const prevLabel = btnEl.textContent;
+        btnEl.textContent = "Cancelling…";
+
+        const results = await Promise.allSettled(
+          targets.map(r => logFollowupAction(r, "cadence_cancelled"))
+        );
+
+        const failed = results.filter(r => r.status === "rejected");
+        fuState.selected.clear();
+        await loadFollowups();
+        btnEl.disabled = false;
+        btnEl.textContent = prevLabel;
+
+        if (failed.length) {
+          alert(`${failed.length} cancellation${failed.length === 1 ? "" : "s"} failed. The successful ones have been removed from the list.`);
+        }
       }
 
       async function logFollowupAction(row, type) {
