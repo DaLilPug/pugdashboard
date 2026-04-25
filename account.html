@@ -1430,17 +1430,21 @@
                   <label><input type="radio" name="ev-sent-${esc(e.id)}" value=""         ${cur === ""         ? "checked" : ""}> —</label>
                 </div>
               `;
+              // Edit form mirrors the readonly layout: Response field
+              // up top (the headline), Message Sent below in a
+              // purple-accented sub-section to match the readonly
+              // .pr-event-msg-pair box.
               editForm = `
                 <form class="pr-event-edit-form pr-event-edit-form-response" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
-                  <label class="pr-event-edit-field">
-                    <span class="pr-event-edit-label">Message sent</span>
-                    <textarea class="pr-event-edit-text" name="message_sent" rows="3" placeholder="The outreach you sent that triggered this response">${esc(pairedMessage)}</textarea>
-                  </label>
                   <label class="pr-event-edit-field">
                     <span class="pr-event-edit-label">Response</span>
                     <textarea class="pr-event-edit-text" name="response" rows="3" placeholder="What the prospect wrote back">${esc(body)}</textarea>
                   </label>
                   ${sentimentRadios}
+                  <label class="pr-event-edit-field pr-event-edit-field-msg">
+                    <span class="pr-event-edit-label">Message sent</span>
+                    <textarea class="pr-event-edit-text" name="message_sent" rows="3" placeholder="The outreach you sent that triggered this response">${esc(pairedMessage)}</textarea>
+                  </label>
                   <div class="pr-event-edit-actions">
                     <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
                     <button type="submit" class="btn-primary pr-action">Save</button>
@@ -1482,25 +1486,26 @@
             ? `<span class="pr-event-date pr-event-date-editable" data-action="edit-event-date" data-event-id="${esc(e.id)}" data-iso="${esc(isoDate)}" title="Click to change the date">${esc(fmtDate(e.occurred_at))}</span>`
             : `<span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>`;
 
-          // Body rendering. Response events render the paired message
-          // (above) and response (below) with labels so the operator
-          // can scan the exchange. Outgoing types render the single
-          // body unlabeled.
+          // Body rendering.
+          //   Response events: response body up top (no label — the
+          //   type is already in the head), then a purple-trimmed
+          //   nested box showing the paired message sent. The visual
+          //   keeps the response as the headline (it's the new
+          //   information) while still surfacing the originating
+          //   outreach for context.
+          //   Outgoing types: single unlabeled body block.
           let bodyHtml = "";
           if (isResponse) {
-            const msgPart  = pairedMessage
-              ? `<div class="pr-event-body pr-event-body-msg">
+            const respPart = body
+              ? `<div class="pr-event-body pr-event-body-resp">${esc(body)}</div>`
+              : "";
+            const msgPart = pairedMessage
+              ? `<div class="pr-event-msg-pair">
                    <span class="pr-event-body-label">Message sent</span>
                    <div class="pr-event-body-text">${esc(pairedMessage)}</div>
                  </div>`
               : "";
-            const respPart = body
-              ? `<div class="pr-event-body pr-event-body-resp">
-                   <span class="pr-event-body-label">Response</span>
-                   <div class="pr-event-body-text">${esc(body)}</div>
-                 </div>`
-              : "";
-            bodyHtml = msgPart + respPart;
+            bodyHtml = respPart + msgPart;
           } else if (body) {
             bodyHtml = `<div class="pr-event-body">${esc(body)}</div>`;
           }

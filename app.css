@@ -3193,28 +3193,11 @@ body.login-body {
   gap: 8px;
 }
 
-/* Labeled body sections — used on response events to show the paired
-   "Message sent" and "Response" alongside each other. Outgoing-type
-   events keep their single unlabeled .pr-event-body block. */
-.pr-event-body-msg,
+/* Response event body — the response text is the headline (no label,
+   since "RESPONSE" already appears in the head). Same typography as
+   the default outgoing-event body. */
 .pr-event-body-resp {
   margin-top: 6px;
-  display: block;
-}
-.pr-event-body-resp {
-  margin-top: 8px;
-}
-.pr-event-body-label {
-  display: block;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--gray-400);
-  margin-bottom: 2px;
-}
-.pr-event-body-text {
   font-size: 12px;
   color: var(--navy);
   line-height: 1.5;
@@ -3222,9 +3205,39 @@ body.login-body {
   word-break: break-word;
 }
 
-/* Stacked Message sent / Response edit fields on response events.
-   Each field gets a label; the form is wider than the single-field
-   case to give long messages room to breathe. */
+/* Nested "Message sent" sub-box on response events — the paired
+   outreach that triggered the response. Purple left-border accent
+   distinguishes it from the yellow-trimmed parent event. Tighter
+   padding so the response stays the visual headline. */
+.pr-event-msg-pair {
+  margin-top: 8px;
+  padding: 6px 10px 7px 10px;
+  border-left: 2px solid #a855f7;
+  background: rgba(168, 85, 247, 0.04);
+  border-radius: 0 4px 4px 0;
+}
+.pr-event-body-label {
+  display: block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #7e3ad6;
+  margin-bottom: 2px;
+}
+.pr-event-body-text {
+  font-size: 11.5px;
+  color: var(--navy);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Edit form on response events. Response textarea up top (headline),
+   then sentiment radios, then the Message Sent textarea in a purple-
+   accented sub-section that mirrors the readonly .pr-event-msg-pair
+   box. Same color treatment so the visual mode-switch is minimal. */
 .pr-event-edit-field {
   display: flex;
   flex-direction: column;
@@ -3237,6 +3250,17 @@ body.login-body {
   letter-spacing: .06em;
   text-transform: uppercase;
   color: var(--gray-400);
+}
+.pr-event-edit-field-msg {
+  margin-top: 4px;
+  padding: 6px 10px 8px 10px;
+  border-left: 2px solid #a855f7;
+  background: rgba(168, 85, 247, 0.04);
+  border-radius: 0 4px 4px 0;
+}
+.pr-event-edit-field-msg .pr-event-edit-label {
+  color: #7e3ad6;
+  font-size: 9.5px;
 }
 
 /* ---- prospect checkbox column ------------------------------------- */
