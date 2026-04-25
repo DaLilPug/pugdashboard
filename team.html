@@ -508,6 +508,31 @@
             return `${actor} changed seat cap from <strong>${esc(oldCap)}</strong> to <strong>${esc(newCap)}</strong>`;
           }
 
+          // Outreach + prospect lifecycle (Slice for full edit/delete
+          // control on the Prospects tab). Logged by RPCs:
+          //   delete_outreach_event   → outreach.deleted
+          //   update_outreach_event   → outreach.edited
+          //   delete_prospect_events  → prospect.deleted
+          // target_id usually points at the operator who originally
+          // logged the event (so admins can see "who deleted whose").
+          case "outreach.deleted": {
+            const evType   = p.type ? esc(p.type).replace(/_/g, " ") : "event";
+            const prospect = p.prospect_name ? `for <strong>${esc(p.prospect_name)}</strong>` : "";
+            return `${actor} deleted ${evType} ${prospect}`.trim();
+          }
+          case "outreach.edited": {
+            const evType   = p.type ? esc(p.type).replace(/_/g, " ") : "event";
+            const prospect = p.prospect_name ? `for <strong>${esc(p.prospect_name)}</strong>` : "";
+            const fields   = p.new ? Object.keys(p.new).join(", ") : "";
+            return `${actor} edited ${evType} ${prospect}${fields ? ` (${esc(fields)})` : ""}`.trim();
+          }
+          case "prospect.deleted": {
+            const name = p.prospect_name ? `<strong>${esc(p.prospect_name)}</strong>` : "<em>(unnamed prospect)</em>";
+            const cnt  = Number.isFinite(p.event_count) ? p.event_count : null;
+            const tail = cnt != null ? ` and ${esc(cnt)} event${cnt === 1 ? "" : "s"}` : "";
+            return `${actor} deleted prospect ${name}${tail}`;
+          }
+
           default:
             return `${actor} performed <code>${esc(ev.action)}</code>`;
         }

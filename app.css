@@ -3087,3 +3087,200 @@ body.login-body {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* ====================================================================
+   Spreadsheet-style edit/delete UI for the Prospects tab
+   ====================================================================
+   Three additions on top of the existing .pr-table:
+     1. Per-event actions (X + pencil) on each timeline row
+     2. Inline edit form per event (response: body + sentiment;
+        outgoing-message types: body only)
+     3. Prospect-level checkboxes + bulk action bar + sortable header
+   ==================================================================== */
+
+/* ---- per-event actions (X / pencil) on timeline rows -------------- */
+
+.pr-event-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* Fade in only on event-row hover so the timeline reads cleanly at
+     rest. The buttons are still keyboard-focusable; opacity-only hide
+     keeps them in the tab order. */
+  opacity: 0;
+  transition: opacity 80ms ease;
+}
+.pr-event:hover .pr-event-actions,
+.pr-event:focus-within .pr-event-actions {
+  opacity: 1;
+}
+
+.pr-event-action {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  line-height: 1;
+  font-family: inherit;
+  color: var(--gray-400);
+  cursor: pointer;
+}
+.pr-event-action:hover {
+  border-color: var(--gray-200);
+  color: var(--navy);
+}
+.pr-event-edit-btn:hover  { color: var(--navy); }
+.pr-event-delete-btn      { font-size: 16px; line-height: 0.7; }
+.pr-event-delete-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-light);
+}
+
+/* ---- inline edit form per event ----------------------------------- */
+
+/* Hidden by default; .pr-event-editing on the parent <li> swaps the
+   readonly body for the edit textarea. We toggle a class rather than
+   re-render the timeline so unrelated rows keep their state and the
+   timeline doesn't flicker. */
+.pr-event-edit-form {
+  display: none;
+  margin-top: 6px;
+  flex-direction: column;
+  gap: 6px;
+}
+.pr-event-editing .pr-event-edit-form { display: flex; }
+.pr-event-editing .pr-event-body      { display: none; }
+.pr-event-editing .pr-event-actions   { display: none; }
+
+.pr-event-edit-text {
+  width: 100%;
+  min-height: 64px;
+  border: 1px solid var(--gray-200);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-family: inherit;
+  color: var(--navy);
+  outline: none;
+  resize: vertical;
+  background: #fff;
+  box-sizing: border-box;
+}
+.pr-event-edit-text:focus { border-color: var(--navy); }
+
+.pr-event-edit-sent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--navy);
+}
+.pr-event-edit-sent label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.pr-event-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- prospect checkbox column ------------------------------------- */
+
+.pr-col-check {
+  width: 32px;
+  padding: 0 4px;
+  text-align: center;
+}
+.pr-check-cell {
+  vertical-align: middle;
+}
+.pr-check-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  cursor: pointer;
+  /* Larger hit target than the bare checkbox so misclicks don't toggle
+     the row's timeline. */
+}
+.pr-check,
+.pr-check-all {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--navy);
+  margin: 0;
+}
+.pr-row.selected {
+  background: rgba(22, 58, 82, 0.04);
+}
+.pr-row.selected:hover {
+  background: rgba(22, 58, 82, 0.07);
+}
+
+/* ---- bulk action bar ---------------------------------------------- */
+
+.pr-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: rgba(22, 58, 82, 0.06);
+  border: 1px solid rgba(22, 58, 82, 0.12);
+  border-radius: 6px;
+}
+.pr-bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-right: auto;
+}
+.pr-bulk-action {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.pr-bulk-action.btn-danger {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+.pr-bulk-action.btn-danger:hover {
+  background: #c53030;
+  border-color: #c53030;
+}
+
+/* ---- sortable Last touch header ----------------------------------- */
+
+.pr-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.pr-table th.sortable:hover {
+  color: var(--navy);
+}
+.pr-table th.sortable .sort-caret {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--gray-400);
+  font-variant-numeric: tabular-nums;
+  min-width: 8px;
+}
+.pr-table th.sorted-asc,
+.pr-table th.sorted-desc {
+  color: var(--navy);
+}
+.pr-table th.sorted-asc  .sort-caret,
+.pr-table th.sorted-desc .sort-caret {
+  color: var(--navy);
+}

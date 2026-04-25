@@ -580,14 +580,25 @@
         const LAST_TF        = `account_${clientId}_pr_tf`;
         const LAST_STATUS    = `account_${clientId}_pr_status`;
         const LAST_SENTIMENT = `account_${clientId}_pr_sentiment`;
+        const LAST_SORT_BY   = `account_${clientId}_pr_sort_by`;
+        const LAST_SORT_DIR  = `account_${clientId}_pr_sort_dir`;
 
         const state = {
           tf:        localStorage.getItem(LAST_TF)        || "all",
           status:    localStorage.getItem(LAST_STATUS)    || "all",
           sentiment: localStorage.getItem(LAST_SENTIMENT) || "all",
+          // sortBy/sortDir = null means "default" — sort by last_touch DESC.
+          // Three-state header click cycle: desc → asc → clear (back to default).
+          sortBy:    localStorage.getItem(LAST_SORT_BY)   || null,
+          sortDir:   localStorage.getItem(LAST_SORT_DIR)  || null,
           search:    "",
           allProspects: null, // populated once after fetch
           filtered:     [],   // current view after applyFilters
+          // Spreadsheet-style multi-select on the prospect table.
+          // Stores prospect.key strings (stable across re-renders).
+          // lastCheckedKey enables shift+click range select.
+          selected:        new Set(),
+          lastCheckedKey:  null,
         };
 
         activatePill(pillsEl, state.tf);
@@ -673,6 +684,38 @@
             handleSaveInfo(infoForm);
             return;
           }
+          const evEditForm = e.target.closest("form[data-action='submit-event-edit']");
+          if (evEditForm) {
+            e.preventDefault();
+            handleSaveEventEdit(evEditForm);
+            return;
+          }
+        });
+
+        // Native checkbox change events: the input fires `change` after the
+        // browser flips its `checked` state. We only need to sync state.selected
+        // here — the click handler above already handled shift-range edge
+        // cases. handleProspectCheckboxToggle is the boring "add or remove
+        // from the Set" path used by both this listener and the toggle-all
+        // action.
+        wrapEl.addEventListener("change", (e) => {
+          // (Existing sentiment-edit change handler below this still runs
+          // because that listener is registered separately on wrapEl —
+          // this listener is additive, browsers fire all matching listeners.)
+          const cb = e.target.closest(".pr-check");
+          if (cb) {
+            const label = cb.closest("[data-key]");
+            if (label) {
+              const key = label.dataset.key;
+              if (cb.checked) state.selected.add(key);
+              else            state.selected.delete(key);
+              state.lastCheckedKey = key;
+              // Re-render only what's needed: bulk bar count + this row's
+              // selected class + the header checkbox. Cheaper than full
+              // rerender, which would also collapse any open timeline.
+              syncSelectionUi();
+            }
+          }
         });
 
         // Sentiment edit — click the pill to swap in a <select>, then
@@ -712,13 +755,31 @@
           if (!state.allProspects) return;
           const scoped   = scopeToTimeframe(state.allProspects, cutoffFor(state.tf));
           const filtered = applyFilters(scoped, state);
-          // Sort by last_touch DESC so the most recent activity floats up.
-          filtered.sort((a, b) =>
-            (b.last_touch || "").localeCompare(a.last_touch || "")
-          );
+          applySort(filtered);
           state.filtered = filtered;
+          // Drop selections for prospects that filtered out so the bulk
+          // bar count doesn't lie about what'd actually be deleted.
+          if (state.selected.size) {
+            const visibleKeys = new Set(filtered.map(p => p.key));
+            for (const k of state.selected) {
+              if (!visibleKeys.has(k)) state.selected.delete(k);
+            }
+          }
           renderTable(wrapEl, filtered);
           renderMeta(metaEl, filtered, state.allProspects.length);
+        }
+
+        // applySort mutates the array in place. Default (sortBy null) =
+        // last_touch DESC, matching the original behavior. Otherwise
+        // sort by the requested key in the requested direction.
+        function applySort(prospects) {
+          const dir = state.sortDir === "asc" ? 1 : -1;
+          if (state.sortBy === "lastTouch") {
+            prospects.sort((a, b) => dir * (a.last_touch || "").localeCompare(b.last_touch || ""));
+          } else {
+            // Default: most recent activity floats up.
+            prospects.sort((a, b) => (b.last_touch || "").localeCompare(a.last_touch || ""));
+          }
         }
 
         // ---- data ----------------------------------------------------
@@ -918,23 +979,70 @@
           // preserved without CSS acrobatics.
           const bodyHtml = prospects.map((p, i) => renderRow(p, i)).join("");
 
+          // Header checkbox: checked when ALL visible prospects are
+          // selected, indeterminate when SOME are selected. Drives the
+          // toggle-all action.
+          const visibleKeys = prospects.map(p => p.key);
+          const visibleSelected = visibleKeys.filter(k => state.selected.has(k)).length;
+          const allChecked  = visibleSelected === visibleKeys.length;
+          const someChecked = visibleSelected > 0 && !allChecked;
+
+          // Sort caret + class on the Last touch header. Three-state cycle
+          // (desc → asc → clear) — see handleSortClick.
+          const sortBy   = state.sortBy;
+          const sortDir  = state.sortDir;
+          const lastSortClass = sortBy === "lastTouch"
+            ? (sortDir === "asc" ? "sorted-asc" : "sorted-desc")
+            : "";
+          const lastSortCaret = sortBy === "lastTouch"
+            ? (sortDir === "asc" ? "▲" : "▼")
+            : "";
+
           root.innerHTML = `
+            ${renderBulkBar(state.selected.size, prospects)}
             <div class="pr-table-scroll">
               <table class="pr-table">
                 <thead>
                   <tr>
+                    <th class="pr-col-check">
+                      <input type="checkbox"
+                             class="pr-check-all"
+                             data-action="toggle-all-prospects"
+                             ${allChecked ? "checked" : ""}
+                             ${someChecked ? "data-indeterminate=\"true\"" : ""}
+                             aria-label="Select all visible prospects" />
+                    </th>
                     <th class="pr-col-name">Prospect</th>
                     <th class="pr-col-company">Company</th>
                     <th class="pr-col-title">Title</th>
                     <th class="pr-col-status">Status</th>
                     <th class="pr-col-sent">Sentiment</th>
                     <th class="pr-col-events num">Events</th>
-                    <th class="pr-col-last">Last touch</th>
+                    <th class="pr-col-last sortable ${lastSortClass}" data-action="sort-column" data-sort="lastTouch" title="Click to sort">Last touch<span class="sort-caret">${lastSortCaret}</span></th>
                     <th class="pr-col-link"></th>
                   </tr>
                 </thead>
                 <tbody>${bodyHtml}</tbody>
               </table>
+            </div>
+          `;
+
+          // The DOM `indeterminate` property can't be set via HTML
+          // attribute — apply it after innerHTML lands.
+          const headCheck = root.querySelector(".pr-check-all");
+          if (headCheck) headCheck.indeterminate = someChecked;
+        }
+
+        // Renders the floating "N selected · Delete" bar shown when one
+        // or more prospects are checked. Empty string when nothing is
+        // selected, so it doesn't take up vertical space.
+        function renderBulkBar(count, prospects) {
+          if (!count) return "";
+          return `
+            <div class="pr-bulk-bar" role="region" aria-label="Bulk actions">
+              <span class="pr-bulk-count">${fmtInt(count)} prospect${count === 1 ? "" : "s"} selected</span>
+              <button class="btn-secondary pr-bulk-action" data-action="bulk-clear-selection" type="button">Clear</button>
+              <button class="btn-danger pr-bulk-action" data-action="bulk-delete-prospects" type="button">Delete ${fmtInt(count)}</button>
             </div>
           `;
         }
@@ -961,8 +1069,19 @@
             ? `<a class="pr-link-btn" href="${esc(linkUrl)}" target="_blank" rel="noopener" title="Open in LinkedIn">LinkedIn ↗</a>`
             : "";
 
+          const isChecked = state.selected.has(p.key);
+
           return `
-            <tr class="pr-row" data-idx="${idx}">
+            <tr class="pr-row${isChecked ? " selected" : ""}" data-idx="${idx}" data-key="${esc(p.key)}">
+              <td class="pr-col-check pr-check-cell">
+                <label class="pr-check-label" data-action="toggle-prospect-check" data-key="${esc(p.key)}">
+                  <input type="checkbox"
+                         class="pr-check"
+                         ${isChecked ? "checked" : ""}
+                         tabindex="-1"
+                         aria-label="Select ${esc(p.name || "prospect")}" />
+                </label>
+              </td>
               <td class="pr-name">
                 <div class="pr-name-main">${esc(p.name || "—")}</div>
               </td>
@@ -975,7 +1094,7 @@
               <td class="pr-link">${linkCell}</td>
             </tr>
             <tr class="pr-timeline-row hidden" data-idx="${idx}">
-              <td colspan="8" class="pr-timeline-cell"></td>
+              <td colspan="9" class="pr-timeline-cell"></td>
             </tr>
           `;
         }
@@ -1013,10 +1132,11 @@
           const hasMeeting = p.events.some(e => e.type === "meeting_booked");
 
           // Meeting button: hidden once a meeting is on record. Re-opens
-          // only if the existing meeting event is deleted (not yet wired —
-          // delete path is a later pass).
+          // when the meeting_booked event is deleted via the per-event X
+          // — hasMeeting recomputes on the next reopenAfterMutation pass,
+          // so the button comes back automatically.
           const meetingBtn = hasMeeting
-            ? `<span class="pr-action-status" title="A meeting_booked event is already logged">Meeting logged ✓</span>`
+            ? `<span class="pr-action-status" title="A meeting_booked event is already logged — delete it from the timeline below to undo">Meeting logged ✓</span>`
             : `<button class="btn-secondary pr-action" data-action="log-meeting" type="button">Mark meeting booked</button>`;
 
           // Email + phone contact line. Either can be clicked (mailto / tel);
@@ -1157,14 +1277,62 @@
             }
           }
 
+          // Editable types — body has meaningful free text the operator
+          // might mistype. connection / meeting_booked have nothing to
+          // edit (the click itself is the event). For those types we
+          // show only the X (delete) button, no pencil.
+          const editableTypes = new Set(["message", "followup", "retargeting", "inmail", "response"]);
+          const editable = e.id && editableTypes.has(e.type);
+
+          // Per-event action buttons. Always include X (delete);
+          // include pencil only for editable types.
+          // Both rely on e.id — historical imports without ids can't be
+          // edited or deleted. Skip the actions block entirely in that
+          // case to avoid a non-functional button.
+          const actions = e.id
+            ? `<span class="pr-event-actions">
+                ${editable ? `<button class="pr-event-action pr-event-edit-btn" data-action="edit-event" data-event-id="${esc(e.id)}" type="button" title="Edit">✎</button>` : ""}
+                <button class="pr-event-action pr-event-delete-btn" data-action="delete-event" data-event-id="${esc(e.id)}" type="button" title="Delete event">×</button>
+              </span>`
+            : "";
+
+          // Inline edit form. Hidden by default; "Edit" toggles
+          // .pr-event-editing on the <li> which CSS uses to swap views.
+          // Response edits include sentiment radios alongside the body
+          // textarea; outgoing-message types only edit the body.
+          let editForm = "";
+          if (editable) {
+            const cur = e.response_sentiment || "";
+            const sentimentRadios = e.type === "response"
+              ? `<div class="pr-event-edit-sent">
+                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value="positive" ${cur === "positive" ? "checked" : ""}> positive</label>
+                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value="neutral"  ${cur === "neutral"  ? "checked" : ""}> neutral</label>
+                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value="negative" ${cur === "negative" ? "checked" : ""}> negative</label>
+                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value=""         ${cur === ""         ? "checked" : ""}> —</label>
+                </div>`
+              : "";
+            editForm = `
+              <form class="pr-event-edit-form" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
+                <textarea class="pr-event-edit-text" name="body" rows="3">${esc(body)}</textarea>
+                ${sentimentRadios}
+                <div class="pr-event-edit-actions">
+                  <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
+                  <button type="submit" class="btn-primary pr-action">Save</button>
+                </div>
+              </form>
+            `;
+          }
+
           return `
-            <li class="pr-event pr-event-${esc(e.type)}">
+            <li class="pr-event pr-event-${esc(e.type)}" data-event-id="${esc(e.id || "")}">
               <div class="pr-event-head">
                 <span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>
                 <span class="pr-event-type">${esc(typeLabel)}</span>
                 ${sentTag}
+                ${actions}
               </div>
               ${body ? `<div class="pr-event-body">${esc(body)}</div>` : ""}
+              ${editForm}
             </li>
           `;
         }
@@ -1247,11 +1415,84 @@
 
         function handleAction(actionEl, clickEvt) {
           const action = actionEl.dataset.action;
+
+          // ---- Top-level actions (no prospect/timeline context) -------
+          // These live OUTSIDE the timeline row — header sort, header
+          // checkbox, bulk action bar buttons. Handle them first so the
+          // timelineRow lookup below doesn't bail out for legitimate
+          // table-level clicks.
+          if (action === "sort-column") {
+            clickEvt.preventDefault();
+            handleSortClick(actionEl);
+            return;
+          }
+          if (action === "toggle-all-prospects") {
+            // The browser fires this BOTH on the change event and on the
+            // wrapping click. Only run once, and only on the input itself.
+            if (clickEvt.target.tagName === "INPUT") {
+              handleToggleAllProspects(clickEvt.target);
+            }
+            return;
+          }
+          if (action === "toggle-prospect-check") {
+            // Wraps the checkbox in a <label data-action>. Clicking the
+            // label fires a click on the input (browser-native), and we
+            // also receive the label click here. Drop the label-level
+            // event to avoid double-toggle, and let the input's change
+            // handler (below in the change listener) do the work.
+            // BUT we use this opportunity to detect shift+click for range
+            // select before the change fires.
+            if (clickEvt.target.tagName !== "INPUT") return;
+            handleProspectCheckboxClick(clickEvt.target, clickEvt);
+            return;
+          }
+          if (action === "bulk-clear-selection") {
+            clickEvt.preventDefault();
+            state.selected.clear();
+            state.lastCheckedKey = null;
+            rerender();
+            return;
+          }
+          if (action === "bulk-delete-prospects") {
+            clickEvt.preventDefault();
+            handleBulkDeleteProspects(actionEl);
+            return;
+          }
+
+          // ---- Per-event actions (timeline-row scoped) ---------------
           const timelineRow = actionEl.closest(".pr-timeline-row");
           if (!timelineRow) return;
           const idx = Number(timelineRow.dataset.idx);
           const prospect = state.filtered[idx];
           if (!prospect) return;
+
+          if (action === "delete-event") {
+            clickEvt.preventDefault();
+            const eventId = actionEl.dataset.eventId;
+            handleDeleteEvent(actionEl, prospect, eventId);
+            return;
+          }
+          if (action === "edit-event") {
+            clickEvt.preventDefault();
+            const eventId = actionEl.dataset.eventId;
+            const li = actionEl.closest(".pr-event");
+            if (!li) return;
+            li.classList.add("pr-event-editing");
+            const ta = li.querySelector(".pr-event-edit-text");
+            if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+            return;
+          }
+          if (action === "cancel-event-edit") {
+            clickEvt.preventDefault();
+            const li = actionEl.closest(".pr-event");
+            if (!li) return;
+            li.classList.remove("pr-event-editing");
+            // Restore textarea to its initial value so cancel == discard.
+            const ta = li.querySelector(".pr-event-edit-text");
+            const body = li.querySelector(".pr-event-body");
+            if (ta && body) ta.value = body.textContent;
+            return;
+          }
 
           if (action === "log-meeting") {
             clickEvt.preventDefault();
@@ -1354,6 +1595,296 @@
             submitBtn.textContent = prevLabel;
             alert("Couldn't log response: " + (err.message || err));
           }
+        }
+
+        // ============================================================
+        // Spreadsheet-style edit/delete handlers
+        // ============================================================
+
+        // Three-state header sort cycle: desc → asc → clear (default).
+        // Mirrors dashboard.html's pattern. Persists to localStorage so
+        // the operator's choice survives a tab switch.
+        function handleSortClick(thEl) {
+          const key = thEl.dataset.sort;
+          if (state.sortBy === key) {
+            if (state.sortDir === "desc")      state.sortDir = "asc";
+            else if (state.sortDir === "asc") { state.sortBy = null; state.sortDir = null; }
+            else                               state.sortDir = "desc";
+          } else {
+            state.sortBy  = key;
+            state.sortDir = "desc";
+          }
+          if (state.sortBy)  localStorage.setItem(LAST_SORT_BY,  state.sortBy);  else localStorage.removeItem(LAST_SORT_BY);
+          if (state.sortDir) localStorage.setItem(LAST_SORT_DIR, state.sortDir); else localStorage.removeItem(LAST_SORT_DIR);
+          rerender();
+        }
+
+        // Header checkbox: select all visible, or clear all if any are
+        // already selected. Mirrors common spreadsheet behavior.
+        function handleToggleAllProspects(inputEl) {
+          const visibleKeys = state.filtered.map(p => p.key);
+          const visibleSelected = visibleKeys.filter(k => state.selected.has(k)).length;
+          const allChecked = visibleSelected === visibleKeys.length;
+          if (allChecked) {
+            // Deselect all visible (preserves any out-of-view selections —
+            // but rerender drops those anyway to avoid lying about counts).
+            for (const k of visibleKeys) state.selected.delete(k);
+          } else {
+            for (const k of visibleKeys) state.selected.add(k);
+          }
+          state.lastCheckedKey = null;
+          rerender();
+        }
+
+        // Per-row checkbox click. Detects shift+click for range select
+        // BEFORE the browser flips the input's checked state. Range fills
+        // include both endpoints.
+        function handleProspectCheckboxClick(inputEl, clickEvt) {
+          const label = inputEl.closest("[data-key]");
+          if (!label) return;
+          const key = label.dataset.key;
+
+          if (clickEvt.shiftKey && state.lastCheckedKey && state.lastCheckedKey !== key) {
+            const keys = state.filtered.map(p => p.key);
+            const startIdx = keys.indexOf(state.lastCheckedKey);
+            const endIdx   = keys.indexOf(key);
+            if (startIdx >= 0 && endIdx >= 0) {
+              const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+              // The shift-click fills toward the new endpoint with the
+              // STATE the new endpoint will land in (i.e. checked, since
+              // the click flips it from unchecked → checked). Match
+              // Excel-ish behavior: shift+click checks the range.
+              const willBeChecked = !inputEl.checked; // browser hasn't flipped yet
+              for (let i = lo; i <= hi; i++) {
+                if (willBeChecked) state.selected.add(keys[i]);
+                else               state.selected.delete(keys[i]);
+              }
+              state.lastCheckedKey = key;
+              // Don't let the browser also flip THIS input — we already
+              // applied the result. Otherwise the click would invert it.
+              clickEvt.preventDefault();
+              syncSelectionUi();
+              return;
+            }
+          }
+          // No shift: let the change handler (registered separately on
+          // wrapEl) handle the toggle. We just need to remember this as
+          // the new range-anchor.
+          state.lastCheckedKey = key;
+        }
+
+        // Re-sync the DOM bits that depend on state.selected without a
+        // full rerender (which would collapse open timelines and lose
+        // any in-flight edit form state).
+        function syncSelectionUi() {
+          // Bulk bar: rebuild it inside the wrap. We render the wrap in
+          // renderTable as: <bulk-bar?> <table-scroll>. Find the bulk
+          // bar (or its absence) and replace.
+          const wrap = wrapEl;
+          const existingBar = wrap.querySelector(":scope > .pr-bulk-bar");
+          const newBarHtml  = renderBulkBar(state.selected.size, state.filtered);
+          if (existingBar) {
+            if (newBarHtml) {
+              const tmp = document.createElement("div");
+              tmp.innerHTML = newBarHtml;
+              existingBar.replaceWith(tmp.firstElementChild);
+            } else {
+              existingBar.remove();
+            }
+          } else if (newBarHtml) {
+            const tmp = document.createElement("div");
+            tmp.innerHTML = newBarHtml;
+            wrap.insertBefore(tmp.firstElementChild, wrap.firstChild);
+          }
+
+          // Per-row .selected class
+          wrap.querySelectorAll(".pr-row").forEach(row => {
+            const k = row.dataset.key;
+            row.classList.toggle("selected", state.selected.has(k));
+          });
+
+          // Header checkbox state (checked / indeterminate / unchecked)
+          const visibleKeys = state.filtered.map(p => p.key);
+          const visibleSelected = visibleKeys.filter(k => state.selected.has(k)).length;
+          const headCheck = wrap.querySelector(".pr-check-all");
+          if (headCheck) {
+            headCheck.checked       = visibleSelected === visibleKeys.length && visibleKeys.length > 0;
+            headCheck.indeterminate = visibleSelected > 0 && visibleSelected < visibleKeys.length;
+          }
+        }
+
+        // Single event delete. Confirms, calls the RPC, removes from
+        // state. If the prospect's events drop to zero, removes the
+        // prospect entirely. Re-renders the timeline (or the whole table
+        // if the prospect went away).
+        async function handleDeleteEvent(btnEl, prospect, eventId) {
+          if (!eventId) return;
+          if (!confirm("Delete this event? This cannot be undone.")) return;
+
+          btnEl.disabled = true;
+          try {
+            await sb.sbFetch("/rest/v1/rpc/delete_outreach_event", {
+              method: "POST",
+              body:   JSON.stringify({ p_id: eventId }),
+            });
+          } catch (err) {
+            btnEl.disabled = false;
+            alert("Couldn't delete event: " + (err.message || err));
+            return;
+          }
+
+          // Remove from in-memory state. findCanonical scans
+          // state.allProspects by stable prospect.key.
+          const canonical = findCanonical(prospect);
+          if (canonical) {
+            canonical.events = canonical.events.filter(ev => ev.id !== eventId);
+            if (canonical.events.length === 0) {
+              // Last event for this prospect — drop the whole row.
+              const idx = state.allProspects.indexOf(canonical);
+              if (idx >= 0) state.allProspects.splice(idx, 1);
+              state.selected.delete(canonical.key);
+              rerender();
+              return;
+            }
+            Object.assign(canonical, rollup(canonical.events));
+          }
+          reopenAfterMutation(prospect);
+        }
+
+        // Save an inline event edit. Sends only the fields that actually
+        // changed via the update_outreach_event RPC. The RPC logs the
+        // diff to audit_events; absent keys mean "don't touch".
+        async function handleSaveEventEdit(form) {
+          const eventId   = form.dataset.eventId;
+          const eventType = form.dataset.eventType;
+          if (!eventId || !eventType) return;
+          const timelineRow = form.closest(".pr-timeline-row");
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          // Locate the canonical event so we can diff against current
+          // values. Avoids logging "edited" when the operator hits Save
+          // without actually changing anything.
+          const canonical = findCanonical(prospect);
+          const ev = canonical ? canonical.events.find(e => e.id === eventId) : null;
+          if (!ev) return;
+
+          const textVal = (form.querySelector(".pr-event-edit-text")?.value || "");
+
+          const changes = {};
+          if (eventType === "response") {
+            // Edit body + sentiment for response events.
+            if (textVal !== (ev.response || "")) changes.response = textVal;
+            const sentRadio = form.querySelector(`input[name="ev-sent-${cssEsc(eventId)}"]:checked`);
+            const sentVal   = sentRadio ? sentRadio.value : null;
+            // sentVal "" (the dash radio) → store null; matches the schema
+            // null-or-positive/neutral/negative shape.
+            const newSent = sentVal === "" ? null : sentVal;
+            const oldSent = ev.response_sentiment || null;
+            if (newSent !== oldSent) changes.response_sentiment = newSent;
+          } else {
+            // message / followup / retargeting / inmail — edit message_sent
+            if (textVal !== (ev.message_sent || "")) changes.message_sent = textVal;
+          }
+
+          if (Object.keys(changes).length === 0) {
+            // Nothing changed — just close the editor.
+            form.closest(".pr-event")?.classList.remove("pr-event-editing");
+            return;
+          }
+
+          const submitBtn = form.querySelector("button[type='submit']");
+          const prevLabel = submitBtn ? submitBtn.textContent : "";
+          if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving…"; }
+          try {
+            await sb.sbFetch("/rest/v1/rpc/update_outreach_event", {
+              method: "POST",
+              body:   JSON.stringify({ p_id: eventId, p_changes: changes }),
+            });
+          } catch (err) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = prevLabel; }
+            alert("Couldn't save edit: " + (err.message || err));
+            return;
+          }
+
+          // Apply changes locally so we don't have to refetch the whole
+          // outreach list. Then re-render the timeline so the body cell
+          // reflects the new value.
+          if ("message_sent"       in changes) ev.message_sent       = changes.message_sent;
+          if ("response"           in changes) ev.response           = changes.response;
+          if ("response_sentiment" in changes) ev.response_sentiment = changes.response_sentiment;
+          if (canonical) Object.assign(canonical, rollup(canonical.events));
+          reopenAfterMutation(prospect);
+        }
+
+        // Bulk delete every selected prospect. One RPC call per prospect
+        // (parallel) — each call deletes all that prospect's outreach
+        // rows and emits ONE prospect.deleted audit event. Re-renders
+        // the table after all calls settle.
+        async function handleBulkDeleteProspects(btnEl) {
+          const keys = Array.from(state.selected);
+          if (!keys.length) return;
+          const msg = keys.length === 1
+            ? "Delete this prospect and all of their events? This cannot be undone."
+            : `Delete ${keys.length} prospects and all of their events? This cannot be undone.`;
+          if (!confirm(msg)) return;
+
+          btnEl.disabled = true;
+          const prevLabel = btnEl.textContent;
+          btnEl.textContent = "Deleting…";
+
+          // Snapshot the prospects we're about to delete (their event ids
+          // + display fields for the audit payload). state.allProspects
+          // gets mutated as we go, so don't lazy-resolve mid-loop.
+          const targets = keys
+            .map(k => state.allProspects.find(p => p.key === k))
+            .filter(Boolean);
+
+          const results = await Promise.allSettled(
+            targets.map(p => sb.sbFetch("/rest/v1/rpc/delete_prospect_events", {
+              method: "POST",
+              body:   JSON.stringify({
+                p_event_ids:     p.events.map(e => e.id).filter(Boolean),
+                p_prospect_name: p.name || null,
+                p_linkedin_id:   p.linkedin_id || null,
+              }),
+            }))
+          );
+
+          // Remove from state any prospect whose RPC succeeded.
+          const failed = [];
+          for (let i = 0; i < targets.length; i++) {
+            const p = targets[i];
+            const r = results[i];
+            if (r.status === "fulfilled") {
+              const idx = state.allProspects.indexOf(p);
+              if (idx >= 0) state.allProspects.splice(idx, 1);
+              state.selected.delete(p.key);
+            } else {
+              failed.push({ name: p.name || "(unnamed)", err: r.reason?.message || String(r.reason) });
+            }
+          }
+
+          btnEl.disabled = false;
+          btnEl.textContent = prevLabel;
+          rerender();
+
+          if (failed.length) {
+            const summary = failed.slice(0, 3).map(f => `• ${f.name}: ${f.err}`).join("\n");
+            const more    = failed.length > 3 ? `\n…and ${failed.length - 3} more` : "";
+            alert(`${failed.length} delete${failed.length === 1 ? "" : "s"} failed:\n${summary}${more}`);
+          }
+        }
+
+        // Tiny CSS-attribute escaper for use inside querySelector strings
+        // built from user-controlled ids. Used in handleSaveEventEdit when
+        // looking up the matching radio group by name="ev-sent-{eventId}".
+        // We trust event ids (UUIDs) but defensively escape in case the
+        // shape ever changes.
+        function cssEsc(s) {
+          if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(s);
+          return String(s).replace(/[^a-zA-Z0-9_-]/g, ch => "\\" + ch);
         }
 
         async function handleSaveInfo(form) {
