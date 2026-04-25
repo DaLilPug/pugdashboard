@@ -3601,11 +3601,22 @@
           : isPositive
             ? `Positive · step ${r.step_index} · day ${r.step_day}`
             : `Step ${r.step_index} · day ${r.step_day}`;
-        const tpl   = r.template
-          ? esc(truncate(renderTemplate(r.template, r), 180))
-          : (isManual
-              ? `<span class="fu-notemplate">No message drafted yet.</span>`
-              : `<span class="fu-notemplate">No template set for this step.</span>`);
+
+        // Editable preview, matching the extension's pattern. Lazy-init
+        // row._editedText from the templated render on first paint;
+        // operator edits update _editedText (see input handler in
+        // wireFollowupRoot). Copy + Mark sent both read from
+        // _editedText so the operator sends exactly what's on screen.
+        // refreshFollowups() / loadFollowups() replace the rows array,
+        // so stale edits can't leak from a previous fetch — intentional:
+        // template changes from the dashboard should re-seed a fresh
+        // default.
+        if (r._editedText == null) {
+          r._editedText = r.template ? renderTemplate(r.template, r) : "";
+        }
+        const previewHtml = r.template
+          ? `<textarea class="fu-preview fu-preview-edit" data-idx="${idx}" rows="3" placeholder="Edit before copy or mark sent…">${esc(r._editedText)}</textarea>`
+          : `<div class="fu-preview"><span class="fu-notemplate">${isManual ? "No message drafted yet." : "No template set for this step."}</span></div>`;
         // Click-to-edit due date — works on BOTH cadence and manual
         // tasks but with different semantics:
         //   cadence/positive: PATCH anchor's cadence_snooze_days (cascades to
@@ -3636,7 +3647,7 @@
             </div>
             <div class="fu-meta">${esc(meta)}</div>
             <div class="fu-step">${esc(stepText)}</div>
-            <div class="fu-preview">${tpl}</div>
+            ${previewHtml}
             <div class="fu-actions">
               <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open thread</button>
               <button class="fu-btn"                data-action="copy"     data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
@@ -3747,6 +3758,19 @@
           headCheck.indeterminate = sel > 0 && sel < visibleKeys.length;
         }
 
+        // Editable preview textarea — capture operator edits into
+        // fuState.rows[idx]._editedText so Copy + Mark sent send what's
+        // on screen rather than the original template render. autoGrow
+        // keeps the textarea sized to fit the content as they type.
+        root.oninput = (e) => {
+          const ta = e.target.closest(".fu-preview-edit");
+          if (!ta) return;
+          const idx = Number(ta.dataset.idx);
+          const row = fuState.rows[idx];
+          if (!row) return;
+          row._editedText = ta.value;
+        };
+
         root.onclick = async (e) => {
           // View toggle
           const viewBtn = e.target.closest("[data-fu-view]");
@@ -3846,7 +3870,11 @@
             return;
           }
           if (action === "copy") {
-            const text = renderTemplate(row.template, row);
+            // Operator-edited text wins over the raw template render so
+            // Copy always pastes what they see in the preview textarea.
+            const text = (row._editedText != null && row._editedText !== "")
+              ? row._editedText
+              : renderTemplate(row.template, row);
             if (!text) { feedback(btn, "No template"); return; }
             try {
               await navigator.clipboard.writeText(text);
@@ -4237,6 +4265,15 @@
       }
 
       async function logFollowupAction(row, type) {
+        // For followup events, use the operator's edited preview text
+        // when available so Mark sent records exactly what they see in
+        // the textarea. Falls back to the raw template render if no
+        // edit was made (e.g. operator clicks Mark sent from list view
+        // where there's no editable preview, or the row was logged
+        // before _editedText was lazy-init'd).
+        const editedMessage = (row._editedText != null && row._editedText !== "")
+          ? row._editedText
+          : renderTemplate(row.template, row);
         const payload = {
           client_id:     clientId,
           operator_id:   session.user.id,
@@ -4247,7 +4284,7 @@
           profile_url:   row.profile_url,
           sales_nav_url: row.sales_nav_url,
           type,
-          message_sent:  type === "followup" ? renderTemplate(row.template, row) : null,
+          message_sent:  type === "followup" ? editedMessage : null,
         };
         await sb.sbFetch("/rest/v1/outreach", {
           method:  "POST",

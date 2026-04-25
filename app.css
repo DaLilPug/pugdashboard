@@ -1274,6 +1274,33 @@ body.login-body {
 }
 .fu-notemplate { color: var(--gray-400); font-style: italic; }
 
+/* Editable preview textarea on follow-up cards. Looks like the static
+   .fu-preview at rest (same surface-2 background + radius); on focus
+   the border deepens to navy so the operator sees they're editing.
+   Mirrors the extension's .sn-fu-preview-edit. */
+textarea.fu-preview-edit {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--navy);
+  min-height: 56px;
+  max-height: 240px;
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+textarea.fu-preview-edit:hover { border-color: var(--gray-200); }
+textarea.fu-preview-edit:focus {
+  border-color: var(--navy);
+  background: #fff;
+}
+
 .fu-actions {
   display: flex;
   flex-wrap: wrap;
