@@ -1470,6 +1470,187 @@ body.login-body {
   border-left: 3px solid #6366f1;
 }
 
+/* ====================================================================
+   Follow-up log modal — pencil icon on a card opens this.
+   ====================================================================
+   Port of the extension's .sn-fu-modal-* with class names rebranded.
+   Two paths: ✓ Meeting booked (one-click sequence-exit) or
+   Log a response (textarea + sentiment pills). Submit fires the same
+   logFollowupAction / outreach-insert paths as the existing buttons. */
+
+.fu-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 24, 38, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fu-modal-fadein 140ms ease;
+}
+@keyframes fu-modal-fadein { from { opacity: 0; } to { opacity: 1; } }
+
+.fu-modal {
+  position: relative;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 18px 48px rgba(15, 24, 38, 0.28);
+  font-family: inherit;
+  color: var(--navy);
+}
+
+.fu-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--gray-400);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: inherit;
+}
+.fu-modal-close:hover { background: var(--surface-2); color: var(--navy); }
+
+.fu-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--navy);
+  padding-right: 32px;
+  margin-bottom: 2px;
+}
+.fu-modal-sub {
+  font-size: 12.5px;
+  color: var(--gray-400);
+  margin-bottom: 14px;
+  line-height: 1.35;
+}
+
+.fu-modal-meeting {
+  display: block;
+  width: 100%;
+  background: #1e6e45;
+  color: #fff;
+  border: 1px solid #1e6e45;
+  border-radius: 6px;
+  padding: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.fu-modal-meeting:hover:not(:disabled) { background: #155534; border-color: #155534; }
+.fu-modal-meeting:disabled { opacity: 0.5; cursor: wait; }
+
+.fu-modal-hint {
+  font-size: 11.5px;
+  color: var(--gray-400);
+  margin-top: 4px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.fu-modal-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 12px;
+  color: var(--gray-400);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.fu-modal-divider::before,
+.fu-modal-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.fu-modal-label {
+  display: block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 10px 0 4px;
+}
+
+.fu-modal-response {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--navy);
+  background: #fff;
+  resize: vertical;
+  min-height: 96px;
+  max-height: 260px;
+  outline: none;
+  box-sizing: border-box;
+}
+.fu-modal-response:focus { border-color: var(--navy); }
+
+.fu-modal-pills {
+  display: flex;
+  gap: 6px;
+}
+.fu-modal-pill {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 120ms ease;
+}
+.fu-modal-pill:hover { border-color: var(--navy); }
+.fu-modal-pill-emoji { font-size: 15px; line-height: 1; }
+.fu-modal-pill-pos.selected { background: #e7f5ed; border-color: #1e6e45; color: #155534; }
+.fu-modal-pill-neu.selected { background: #fff4e5; border-color: #b87400; color: #8a5700; }
+.fu-modal-pill-neg.selected { background: #fde8e8; border-color: #9a2c1f; color: #7a1e14; }
+
+.fu-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.fu-modal-cancel,
+.fu-modal-log-response {
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 120ms ease;
+}
+
 /* ---- list view ------------------------------------------------- */
 
 .fu-list-wrap {

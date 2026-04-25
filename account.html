@@ -3336,6 +3336,9 @@
         view:     localStorage.getItem(FU_VIEW_KEY) === "list" ? "list" : "cards",
         selected: new Set(),
         rows:     [],
+        // Anchor key for shift+click range select in list view (same
+        // pattern as state.lastCheckedKey on the Prospects tab).
+        lastCheckedKey: null,
       };
 
       function initFollowups() {
@@ -3482,10 +3485,10 @@
             <div class="fu-step">${esc(stepText)}</div>
             <div class="fu-preview">${tpl}</div>
             <div class="fu-actions">
-              <button class="fu-btn fu-btn-primary" data-action="open"    data-idx="${idx}" type="button">Open thread</button>
-              <button class="fu-btn"                data-action="copy"    data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
-              <button class="fu-btn fu-btn-success" data-action="sent"    data-idx="${idx}" type="button">Mark sent</button>
-              <button class="fu-btn fu-btn-ghost"   data-action="meeting" data-idx="${idx}" type="button" title="Log meeting booked">📅</button>
+              <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open thread</button>
+              <button class="fu-btn"                data-action="copy"     data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
+              <button class="fu-btn fu-btn-success" data-action="sent"     data-idx="${idx}" type="button">Mark sent</button>
+              <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log response or meeting…" aria-label="Log response or meeting">✎</button>
             </div>
           </article>
         `;
@@ -3546,9 +3549,10 @@
             <td class="fu-col-step">${esc(step)}</td>
             <td class="fu-col-due">${dueHtml}</td>
             <td class="fu-col-actions">
-              <button class="fu-btn fu-btn-primary" data-action="open" data-idx="${idx}" type="button">Open</button>
-              <button class="fu-btn fu-btn-success" data-action="sent" data-idx="${idx}" type="button">Mark sent</button>
-              <button class="fu-cancel"             data-action="cancel" data-idx="${idx}" type="button" title="${cancelTitle}" aria-label="${cancelTitle}">×</button>
+              <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open</button>
+              <button class="fu-btn fu-btn-success" data-action="sent"     data-idx="${idx}" type="button">Mark sent</button>
+              <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log response or meeting…" aria-label="Log response or meeting">✎</button>
+              <button class="fu-cancel"             data-action="cancel"   data-idx="${idx}" type="button" title="${cancelTitle}" aria-label="${cancelTitle}">×</button>
             </td>
           </tr>
         `;
@@ -3595,16 +3599,35 @@
             return;
           }
 
-          // List-view: row checkbox toggle
+          // List-view: row checkbox toggle. Supports shift+click range
+          // select — anchor is fuState.lastCheckedKey (set on every
+          // plain click). Same pattern as the Prospects tab's
+          // checkbox range select.
           const cbCell = e.target.closest("[data-action='toggle-fu-row']");
           if (cbCell) {
             e.preventDefault();
             const key = cbCell.dataset.key;
-            if (key) {
-              if (fuState.selected.has(key)) fuState.selected.delete(key);
-              else                            fuState.selected.add(key);
-              renderFollowups();
+            if (!key) return;
+
+            if (e.shiftKey && fuState.lastCheckedKey && fuState.lastCheckedKey !== key) {
+              // Range fill — always SELECT (Excel-/Sheets-like).
+              const keys = fuState.rows.map(fuRowKey);
+              const startIdx = keys.indexOf(fuState.lastCheckedKey);
+              const endIdx   = keys.indexOf(key);
+              if (startIdx >= 0 && endIdx >= 0) {
+                const [lo, hi] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+                for (let i = lo; i <= hi; i++) fuState.selected.add(keys[i]);
+                fuState.lastCheckedKey = key;
+                renderFollowups();
+                return;
+              }
             }
+
+            // Plain toggle.
+            if (fuState.selected.has(key)) fuState.selected.delete(key);
+            else                            fuState.selected.add(key);
+            fuState.lastCheckedKey = key;
+            renderFollowups();
             return;
           }
 
@@ -3717,7 +3740,172 @@
             handleEditFollowupDue(btn, row);
             return;
           }
+          if (action === "edit-log") {
+            openFollowupLogModal(row);
+            return;
+          }
         };
+      }
+
+      // Modal: pencil-icon path on follow-up cards / list rows. Lets
+      // the operator log either a meeting_booked (sequence-exit, one
+      // click) OR a response (with text + sentiment). Mirrors the
+      // extension's openFollowupEditModal so the surface feels the
+      // same across web + extension. Single instance — opening tears
+      // down any pre-existing modal.
+      function openFollowupLogModal(row) {
+        closeFollowupLogModal();
+
+        const backdrop = document.createElement("div");
+        backdrop.className = "fu-modal-backdrop";
+        backdrop.setAttribute("role", "dialog");
+        backdrop.setAttribute("aria-modal", "true");
+        backdrop.setAttribute("aria-label", "Log follow-up outcome");
+        const metaLine = [row.title, row.company].filter(Boolean).join(" · ");
+        backdrop.innerHTML = `
+          <div class="fu-modal">
+            <button type="button" class="fu-modal-close" data-action="modal-cancel" aria-label="Close">×</button>
+            <div class="fu-modal-title">Log for ${esc(row.prospect_name || "")}</div>
+            ${metaLine ? `<div class="fu-modal-sub">${esc(metaLine)}</div>` : ""}
+
+            <button type="button" class="fu-modal-meeting" data-action="modal-meeting">
+              ✓ Meeting booked
+            </button>
+            <div class="fu-modal-hint">Exits the follow-up sequence.</div>
+
+            <div class="fu-modal-divider"><span>or log a response</span></div>
+
+            <label class="fu-modal-label" for="fu-modal-response">Response content</label>
+            <textarea id="fu-modal-response" class="fu-modal-response"
+                      placeholder="Paste what they said…"></textarea>
+
+            <label class="fu-modal-label">Sentiment</label>
+            <div class="fu-modal-pills" role="radiogroup" aria-label="Response sentiment">
+              <button type="button" class="fu-modal-pill fu-modal-pill-pos" data-sentiment="positive">
+                <span class="fu-modal-pill-emoji">👍</span> Positive
+              </button>
+              <button type="button" class="fu-modal-pill fu-modal-pill-neu" data-sentiment="neutral">
+                <span class="fu-modal-pill-emoji">😐</span> Neutral
+              </button>
+              <button type="button" class="fu-modal-pill fu-modal-pill-neg" data-sentiment="negative">
+                <span class="fu-modal-pill-emoji">👎</span> Negative
+              </button>
+            </div>
+
+            <div class="fu-modal-actions">
+              <button type="button" class="btn-secondary fu-modal-cancel" data-action="modal-cancel">Cancel</button>
+              <button type="button" class="btn-primary fu-modal-log-response" data-action="modal-log-response" disabled>Log response</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(backdrop);
+
+        const respTa     = backdrop.querySelector(".fu-modal-response");
+        const logRespBtn = backdrop.querySelector(".fu-modal-log-response");
+        const pills      = backdrop.querySelectorAll(".fu-modal-pill");
+        respTa.focus();
+
+        let chosenSentiment = null;
+        const refreshLogBtn = () => {
+          const hasText = (respTa.value || "").trim().length > 0;
+          logRespBtn.disabled = !(hasText && chosenSentiment);
+        };
+        respTa.addEventListener("input", refreshLogBtn);
+        pills.forEach(p => p.addEventListener("click", () => {
+          chosenSentiment = p.dataset.sentiment;
+          pills.forEach(x => x.classList.toggle("selected", x === p));
+          refreshLogBtn();
+        }));
+
+        backdrop.addEventListener("click", async (e) => {
+          // Backdrop click closes; clicks inside the modal don't bubble out.
+          if (e.target === backdrop) { closeFollowupLogModal(); return; }
+          const action = e.target.closest("[data-action]")?.dataset.action;
+          if (!action) return;
+
+          if (action === "modal-cancel") {
+            closeFollowupLogModal();
+            return;
+          }
+
+          if (action === "modal-meeting") {
+            const btn = e.target.closest("[data-action='modal-meeting']");
+            btn.disabled = true;
+            try {
+              await logFollowupAction(row, "meeting_booked");
+              if (row.source === "manual" && row.task_id) {
+                await sb.sbFetch(
+                  `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(row.task_id)}`,
+                  { method: "DELETE", headers: { Prefer: "return=minimal" } }
+                );
+              }
+              closeFollowupLogModal();
+              await loadFollowups();
+            } catch (err) {
+              btn.disabled = false;
+              alert("Couldn't log meeting: " + (err.message || err));
+            }
+            return;
+          }
+
+          if (action === "modal-log-response") {
+            const btn = logRespBtn;
+            const text = (respTa.value || "").trim();
+            if (!text || !chosenSentiment) return;
+            btn.disabled = true;
+            try {
+              // Build payload directly from the tasks_due row shape
+              // (prospect_name, not name) — buildOutreachPayload
+              // expects the buildProspects-shape object instead.
+              const payload = {
+                client_id:          clientId,
+                operator_id:        session.user.id,
+                prospect_name:      row.prospect_name || "",
+                company:            row.company       || null,
+                title:              row.title         || null,
+                linkedin_id:        row.linkedin_id   || null,
+                profile_url:        row.profile_url   || null,
+                sales_nav_url:      row.sales_nav_url || null,
+                type:               "response",
+                response:           text,
+                responded_at:       new Date().toISOString(),
+                response_sentiment: chosenSentiment,
+              };
+              await sb.sbFetch("/rest/v1/outreach", {
+                method:  "POST",
+                body:    JSON.stringify([payload]),
+                headers: { Prefer: "return=minimal" },
+              });
+              if (row.source === "manual" && row.task_id) {
+                await sb.sbFetch(
+                  `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(row.task_id)}`,
+                  { method: "DELETE", headers: { Prefer: "return=minimal" } }
+                );
+              }
+              closeFollowupLogModal();
+              await loadFollowups();
+            } catch (err) {
+              btn.disabled = false;
+              alert("Couldn't log response: " + (err.message || err));
+            }
+            return;
+          }
+        });
+
+        // Esc to close.
+        const onKey = (e) => {
+          if (e.key === "Escape") { e.preventDefault(); closeFollowupLogModal(); }
+        };
+        document.addEventListener("keydown", onKey);
+        backdrop.dataset.keyHandler = "1";
+        backdrop._onKey = onKey;
+      }
+
+      function closeFollowupLogModal() {
+        const existing = document.querySelector(".fu-modal-backdrop");
+        if (!existing) return;
+        if (existing._onKey) document.removeEventListener("keydown", existing._onKey);
+        existing.remove();
       }
 
       // Click-to-edit follow-up due date. Swap the date label for an
