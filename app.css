@@ -3234,6 +3234,54 @@ body.login-body {
   word-break: break-word;
 }
 
+/* Inline-editable contenteditable bodies on response events
+   (.pr-event-body-resp + .pr-event-body-text inside .pr-event-msg-pair
+   when the parent event is a response). Click anywhere inside the
+   text → cursor lands at the click position → operator types → blur
+   triggers the save. Hover state hints editability without being
+   noisy at rest; focus state gives a clear "I'm editing this now"
+   visual. */
+.pr-inline-edit {
+  outline: none;
+  cursor: text;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  transition: border-color 80ms ease, background 80ms ease;
+}
+.pr-inline-edit:hover {
+  border-color: var(--gray-200);
+}
+.pr-inline-edit:focus {
+  border-color: var(--navy);
+  background: #fff;
+}
+
+/* Empty placeholder. contenteditable elements need a :empty hack since
+   CSS placeholder doesn't apply to them. Hidden when focused so the
+   cursor isn't competing with placeholder text. */
+.pr-inline-edit:empty::before {
+  content: attr(data-placeholder);
+  color: var(--gray-300);
+  font-style: italic;
+  pointer-events: none;
+}
+.pr-inline-edit:focus:empty::before {
+  content: "";
+}
+
+/* Saving / saved indicators. Saving = subtle dashed border (request
+   in flight); saved = quick green flash (confirmation). */
+.pr-inline-edit-saving {
+  border-color: var(--gray-300) !important;
+  border-style: dashed !important;
+}
+.pr-inline-edit-saved {
+  border-color: #1EB683 !important;
+  background: rgba(30, 182, 131, 0.05);
+}
+
 /* Edit form on response events. Response textarea up top (headline),
    then sentiment radios, then the Message Sent textarea in a purple-
    accented sub-section that mirrors the readonly .pr-event-msg-pair
@@ -3398,16 +3446,6 @@ body.login-body {
        timeline head, the .pr-timeline-cell gets .pr-split-mode, and
        this CSS reveals per-event checkboxes + a sticky split bar.
    ==================================================================== */
-
-.pr-bulk-action.btn-primary {
-  background: var(--navy);
-  color: #fff;
-  border-color: var(--navy);
-}
-.pr-bulk-action.btn-primary:hover:not(:disabled) {
-  background: var(--navy-dark);
-  border-color: var(--navy-dark);
-}
 
 /* Per-event split checkbox — hidden at rest, revealed when the parent
    .pr-timeline-cell has .pr-split-mode. */

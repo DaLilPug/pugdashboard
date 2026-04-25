@@ -319,6 +319,10 @@
         selectTab(btn.dataset.tab);
       });
 
+      // Whitelist of valid tab names — used for sanitizing the URL
+      // hash on page load. Anything outside this falls back to summary.
+      const VALID_TABS = new Set(Object.keys(loaded));
+
       function selectTab(name) {
         tabs.querySelectorAll(".sub-tab").forEach(b =>
           b.classList.toggle("active", b.dataset.tab === name)
@@ -335,11 +339,26 @@
           else if (name === "cadence")   initCadence();
           loaded[name] = true;
         }
+        // Mirror the active tab into the URL hash so a hard reload
+        // (or pasting the URL into a new tab) lands on the same tab
+        // instead of always falling back to Summary. replaceState so
+        // the back button doesn't get spammed with one entry per
+        // tab-click.
+        const newHash = name === "summary" ? "" : `#${name}`;
+        if (location.hash !== newHash) {
+          history.replaceState(null, "", location.pathname + location.search + newHash);
+        }
       }
 
-      // Summary loads on page open (it's the default tab).
-      initSummary();
-      loaded.summary = true;
+      // Resolve the initial tab: URL hash if present and recognized,
+      // otherwise summary. Note we run this BEFORE the eager
+      // initSummary call below so we don't load summary twice when the
+      // user lands on a non-summary tab.
+      const initialTab = (() => {
+        const h = (location.hash || "").replace(/^#/, "").toLowerCase();
+        return VALID_TABS.has(h) ? h : "summary";
+      })();
+      selectTab(initialTab);
 
       // ================= SUMMARY ======================================
 
@@ -748,6 +767,110 @@
           handleUpdateSentiment(sel);
         });
 
+        // ---- inline contenteditable bodies (response events) ---------
+        // Operators can click directly into the response and the paired
+        // message_sent on response events to edit them in place. Save
+        // happens on blur (focusout); Escape reverts to the value at
+        // focus time. Paste is sanitized to plain text so pastes from
+        // Gmail / Slack / Word don't inject styled spans into the body.
+
+        // Snapshot the value when the field gets focus so we can detect
+        // actual changes on blur (no-op blurs shouldn't fire the RPC).
+        wrapEl.addEventListener("focusin", (e) => {
+          const el = e.target.closest(".pr-inline-edit");
+          if (!el) return;
+          el.dataset.original = el.textContent.trim();
+        });
+
+        wrapEl.addEventListener("focusout", (e) => {
+          const el = e.target.closest(".pr-inline-edit");
+          if (!el) return;
+          const original = el.dataset.original || "";
+          const current  = el.textContent.trim();
+          if (original === current) return;
+
+          const eventId = el.dataset.eventId;
+          const field   = el.dataset.field;
+          if (!eventId || !field) return;
+
+          const timelineRow = el.closest(".pr-timeline-row");
+          if (!timelineRow) return;
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          saveInlineEdit(el, prospect, eventId, field, current, original);
+        });
+
+        // Strip HTML on paste — pastes from Gmail / Slack / Word ship
+        // styled spans that would inherit fonts / colors / link colors
+        // into the inline-edit element. execCommand("insertText") still
+        // works in Chromium-based browsers and is the simplest path
+        // for inserting plain text at cursor.
+        wrapEl.addEventListener("paste", (e) => {
+          const el = e.target.closest(".pr-inline-edit");
+          if (!el) return;
+          e.preventDefault();
+          const cb = e.clipboardData || window.clipboardData;
+          const text = cb ? cb.getData("text/plain") : "";
+          if (document.execCommand) {
+            document.execCommand("insertText", false, text);
+          } else {
+            // Fallback for older browsers / non-Chromium engines
+            // without execCommand. Naive append is fine — the cursor
+            // position is best-effort anyway.
+            el.textContent += text;
+          }
+        });
+
+        // Escape → revert without saving. Enter is intentionally NOT
+        // trapped — multi-line responses / messages need newlines.
+        wrapEl.addEventListener("keydown", (e) => {
+          if (e.key !== "Escape") return;
+          const el = e.target.closest(".pr-inline-edit");
+          if (!el) return;
+          e.preventDefault();
+          el.textContent = el.dataset.original || "";
+          el.blur();
+        });
+
+        async function saveInlineEdit(el, prospect, eventId, field, newValue, oldValue) {
+          // Optimistic UI: keep the new text in place while the RPC is
+          // in flight; flash a saving / saved class so the operator
+          // gets a visual receipt that something happened. On error,
+          // revert to the pre-edit value and surface the error.
+          el.classList.add("pr-inline-edit-saving");
+          try {
+            const changes = {};
+            changes[field] = newValue;
+            await sb.sbFetch("/rest/v1/rpc/update_outreach_event", {
+              method: "POST",
+              body:   JSON.stringify({ p_id: eventId, p_changes: changes }),
+            });
+          } catch (err) {
+            el.classList.remove("pr-inline-edit-saving");
+            el.textContent = oldValue;
+            el.dataset.original = oldValue;
+            alert("Couldn't save: " + (err.message || err));
+            return;
+          }
+          el.classList.remove("pr-inline-edit-saving");
+          el.classList.add("pr-inline-edit-saved");
+          setTimeout(() => el.classList.remove("pr-inline-edit-saved"), 900);
+
+          // Mirror in canonical state so a subsequent rerender preserves
+          // the edit. rollup() recomputes status / last_touch in case
+          // anything depended on the field (it doesn't today, but cheap
+          // insurance).
+          const canonical = findCanonical(prospect);
+          const ev = canonical ? canonical.events.find(x => x.id === eventId) : null;
+          if (ev) {
+            ev[field] = newValue;
+            Object.assign(canonical, rollup(canonical.events));
+          }
+          el.dataset.original = newValue;
+        }
+
         // ---- load ----------------------------------------------------
 
         loadAll();
@@ -1108,7 +1231,7 @@
         function renderBulkBar(count, prospects) {
           if (!count) return "";
           const mergeBtn = count >= 2
-            ? `<button class="btn-primary pr-bulk-action" data-action="bulk-merge-prospects" type="button" title="Combine the selected prospects into one">Merge ${fmtInt(count)}</button>`
+            ? `<button class="btn-secondary pr-bulk-action" data-action="bulk-merge-prospects" type="button" title="Combine the selected prospects into one">Merge ${fmtInt(count)}</button>`
             : "";
           return `
             <div class="pr-bulk-bar" role="region" aria-label="Bulk actions">
@@ -1397,71 +1520,47 @@
           // might mistype. connection / meeting_booked have nothing to
           // edit (the click itself is the event). For those types we
           // show only the X (delete) button, no pencil.
-          const editableTypes = new Set(["message", "followup", "retargeting", "inmail", "response"]);
-          const editable = e.id && editableTypes.has(e.type);
+          //
+          // Response events are a special case: response + message_sent
+          // are now inline-editable (contenteditable) directly in the
+          // body section, so the pencil-button / form-mode is redundant
+          // for them. Only outgoing types (message / followup /
+          // retargeting / inmail) still need the pencil to open the
+          // single-textarea edit form.
+          const formEditableTypes = new Set(["message", "followup", "retargeting", "inmail"]);
+          const formEditable = e.id && formEditableTypes.has(e.type);
+          // Whether the event has *any* editable content at all (used
+          // to decide whether to bother attaching contenteditable
+          // listeners later). connection / meeting_booked → false.
+          const inlineEditable = e.id && e.type === "response";
 
-          // Per-event action buttons. Always include X (delete);
-          // include pencil only for editable types.
-          // Both rely on e.id — historical imports without ids can't be
-          // edited or deleted. Skip the actions block entirely in that
-          // case to avoid a non-functional button.
+          // Per-event action buttons. Always include X (delete) for
+          // events with an id; include pencil only when there's a
+          // form-edit path. Historical imports without ids skip the
+          // actions block entirely to avoid non-functional buttons.
           const actions = e.id
             ? `<span class="pr-event-actions">
-                ${editable ? `<button class="pr-event-action pr-event-edit-btn" data-action="edit-event" data-event-id="${esc(e.id)}" type="button" title="Edit">✎</button>` : ""}
+                ${formEditable ? `<button class="pr-event-action pr-event-edit-btn" data-action="edit-event" data-event-id="${esc(e.id)}" type="button" title="Edit">✎</button>` : ""}
                 <button class="pr-event-action pr-event-delete-btn" data-action="delete-event" data-event-id="${esc(e.id)}" type="button" title="Delete event">×</button>
               </span>`
             : "";
 
           // Inline edit form. Hidden by default; "Edit" toggles
           // .pr-event-editing on the <li> which CSS uses to swap views.
-          // For response events: separate Message Sent + Response
-          // textareas + sentiment radios — the operator can fix either
-          // half of the captured pair. For outgoing types: a single
-          // Message Sent textarea.
+          // Only used for outgoing types now (single message_sent
+          // textarea) — response events use contenteditable bodies
+          // directly so the pencil + form mode is redundant for them.
           let editForm = "";
-          if (editable) {
-            const cur = e.response_sentiment || "";
-            if (isResponse) {
-              const sentimentRadios = `
-                <div class="pr-event-edit-sent">
-                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value="positive" ${cur === "positive" ? "checked" : ""}> positive</label>
-                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value="neutral"  ${cur === "neutral"  ? "checked" : ""}> neutral</label>
-                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value="negative" ${cur === "negative" ? "checked" : ""}> negative</label>
-                  <label><input type="radio" name="ev-sent-${esc(e.id)}" value=""         ${cur === ""         ? "checked" : ""}> —</label>
+          if (formEditable) {
+            editForm = `
+              <form class="pr-event-edit-form" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
+                <textarea class="pr-event-edit-text" name="message_sent" rows="3">${esc(body)}</textarea>
+                <div class="pr-event-edit-actions">
+                  <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
+                  <button type="submit" class="btn-primary pr-action">Save</button>
                 </div>
-              `;
-              // Edit form mirrors the readonly layout: Response field
-              // up top (the headline), Message Sent below in a
-              // purple-accented sub-section to match the readonly
-              // .pr-event-msg-pair box.
-              editForm = `
-                <form class="pr-event-edit-form pr-event-edit-form-response" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
-                  <label class="pr-event-edit-field">
-                    <span class="pr-event-edit-label">Response</span>
-                    <textarea class="pr-event-edit-text" name="response" rows="3" placeholder="What the prospect wrote back">${esc(body)}</textarea>
-                  </label>
-                  ${sentimentRadios}
-                  <label class="pr-event-edit-field pr-event-edit-field-msg">
-                    <span class="pr-event-edit-label">Message sent</span>
-                    <textarea class="pr-event-edit-text" name="message_sent" rows="3" placeholder="The outreach you sent that triggered this response">${esc(pairedMessage)}</textarea>
-                  </label>
-                  <div class="pr-event-edit-actions">
-                    <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
-                    <button type="submit" class="btn-primary pr-action">Save</button>
-                  </div>
-                </form>
-              `;
-            } else {
-              editForm = `
-                <form class="pr-event-edit-form" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
-                  <textarea class="pr-event-edit-text" name="message_sent" rows="3">${esc(body)}</textarea>
-                  <div class="pr-event-edit-actions">
-                    <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
-                    <button type="submit" class="btn-primary pr-action">Save</button>
-                  </div>
-                </form>
-              `;
-            }
+              </form>
+            `;
           }
 
           // Split-mode checkbox — hidden by default, revealed by CSS
@@ -1489,23 +1588,38 @@
           // Body rendering.
           //   Response events: response body up top (no label — the
           //   type is already in the head), then a purple-trimmed
-          //   nested box showing the paired message sent. The visual
-          //   keeps the response as the headline (it's the new
-          //   information) while still surfacing the originating
-          //   outreach for context.
-          //   Outgoing types: single unlabeled body block.
+          //   nested box showing the paired message sent. Both fields
+          //   are contenteditable for response events so the operator
+          //   can fix either half inline without dropping into a
+          //   form mode (they save on blur, see wireInlineEdits below).
+          //   Always render BOTH boxes for response events — even when
+          //   empty — so the operator can paste in a missing message
+          //   without first clicking edit.
+          //   Outgoing types: single unlabeled, non-editable body
+          //   block (operators use the pencil to open the form).
           let bodyHtml = "";
           if (isResponse) {
-            const respPart = body
-              ? `<div class="pr-event-body pr-event-body-resp">${esc(body)}</div>`
-              : "";
-            const msgPart = pairedMessage
-              ? `<div class="pr-event-msg-pair">
-                   <span class="pr-event-body-label">Message sent</span>
-                   <div class="pr-event-body-text">${esc(pairedMessage)}</div>
-                 </div>`
-              : "";
-            bodyHtml = respPart + msgPart;
+            // Empty contenteditable elements get a CSS placeholder via
+            // data-placeholder. spellcheck off to avoid the red-squiggle
+            // on names / company terms.
+            const respHtml = `<div class="pr-event-body pr-event-body-resp pr-inline-edit"
+                                   contenteditable="true"
+                                   spellcheck="false"
+                                   data-action="inline-edit"
+                                   data-event-id="${esc(e.id)}"
+                                   data-field="response"
+                                   data-placeholder="(click to add the response)">${esc(body)}</div>`;
+            const msgHtml = `<div class="pr-event-msg-pair">
+                              <span class="pr-event-body-label">Message sent</span>
+                              <div class="pr-event-body-text pr-inline-edit"
+                                   contenteditable="true"
+                                   spellcheck="false"
+                                   data-action="inline-edit"
+                                   data-event-id="${esc(e.id)}"
+                                   data-field="message_sent"
+                                   data-placeholder="(click to add the message that triggered this response)">${esc(pairedMessage)}</div>
+                            </div>`;
+            bodyHtml = respHtml + msgHtml;
           } else if (body) {
             bodyHtml = `<div class="pr-event-body">${esc(body)}</div>`;
           }
@@ -1738,6 +1852,15 @@
           if (action === "edit-event-date") {
             clickEvt.preventDefault();
             handleEditEventDate(actionEl, prospect);
+            return;
+          }
+          if (action === "inline-edit") {
+            // Click-to-edit on a contenteditable response body or
+            // paired message_sent. Browser handles focus + cursor
+            // placement on its own; the focusin/focusout listeners
+            // on wrapEl handle the save lifecycle. Explicit case so
+            // the click isn't incidentally caught by the timeline
+            // toggle later in this function.
             return;
           }
           if (action === "edit-event") {
