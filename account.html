@@ -137,7 +137,8 @@
             <span class="pr-filter-label">Status</span>
             <div class="pr-filter-chips" id="pr-status-filter">
               <button class="pr-chip active" data-status="all"        type="button">All</button>
-              <button class="pr-chip"        data-status="connection" type="button">Connected</button>
+              <button class="pr-chip"        data-status="connection" type="button">Connection request</button>
+              <button class="pr-chip"        data-status="inmail"     type="button">InMail</button>
               <button class="pr-chip"        data-status="message"    type="button">Messaged</button>
               <button class="pr-chip"        data-status="response"   type="button">Responded</button>
               <button class="pr-chip"        data-status="meeting"    type="button">Meeting</button>
@@ -916,11 +917,19 @@
             }
           }
 
+          // Status precedence (most-advanced funnel stage wins). InMail
+          // sits below connection because connection-then-inmail is rare
+          // and connection-request acceptance is the more common starter
+          // path in practice; meeting_booked / response / message
+          // supersede both. Per Austin: "a new prospect can be created by
+          // logging an inmail, but that status should be superseded by a
+          // response or meeting booked."
           let status;
           if      (counts.meeting_booked > 0) status = "meeting";
           else if (counts.response       > 0) status = "response";
           else if (counts.message        > 0) status = "message";
           else if (counts.connection     > 0) status = "connection";
+          else if (counts.inmail         > 0) status = "inmail";
           else                                status = "other";
 
           return { counts, positives, last_touch: lastTouch, status, sentiment };
@@ -1019,7 +1028,8 @@
                     <th class="pr-col-sent">Sentiment</th>
                     <th class="pr-col-events num">Events</th>
                     <th class="pr-col-last sortable ${lastSortClass}" data-action="sort-column" data-sort="lastTouch" title="Click to sort">Last touch<span class="sort-caret">${lastSortCaret}</span></th>
-                    <th class="pr-col-link"></th>
+                    <th class="pr-col-sn">Sales Nav</th>
+                    <th class="pr-col-link">LinkedIn</th>
                   </tr>
                 </thead>
                 <tbody>${bodyHtml}</tbody>
@@ -1052,7 +1062,8 @@
             meeting:    "Meeting",
             response:   "Response",
             message:    "Messaged",
-            connection: "Connected",
+            connection: "Connection request",
+            inmail:     "InMail",
             other:      "—",
           }[p.status] || "—";
 
@@ -1060,14 +1071,18 @@
             ? `<span class="pr-sent pr-sent-${esc(p.sentiment)}">${esc(p.sentiment)}</span>`
             : `<span class="pr-sent-none">—</span>`;
 
-          // LinkedIn link lives in its own compact column so operators can
-          // jump straight into LinkedIn without expanding the timeline
-          // first. Falls back to profile_url when sales_nav_url isn't
-          // populated — same waterfall as the timeline head used to use.
-          const linkUrl = p.sales_nav_url || p.profile_url;
-          const linkCell = linkUrl
-            ? `<a class="pr-link-btn" href="${esc(linkUrl)}" target="_blank" rel="noopener" title="Open in LinkedIn">LinkedIn ↗</a>`
-            : "";
+          // Two link columns side-by-side: Sales Nav (sales_nav_url) opens
+          // the SalesNav messaging thread; LinkedIn (profile_url) opens the
+          // canonical linkedin.com/in/<slug> profile. Empty URL → muted
+          // dash so the column footprint stays even and the operator can
+          // see at a glance which fields are missing. Both are editable
+          // via the Edit info form below.
+          const snCell = p.sales_nav_url
+            ? `<a class="pr-link-btn" href="${esc(p.sales_nav_url)}" target="_blank" rel="noopener" title="Open Sales Nav thread">Sales Nav ↗</a>`
+            : `<span class="pr-link-empty" title="No Sales Nav URL — add it via Edit info">—</span>`;
+          const liCell = p.profile_url
+            ? `<a class="pr-link-btn" href="${esc(p.profile_url)}" target="_blank" rel="noopener" title="Open LinkedIn profile">LinkedIn ↗</a>`
+            : `<span class="pr-link-empty" title="No LinkedIn URL — add it via Edit info">—</span>`;
 
           const isChecked = state.selected.has(p.key);
 
@@ -1091,10 +1106,11 @@
               <td>${sentimentHtml}</td>
               <td class="num">${fmtInt(p.events.length)}</td>
               <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
-              <td class="pr-link">${linkCell}</td>
+              <td class="pr-sn">${snCell}</td>
+              <td class="pr-link">${liCell}</td>
             </tr>
             <tr class="pr-timeline-row hidden" data-idx="${idx}">
-              <td colspan="9" class="pr-timeline-cell"></td>
+              <td colspan="10" class="pr-timeline-cell"></td>
             </tr>
           `;
         }
@@ -1199,6 +1215,14 @@
                 <label class="pr-info-field">
                   <span class="pr-form-label">Phone</span>
                   <input type="text" name="pr_phone" value="${esc(p.phone || "")}" autocomplete="off" />
+                </label>
+                <label class="pr-info-field pr-info-field-wide">
+                  <span class="pr-form-label">LinkedIn URL</span>
+                  <input type="text" name="pr_profile_url" value="${esc(p.profile_url || "")}" autocomplete="off" placeholder="https://www.linkedin.com/in/..." />
+                </label>
+                <label class="pr-info-field pr-info-field-wide">
+                  <span class="pr-form-label">Sales Nav URL</span>
+                  <input type="text" name="pr_sales_nav_url" value="${esc(p.sales_nav_url || "")}" autocomplete="off" placeholder="https://www.linkedin.com/sales/lead/..." />
                 </label>
               </div>
               <div class="pr-info-form-footer">
@@ -1898,18 +1922,22 @@
           // didn't touch and keeps the request body small.
           const fd = new FormData(form);
           const next = {
-            prospect_name: (fd.get("pr_name")    || "").trim(),
-            company:       (fd.get("pr_company") || "").trim(),
-            title:         (fd.get("pr_title")   || "").trim(),
-            email:         (fd.get("pr_email")   || "").trim(),
-            phone:         (fd.get("pr_phone")   || "").trim(),
+            prospect_name: (fd.get("pr_name")          || "").trim(),
+            company:       (fd.get("pr_company")       || "").trim(),
+            title:         (fd.get("pr_title")         || "").trim(),
+            email:         (fd.get("pr_email")         || "").trim(),
+            phone:         (fd.get("pr_phone")         || "").trim(),
+            profile_url:   (fd.get("pr_profile_url")   || "").trim(),
+            sales_nav_url: (fd.get("pr_sales_nav_url") || "").trim(),
           };
           const current = {
-            prospect_name: prospect.name    || "",
-            company:       prospect.company || "",
-            title:         prospect.title   || "",
-            email:         prospect.email   || "",
-            phone:         prospect.phone   || "",
+            prospect_name: prospect.name          || "",
+            company:       prospect.company       || "",
+            title:         prospect.title         || "",
+            email:         prospect.email         || "",
+            phone:         prospect.phone         || "",
+            profile_url:   prospect.profile_url   || "",
+            sales_nav_url: prospect.sales_nav_url || "",
           };
           const patch = {};
           for (const k of Object.keys(next)) {
@@ -1959,11 +1987,13 @@
                   evt[col] = val;
                 }
               }
-              if ("prospect_name" in patch) canonical.name    = patch.prospect_name;
-              if ("company"       in patch) canonical.company = patch.company || "";
-              if ("title"         in patch) canonical.title   = patch.title   || "";
-              if ("email"         in patch) canonical.email   = patch.email   || "";
-              if ("phone"         in patch) canonical.phone   = patch.phone   || "";
+              if ("prospect_name" in patch) canonical.name          = patch.prospect_name;
+              if ("company"       in patch) canonical.company       = patch.company       || "";
+              if ("title"         in patch) canonical.title         = patch.title         || "";
+              if ("email"         in patch) canonical.email         = patch.email         || "";
+              if ("phone"         in patch) canonical.phone         = patch.phone         || "";
+              if ("profile_url"   in patch) canonical.profile_url   = patch.profile_url   || null;
+              if ("sales_nav_url" in patch) canonical.sales_nav_url = patch.sales_nav_url || null;
             }
             reopenAfterMutation(prospect);
           } catch (err) {
