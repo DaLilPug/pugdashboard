@@ -460,7 +460,13 @@
       // (names, emails) goes through esc() here, not at the call site.
       function formatActivity(ev) {
         const p = ev.payload || {};
-        const actorName  = ev.actor?.name  || ev.actor?.email  || "(unknown)";
+        // Fallback "Uptown admin" when the operators embed is null —
+        // happens when the actor doesn't share an org with the viewer
+        // (per the operators.SELECT policy "operators see same-org
+        // teammates"). In practice this means platform admins acting
+        // from outside a customer's org. Austin opted for the simple
+        // string label over snapshotting actor name in the payload.
+        const actorName  = ev.actor?.name  || ev.actor?.email  || "Uptown admin";
         const targetName = ev.target?.name || ev.target?.email || p.email || "(unknown)";
         const actor  = `<span class="activity-actor">${esc(actorName)}</span>`;
         const target = `<span class="activity-target">${esc(targetName)}</span>`;
