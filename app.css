@@ -3397,6 +3397,36 @@ body.login-body {
   pointer-events: none;
 }
 
+/* Click-to-edit event date. The date span is interactive — hover state
+   and underline-on-hover signal that. While editing, the span gets
+   swapped for an <input type="date"> by the click handler; CSS here
+   styles that input to fit visually with the surrounding row. */
+.pr-event-date-editable {
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  padding-bottom: 1px;
+  transition: border-color 80ms ease, color 80ms ease;
+}
+.pr-event-date-editable:hover {
+  color: var(--navy);
+  border-bottom-color: var(--gray-300);
+}
+.pr-event-date-input {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: .04em;
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: #fff;
+  outline: none;
+}
+.pr-event-date-input:focus {
+  border-color: var(--navy);
+}
+
 /* ====================================================================
    Site-wide footer for legal links
    ====================================================================

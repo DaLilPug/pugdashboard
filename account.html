@@ -125,6 +125,7 @@
             </div>
             <input id="pr-search" class="pr-search" type="search"
                    placeholder="Search name, company, title…" autocomplete="off" />
+            <button id="pr-copy"   class="btn-secondary pr-export" type="button" title="Copy the visible prospects as TSV (paste into Sheets / Excel)">Copy</button>
             <button id="pr-export" class="btn-secondary pr-export" type="button">Export CSV</button>
           </div>
         </div>
@@ -574,6 +575,7 @@
         const statusEl    = document.getElementById("pr-status-filter");
         const sentimentEl = document.getElementById("pr-sentiment-filter");
         const exportBtn   = document.getElementById("pr-export");
+        const copyBtn     = document.getElementById("pr-copy");
         const metaEl      = document.getElementById("pr-meta");
         const wrapEl      = document.getElementById("pr-table-wrap");
 
@@ -653,6 +655,28 @@
         });
 
         exportBtn.addEventListener("click", () => exportCsv(state.filtered));
+
+        // Copy button — TSV to clipboard. 1.4s "Copied!" feedback then
+        // restore. Falls back to CSV download if clipboard write fails
+        // (e.g. permission denied) so the operator never gets stuck.
+        copyBtn.addEventListener("click", async () => {
+          const prevLabel = copyBtn.textContent;
+          copyBtn.disabled = true;
+          try {
+            const n = await copyToClipboard(state.filtered);
+            copyBtn.textContent = `Copied ${fmtInt(n)}!`;
+            setTimeout(() => {
+              copyBtn.textContent = prevLabel;
+              copyBtn.disabled    = false;
+            }, 1400);
+          } catch (err) {
+            copyBtn.textContent = prevLabel;
+            copyBtn.disabled    = false;
+            console.warn("clipboard write failed:", err);
+            alert("Couldn't copy to clipboard. Falling back to CSV download.");
+            exportCsv(state.filtered);
+          }
+        });
 
         // Delegated click handler — survives timeline re-renders.
         //
@@ -1436,11 +1460,21 @@
                </label>`
             : "";
 
+          // Date is click-to-edit when the event has an id. Renders as
+          // a span with data-action so the wrapEl click delegate picks
+          // it up; the handler swaps the span for an input[type=date]
+          // and calls update_outreach_event with the new occurred_at on
+          // change. Historical imports without ids stay read-only.
+          const isoDate = (e.occurred_at || "").slice(0, 10);
+          const dateSpan = e.id
+            ? `<span class="pr-event-date pr-event-date-editable" data-action="edit-event-date" data-event-id="${esc(e.id)}" data-iso="${esc(isoDate)}" title="Click to change the date">${esc(fmtDate(e.occurred_at))}</span>`
+            : `<span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>`;
+
           return `
             <li class="pr-event pr-event-${esc(e.type)}" data-event-id="${esc(e.id || "")}">
               <div class="pr-event-head">
                 ${splitCheck}
-                <span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>
+                ${dateSpan}
                 <span class="pr-event-type">${esc(typeLabel)}</span>
                 ${sentTag}
                 ${actions}
@@ -1453,40 +1487,77 @@
 
         // ---- export --------------------------------------------------
 
-        function exportCsv(prospects) {
-          if (!prospects.length) return;
+        // ---- export / copy --------------------------------------------
+        //
+        // Both the CSV download and the TSV-to-clipboard Copy button feed
+        // off the same headers + per-prospect row builder so the two
+        // outputs are always in sync. Anything you'd see in the file
+        // is what gets copied.
 
-          // Every outreach type gets its own column so nothing hides once
-          // the extension starts logging follow-ups / InMails / retargeting.
-          // Email + Phone sit next to Name so enriched rows and externally-
-          // booked meetings (where we may only have a contact) survive
-          // the export.
+        function buildExportRows(prospects) {
           const header = [
             "Name", "Email", "Phone", "Company", "Title", "Status", "Sentiment",
             "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
             "Responses", "Positive Responses", "Meetings",
-            "Events", "Last Touch", "LinkedIn URL",
+            "Events", "Last Touch",
+            "LinkedIn URL", "Sales Nav URL",
+            "Latest Message Sent", "Latest Response",
           ];
-          const rows = prospects.map(p => [
-            p.name || "",
-            p.email || "",
-            p.phone || "",
-            p.company || "",
-            p.title || "",
-            p.status,
-            p.sentiment || "",
-            p.counts.connection,
-            p.counts.inmail,
-            p.counts.message,
-            p.counts.followup,
-            p.counts.retargeting,
-            p.counts.response,
-            p.positives,
-            p.counts.meeting_booked,
-            p.events.length,
-            p.last_touch ? usDate(p.last_touch.slice(0, 10)) : "",
-            p.sales_nav_url || p.profile_url || "",
-          ]);
+
+          const rows = prospects.map(p => {
+            // Most-recent outgoing message body across the message-like
+            // event types. pickLatest walks the events list (already
+            // sorted ASC by occurred_at via buildProspects) from the end.
+            const latestMessage = pickLatest(p.events, e =>
+              (e.type === "message" || e.type === "followup" ||
+               e.type === "retargeting" || e.type === "inmail")
+              && (e.message_sent || "").trim() !== ""
+            )?.message_sent || "";
+            const latestResponse = pickLatest(p.events, e =>
+              e.type === "response" && (e.response || "").trim() !== ""
+            )?.response || "";
+
+            return [
+              p.name || "",
+              p.email || "",
+              p.phone || "",
+              p.company || "",
+              p.title || "",
+              p.status,
+              p.sentiment || "",
+              p.counts.connection,
+              p.counts.inmail,
+              p.counts.message,
+              p.counts.followup,
+              p.counts.retargeting,
+              p.counts.response,
+              p.positives,
+              p.counts.meeting_booked,
+              p.events.length,
+              p.last_touch ? usDate(p.last_touch.slice(0, 10)) : "",
+              p.profile_url   || "",
+              p.sales_nav_url || "",
+              latestMessage,
+              latestResponse,
+            ];
+          });
+
+          return { header, rows };
+        }
+
+        // Walks the events array from newest → oldest and returns the
+        // first match. Events are stored in ASC chronological order so
+        // we iterate from the end.
+        function pickLatest(events, predicate) {
+          for (let i = events.length - 1; i >= 0; i--) {
+            if (predicate(events[i])) return events[i];
+          }
+          return null;
+        }
+
+        function exportCsv(prospects) {
+          if (!prospects.length) return;
+          const { header, rows } = buildExportRows(prospects);
 
           // UTF-8 BOM so Excel opens the file in the right encoding
           // without the user having to pick an import option.
@@ -1511,6 +1582,31 @@
           if (v == null) return "";
           const s = String(v);
           return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        }
+
+        // Copy the same data as Export CSV to the clipboard, but as TSV
+        // (tab-separated) — pastes cleanly into Google Sheets, Excel,
+        // and Notion tables. Returns the number of data rows copied so
+        // callers can flash UI feedback.
+        async function copyToClipboard(prospects) {
+          if (!prospects.length) return 0;
+          const { header, rows } = buildExportRows(prospects);
+          const tsv = [header, ...rows]
+            .map(r => r.map(tsvEscape).join("\t"))
+            .join("\r\n");
+          await navigator.clipboard.writeText(tsv);
+          return rows.length;
+        }
+
+        // TSV escape: tabs and newlines inside cell values would split
+        // the row in the destination spreadsheet, so wrap cells that
+        // contain them (and any pre-existing quotes) in double quotes
+        // with quote-doubling, matching CSV's escape rules. Sheets and
+        // Excel both honor this on paste.
+        function tsvEscape(v) {
+          if (v == null) return "";
+          const s = String(v);
+          return /[\t"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
         }
 
         // ---- inline actions -----------------------------------------
@@ -1589,6 +1685,11 @@
             clickEvt.preventDefault();
             const eventId = actionEl.dataset.eventId;
             handleDeleteEvent(actionEl, prospect, eventId);
+            return;
+          }
+          if (action === "edit-event-date") {
+            clickEvt.preventDefault();
+            handleEditEventDate(actionEl, prospect);
             return;
           }
           if (action === "edit-event") {
@@ -1841,10 +1942,19 @@
             wrap.insertBefore(tmp.firstElementChild, wrap.firstChild);
           }
 
-          // Per-row .selected class
+          // Per-row .selected class + checkbox state. Without the
+          // checkbox sync, shift+click range selection adds rows to
+          // state.selected but the checkboxes themselves stay unchecked
+          // (preventDefault stops the browser from toggling the click
+          // target, and rows in the range never get a native event at
+          // all). The .selected class would highlight the row but the
+          // checkbox would visually lie.
           wrap.querySelectorAll(".pr-row").forEach(row => {
             const k = row.dataset.key;
-            row.classList.toggle("selected", state.selected.has(k));
+            const isChecked = state.selected.has(k);
+            row.classList.toggle("selected", isChecked);
+            const cb = row.querySelector(".pr-check");
+            if (cb) cb.checked = isChecked;
           });
 
           // Header checkbox state (checked / indeterminate / unchecked)
@@ -1960,6 +2070,111 @@
           if ("response_sentiment" in changes) ev.response_sentiment = changes.response_sentiment;
           if (canonical) Object.assign(canonical, rollup(canonical.events));
           reopenAfterMutation(prospect);
+        }
+
+        // Click-to-edit the event's date. Swaps the readonly span for an
+        // input[type=date], focuses + shows the native picker, and on
+        // 'change' calls update_outreach_event with the new occurred_at.
+        // On blur without change (or Escape), reverts the span without
+        // a save.
+        function handleEditEventDate(spanEl, prospect) {
+          // Re-entrancy guard — second click while already editing
+          // should do nothing.
+          if (spanEl.dataset.editing === "1") return;
+          spanEl.dataset.editing = "1";
+
+          const eventId  = spanEl.dataset.eventId;
+          const startIso = spanEl.dataset.iso || "";
+
+          const input = document.createElement("input");
+          input.type      = "date";
+          input.className = "pr-event-date-input";
+          input.value     = startIso;
+          input.setAttribute("aria-label", "Edit event date");
+
+          spanEl.replaceWith(input);
+          input.focus();
+          // showPicker isn't available everywhere (older browsers), but
+          // the date input already opens its picker on focus + click in
+          // most engines. Try it where supported.
+          if (typeof input.showPicker === "function") {
+            try { input.showPicker(); } catch { /* ignore */ }
+          }
+
+          // Restore the (possibly new) span on cleanup. fresh = the iso
+          // date that was committed (either the unchanged start or a
+          // new one after a successful save).
+          const restore = (freshIso) => {
+            const newSpan = document.createElement("span");
+            newSpan.className = "pr-event-date pr-event-date-editable";
+            newSpan.dataset.action  = "edit-event-date";
+            newSpan.dataset.eventId = eventId;
+            newSpan.dataset.iso     = freshIso;
+            newSpan.title           = "Click to change the date";
+            newSpan.textContent     = fmtDate(freshIso);
+            input.replaceWith(newSpan);
+          };
+
+          let saving = false;
+          const save = async () => {
+            if (saving) return;
+            const next = input.value;            // YYYY-MM-DD or "" if cleared
+            if (!next || next === startIso) {
+              restore(startIso);
+              return;
+            }
+            saving = true;
+            input.disabled = true;
+            try {
+              await sb.sbFetch("/rest/v1/rpc/update_outreach_event", {
+                method: "POST",
+                body:   JSON.stringify({
+                  p_id: eventId,
+                  // Send a date string; Postgres casts to timestamptz at
+                  // midnight in the server's timezone. Date-only is what
+                  // the operator expressed via the picker.
+                  p_changes: { occurred_at: next },
+                }),
+              });
+            } catch (err) {
+              alert("Couldn't update date: " + (err.message || err));
+              restore(startIso);
+              return;
+            }
+
+            // Mirror locally: update the canonical event's occurred_at
+            // and the prospect's last_touch / status via rollup. Use
+            // ISO midnight so subsequent sorts work like server-side.
+            const canonical = findCanonical(prospect);
+            const ev = canonical ? canonical.events.find(x => x.id === eventId) : null;
+            if (ev) {
+              ev.occurred_at = next + "T00:00:00.000Z";
+            }
+            if (canonical) Object.assign(canonical, rollup(canonical.events));
+            reopenAfterMutation(prospect);
+            // reopenAfterMutation rerenders, replacing the timeline —
+            // no need to manually restore the span.
+          };
+
+          const cancel = () => restore(startIso);
+
+          input.addEventListener("change", save);
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              cancel();
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              save();
+            }
+          });
+          input.addEventListener("blur", () => {
+            // Defer so a 'change' triggered by clicking a date in the
+            // native picker has a chance to fire first.
+            setTimeout(() => {
+              if (input.isConnected) cancel();
+            }, 50);
+          });
         }
 
         // Bulk delete every selected prospect. One RPC call per prospect
