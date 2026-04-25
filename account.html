@@ -600,6 +600,12 @@
           // lastCheckedKey enables shift+click range select.
           selected:        new Set(),
           lastCheckedKey:  null,
+          // Split mode is active for at most one expanded prospect at a
+          // time (only one timeline can be open). When active:
+          //   { prospectKey, selectedEventIds: Set<string> }
+          // Otherwise null. Reset on timeline collapse / cancel /
+          // successful split.
+          splitMode:       null,
         };
 
         activatePill(pillsEl, state.tf);
@@ -716,6 +722,21 @@
               // rerender, which would also collapse any open timeline.
               syncSelectionUi();
             }
+            return;
+          }
+
+          // Per-event split-mode checkbox toggle. Mirrors the prospect-
+          // level pattern but writes into state.splitMode.selectedEventIds
+          // and updates the in-bar count + Split button enabled state.
+          const splitCb = e.target.closest(".pr-event-split-check input");
+          if (splitCb && state.splitMode) {
+            const label = splitCb.closest("[data-event-id]");
+            if (label) {
+              const eventId = label.dataset.eventId;
+              if (splitCb.checked) state.splitMode.selectedEventIds.add(eventId);
+              else                 state.splitMode.selectedEventIds.delete(eventId);
+              syncSplitBar();
+            }
           }
         });
 
@@ -740,7 +761,7 @@
             // the grouping waterfall and the timeline head display.
             const rows = await sb.sbFetchAll(
               `/rest/v1/outreach?` +
-              `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail` +
+              `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id` +
               `&client_id=eq.${encodeURIComponent(clientId)}` +
               `&order=occurred_at.asc`
             );
@@ -805,12 +826,34 @@
         // hides real data (Bill Hennessy example: one prospect showing
         // as 3 rows in the CSV with meetings and responses disconnected).
         function buildProspects(rows) {
-          // Disjoint-set over row indexes + one synthetic node per
-          // distinct identifier string. Union each row with each of its
-          // identifier nodes; rows sharing an identifier end up under the
-          // same root.
-          const parent = new Array(rows.length);
-          for (let i = 0; i < rows.length; i++) parent[i] = i;
+          // Two-phase clustering:
+          //   1. Events with a non-null merge_group_id cluster strictly
+          //      by group_id — manual merges/splits override auto.
+          //   2. Events with NULL merge_group_id cluster via the
+          //      original union-find on shared identifiers.
+          // An event with a non-null group_id NEVER co-clusters with an
+          // event with a different (or null) group_id, even if they
+          // share name / linkedin_id / etc. That keeps split overrides
+          // from being silently un-done by union-find on the next render.
+
+          const grouped   = new Map();   // group_id → rows[]
+          const ungrouped = [];
+          for (const r of rows) {
+            if (r.merge_group_id) {
+              let arr = grouped.get(r.merge_group_id);
+              if (!arr) { arr = []; grouped.set(r.merge_group_id, arr); }
+              arr.push(r);
+            } else {
+              ungrouped.push(r);
+            }
+          }
+
+          // Disjoint-set over ungrouped row indexes + one synthetic node
+          // per distinct identifier string. Union each row with each of
+          // its identifier nodes; rows sharing an identifier end up
+          // under the same root.
+          const parent = new Array(ungrouped.length);
+          for (let i = 0; i < ungrouped.length; i++) parent[i] = i;
 
           const addNode = () => {
             const n = parent.length;
@@ -836,8 +879,8 @@
             return n;
           };
 
-          for (let i = 0; i < rows.length; i++) {
-            const r = rows[i];
+          for (let i = 0; i < ungrouped.length; i++) {
+            const r = ungrouped[i];
             if (r.linkedin_id)   union(i, nodeFor(`id:${r.linkedin_id}`));
             if (r.profile_url)   union(i, nodeFor(`url:${r.profile_url.toLowerCase()}`));
             if (r.sales_nav_url) union(i, nodeFor(`sn:${r.sales_nav_url.toLowerCase()}`));
@@ -846,13 +889,19 @@
             if (nm)              union(i, nodeFor(`name:${nm}`));
           }
 
-          // Bucket each row by its cluster root.
+          // Bucket each row by its cluster root, then merge in the
+          // grouped buckets (each group_id = one cluster).
           const clusters = new Map();
-          for (let i = 0; i < rows.length; i++) {
+          for (let i = 0; i < ungrouped.length; i++) {
             const root = find(i);
             let arr = clusters.get(root);
             if (!arr) { arr = []; clusters.set(root, arr); }
-            arr.push(rows[i]);
+            arr.push(ungrouped[i]);
+          }
+          for (const [groupId, groupRows] of grouped) {
+            // Prefix the key so a UUID can never collide with a
+            // union-find numeric root.
+            clusters.set(`g:${groupId}`, groupRows);
           }
 
           // Fold each cluster down into a single prospect. Rows arrive in
@@ -861,36 +910,42 @@
           const out = [];
           for (const clusterRows of clusters.values()) {
             const p = {
-              key:           "",
-              name:          "",
-              email:         "",
-              phone:         "",
-              company:       "",
-              title:         "",
-              profile_url:   null,
-              sales_nav_url: null,
-              linkedin_id:   null,
-              events:        [],
+              key:            "",
+              name:           "",
+              email:          "",
+              phone:          "",
+              company:        "",
+              title:          "",
+              profile_url:    null,
+              sales_nav_url:  null,
+              linkedin_id:    null,
+              merge_group_id: null,
+              events:         [],
             };
             for (const r of clusterRows) {
-              if (!p.name          && r.prospect_name)  p.name          = r.prospect_name;
-              if (!p.email         && r.email)          p.email         = r.email;
-              if (!p.phone         && r.phone)          p.phone         = r.phone;
-              if (!p.company       && r.company)        p.company       = r.company;
-              if (!p.title         && r.title)          p.title         = r.title;
-              if (!p.profile_url   && r.profile_url)    p.profile_url   = r.profile_url;
-              if (!p.sales_nav_url && r.sales_nav_url)  p.sales_nav_url = r.sales_nav_url;
-              if (!p.linkedin_id   && r.linkedin_id)    p.linkedin_id   = r.linkedin_id;
+              if (!p.name           && r.prospect_name)  p.name           = r.prospect_name;
+              if (!p.email          && r.email)          p.email          = r.email;
+              if (!p.phone          && r.phone)          p.phone          = r.phone;
+              if (!p.company        && r.company)        p.company        = r.company;
+              if (!p.title          && r.title)          p.title          = r.title;
+              if (!p.profile_url    && r.profile_url)    p.profile_url    = r.profile_url;
+              if (!p.sales_nav_url  && r.sales_nav_url)  p.sales_nav_url  = r.sales_nav_url;
+              if (!p.linkedin_id    && r.linkedin_id)    p.linkedin_id    = r.linkedin_id;
+              if (!p.merge_group_id && r.merge_group_id) p.merge_group_id = r.merge_group_id;
               p.events.push(r);
             }
-            // Stable key for React-style diffing / debugging. Derived
-            // from whichever strong identifier we have.
+            // Stable key for React-style diffing / debugging. For
+            // manually-merged prospects, group_id wins — guarantees
+            // uniqueness even when merged events share no identifiers,
+            // and keeps the key stable across re-renders so selection /
+            // findCanonical lookups don't drift.
             p.key =
-              p.linkedin_id   ? `id:${p.linkedin_id}` :
-              p.profile_url   ? `url:${p.profile_url.toLowerCase()}` :
-              p.sales_nav_url ? `sn:${p.sales_nav_url.toLowerCase()}` :
-              p.email         ? `email:${p.email.toLowerCase()}` :
-                                `name:${(p.name || "").toLowerCase()}`;
+              p.merge_group_id ? `g:${p.merge_group_id}` :
+              p.linkedin_id    ? `id:${p.linkedin_id}` :
+              p.profile_url    ? `url:${p.profile_url.toLowerCase()}` :
+              p.sales_nav_url  ? `sn:${p.sales_nav_url.toLowerCase()}` :
+              p.email          ? `email:${p.email.toLowerCase()}` :
+                                 `name:${(p.name || "").toLowerCase()}`;
             out.push({ ...p, ...rollup(p.events) });
           }
           return out;
@@ -1043,15 +1098,22 @@
           if (headCheck) headCheck.indeterminate = someChecked;
         }
 
-        // Renders the floating "N selected · Delete" bar shown when one
-        // or more prospects are checked. Empty string when nothing is
-        // selected, so it doesn't take up vertical space.
+        // Renders the floating bulk-action bar shown when one or more
+        // prospects are checked. Empty string when nothing is selected,
+        // so it doesn't take up vertical space.
+        //
+        // Merge button only appears when 2+ prospects are selected (a
+        // single-prospect "merge" is a no-op). Delete is always shown.
         function renderBulkBar(count, prospects) {
           if (!count) return "";
+          const mergeBtn = count >= 2
+            ? `<button class="btn-primary pr-bulk-action" data-action="bulk-merge-prospects" type="button" title="Combine the selected prospects into one">Merge ${fmtInt(count)}</button>`
+            : "";
           return `
             <div class="pr-bulk-bar" role="region" aria-label="Bulk actions">
               <span class="pr-bulk-count">${fmtInt(count)} prospect${count === 1 ? "" : "s"} selected</span>
               <button class="btn-secondary pr-bulk-action" data-action="bulk-clear-selection" type="button">Clear</button>
+              ${mergeBtn}
               <button class="btn-danger pr-bulk-action" data-action="bulk-delete-prospects" type="button">Delete ${fmtInt(count)}</button>
             </div>
           `;
@@ -1125,11 +1187,14 @@
 
           // Collapse any other open timeline — only one at a time keeps
           // the table scannable and lazy-renders each body only on click.
+          // Exiting any timeline also exits split mode (split mode is
+          // scoped to the open timeline).
           tbody.querySelectorAll(".pr-timeline-row:not(.hidden)").forEach(t => {
             t.classList.add("hidden");
             t.querySelector(".pr-timeline-cell").innerHTML = "";
           });
           tbody.querySelectorAll(".pr-row.expanded").forEach(r => r.classList.remove("expanded"));
+          state.splitMode = null;
 
           if (!wasOpen) {
             const p = state.filtered[idx];
@@ -1181,7 +1246,19 @@
                 <button class="btn-secondary pr-action" data-action="show-info-form" type="button">Edit info</button>
                 ${meetingBtn}
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
+                ${p.events.length >= 2 ? `<button class="btn-secondary pr-action" data-action="enter-split-mode" type="button" title="Peel events off this prospect into a new prospect">Split events…</button>` : ""}
               </div>
+            </div>
+
+            <!-- Split-mode bar — hidden by default. Revealed when the
+                 .pr-timeline-cell gets the .pr-split-mode class (set by
+                 the enter-split-mode handler). CSS reveals the per-event
+                 checkboxes inside .pr-event rows at the same time. -->
+            <div class="pr-split-bar" data-key="${esc(p.key)}">
+              <span class="pr-split-bar-label">Pick events to split off into a new prospect</span>
+              <span class="pr-split-bar-count">0 selected</span>
+              <button type="button" class="btn-secondary pr-action" data-action="cancel-split-mode">Cancel</button>
+              <button type="button" class="btn-primary pr-action pr-split-confirm" data-action="confirm-split" disabled>Split off 0</button>
             </div>
 
             <!-- Edit-info form — hidden by default, shown when "Edit info"
@@ -1347,9 +1424,22 @@
             `;
           }
 
+          // Split-mode checkbox — hidden by default, revealed by CSS
+          // when the parent .pr-timeline-cell has .pr-split-mode. Wrapped
+          // in a <label data-action> so the wrapEl click delegate can
+          // pick up the toggle without conflicting with the row-toggle
+          // chain. Skipped entirely for events without an id (historical
+          // imports can't be split).
+          const splitCheck = e.id
+            ? `<label class="pr-event-split-check" data-action="toggle-split-event" data-event-id="${esc(e.id)}" title="Select to split off">
+                <input type="checkbox" tabindex="-1" aria-label="Select event for split" />
+               </label>`
+            : "";
+
           return `
             <li class="pr-event pr-event-${esc(e.type)}" data-event-id="${esc(e.id || "")}">
               <div class="pr-event-head">
+                ${splitCheck}
                 <span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>
                 <span class="pr-event-type">${esc(typeLabel)}</span>
                 ${sentTag}
@@ -1482,6 +1572,11 @@
             handleBulkDeleteProspects(actionEl);
             return;
           }
+          if (action === "bulk-merge-prospects") {
+            clickEvt.preventDefault();
+            handleBulkMergeProspects(actionEl);
+            return;
+          }
 
           // ---- Per-event actions (timeline-row scoped) ---------------
           const timelineRow = actionEl.closest(".pr-timeline-row");
@@ -1515,6 +1610,31 @@
             const ta = li.querySelector(".pr-event-edit-text");
             const body = li.querySelector(".pr-event-body");
             if (ta && body) ta.value = body.textContent;
+            return;
+          }
+
+          // ---- Split-mode actions (timeline-cell scoped) -------------
+          if (action === "enter-split-mode") {
+            clickEvt.preventDefault();
+            enterSplitMode(prospect, timelineRow);
+            return;
+          }
+          if (action === "cancel-split-mode") {
+            clickEvt.preventDefault();
+            exitSplitMode(timelineRow);
+            return;
+          }
+          if (action === "toggle-split-event") {
+            // Same trick as the prospect-level toggle — only respond to
+            // the input click, not the wrapping label click. The change
+            // handler below syncs state.splitMode.selectedEventIds.
+            if (clickEvt.target.tagName !== "INPUT") return;
+            // No body — let the change event do the work.
+            return;
+          }
+          if (action === "confirm-split") {
+            clickEvt.preventDefault();
+            handleConfirmSplit(actionEl, prospect, timelineRow);
             return;
           }
 
@@ -1899,6 +2019,254 @@
             const more    = failed.length > 3 ? `\n…and ${failed.length - 3} more` : "";
             alert(`${failed.length} delete${failed.length === 1 ? "" : "s"} failed:\n${summary}${more}`);
           }
+        }
+
+        // Bulk merge: combines two or more selected prospects into one
+        // canonical group via the merge_prospects RPC. The first-selected
+        // prospect's name wins (per Austin's pick — Set iteration order
+        // mirrors insertion order, so state.selected gives us first-
+        // selected at index 0). All merged events get the same
+        // merge_group_id and (when canonical_name is provided) the same
+        // prospect_name so the merged prospect renders cohesively.
+        async function handleBulkMergeProspects(btnEl) {
+          const keys = Array.from(state.selected);
+          if (keys.length < 2) return;
+          const targets = keys
+            .map(k => state.allProspects.find(p => p.key === k))
+            .filter(Boolean);
+          if (targets.length < 2) return;
+
+          // First-selected wins for canonical_name — matches the
+          // operator's mental model that the first row they tick is the
+          // "primary" (Austin's preference).
+          const canonical = targets[0];
+          const canonicalName = canonical.name || "";
+          const others = targets.slice(1);
+          const otherNames = others.map(p => p.name || "(unnamed)").join(", ");
+
+          const msg = `Merge ${keys.length} prospects into "${canonicalName || "(unnamed)"}"?\n\nWill be merged: ${otherNames}\n\nAll events keep their data; the resulting prospect uses "${canonicalName || "(unnamed)"}" as the canonical name.`;
+          if (!confirm(msg)) return;
+
+          btnEl.disabled = true;
+          const prevLabel = btnEl.textContent;
+          btnEl.textContent = "Merging…";
+
+          // Collect every event id across all selected prospects.
+          const allEventIds = [];
+          for (const p of targets) {
+            for (const e of p.events) {
+              if (e.id) allEventIds.push(e.id);
+            }
+          }
+          if (!allEventIds.length) {
+            btnEl.disabled = false;
+            btnEl.textContent = prevLabel;
+            alert("No events to merge.");
+            return;
+          }
+
+          let newGroupId;
+          try {
+            newGroupId = await sb.sbFetch("/rest/v1/rpc/merge_prospects", {
+              method: "POST",
+              body:   JSON.stringify({
+                p_event_ids:      allEventIds,
+                p_canonical_name: canonicalName || null,
+              }),
+            });
+          } catch (err) {
+            btnEl.disabled = false;
+            btnEl.textContent = prevLabel;
+            alert("Couldn't merge: " + (err.message || err));
+            return;
+          }
+
+          // Mirror the server-side update locally: stamp every event with
+          // the new group_id + canonical name, fold all targets into one
+          // prospect, drop the rest from state.allProspects.
+          const groupIdValue = (typeof newGroupId === "string")
+            ? newGroupId
+            : (newGroupId && typeof newGroupId === "object" ? Object.values(newGroupId)[0] : null);
+          for (const p of targets) {
+            for (const e of p.events) {
+              e.merge_group_id = groupIdValue;
+              if (canonicalName) e.prospect_name = canonicalName;
+            }
+          }
+          // Build a fresh canonical from the union of all events. Easiest
+          // way: rebuild the whole allProspects from the underlying rows.
+          // Cheaper: collapse targets in place. Going with the cheaper
+          // path so unrelated state (e.g. other expanded timelines)
+          // doesn't get blown away by a full rebuild.
+          const allEvents = [];
+          for (const p of targets) for (const e of p.events) allEvents.push(e);
+          // Use the first target as the surviving prospect; absorb
+          // events from the others.
+          canonical.events = allEvents;
+          if (canonicalName) canonical.name = canonicalName;
+          canonical.merge_group_id = groupIdValue;
+          // Re-derive the key based on the new group_id (matches the
+          // priority in buildProspects).
+          canonical.key = `g:${groupIdValue}`;
+          Object.assign(canonical, rollup(canonical.events));
+          // Drop the absorbed prospects.
+          for (const p of others) {
+            const idx = state.allProspects.indexOf(p);
+            if (idx >= 0) state.allProspects.splice(idx, 1);
+          }
+
+          state.selected.clear();
+          state.lastCheckedKey = null;
+          btnEl.disabled = false;
+          btnEl.textContent = prevLabel;
+          rerender();
+        }
+
+        // Enter split mode for the currently-expanded prospect timeline.
+        // Toggles a class on the .pr-timeline-cell so CSS can reveal the
+        // per-event checkboxes + the split bar. Initializes empty
+        // selection state.
+        function enterSplitMode(prospect, timelineRow) {
+          const cell = timelineRow.querySelector(".pr-timeline-cell");
+          if (!cell) return;
+          state.splitMode = {
+            prospectKey:      prospect.key,
+            selectedEventIds: new Set(),
+          };
+          cell.classList.add("pr-split-mode");
+          // Hide any open inline forms so the operator's eye is on the
+          // events, not other modes.
+          cell.querySelectorAll(".pr-info-form, .pr-response-form").forEach(f => f.classList.add("hidden"));
+          cell.querySelectorAll(".pr-event-editing").forEach(li => li.classList.remove("pr-event-editing"));
+          syncSplitBar();
+        }
+
+        // Exit split mode without committing. Clears selected event ids
+        // and unchecks every checkbox in the timeline.
+        function exitSplitMode(timelineRow) {
+          const cell = timelineRow.querySelector(".pr-timeline-cell");
+          if (!cell) return;
+          cell.classList.remove("pr-split-mode");
+          cell.querySelectorAll(".pr-event-split-check input:checked").forEach(cb => { cb.checked = false; });
+          state.splitMode = null;
+        }
+
+        // Re-render the bar's "N selected" text + Split button enabled
+        // state. Cheaper than re-rendering the timeline.
+        function syncSplitBar() {
+          if (!state.splitMode) return;
+          const count = state.splitMode.selectedEventIds.size;
+          const bar = wrapEl.querySelector(".pr-split-bar");
+          if (!bar) return;
+          const countEl = bar.querySelector(".pr-split-bar-count");
+          const confirmBtn = bar.querySelector(".pr-split-confirm");
+          if (countEl) countEl.textContent = `${count} selected`;
+          if (confirmBtn) {
+            // Don't allow splitting off ALL events — that would just be a
+            // rename, not a split. Don't allow splitting off zero either.
+            // Fetch event count from the open prospect.
+            const total = currentSplitProspectEventCount();
+            confirmBtn.disabled = (count === 0 || count === total);
+            confirmBtn.textContent = `Split off ${count}`;
+          }
+        }
+
+        // Helper: count of events on the prospect that's currently in
+        // split mode. Used to disable the Split button when the operator
+        // would be splitting off all of them (a no-op).
+        function currentSplitProspectEventCount() {
+          if (!state.splitMode) return 0;
+          const p = state.allProspects.find(x => x.key === state.splitMode.prospectKey);
+          return p ? p.events.length : 0;
+        }
+
+        // Confirm the split: send selected event ids to the
+        // split_prospect_events RPC, mirror the result locally, re-render.
+        async function handleConfirmSplit(btnEl, prospect, timelineRow) {
+          if (!state.splitMode) return;
+          const eventIds = Array.from(state.splitMode.selectedEventIds);
+          if (!eventIds.length) return;
+
+          if (!confirm(`Split off ${eventIds.length} event${eventIds.length === 1 ? "" : "s"} into a new prospect?`)) return;
+
+          btnEl.disabled = true;
+          const prevLabel = btnEl.textContent;
+          btnEl.textContent = "Splitting…";
+
+          let newGroupId;
+          try {
+            newGroupId = await sb.sbFetch("/rest/v1/rpc/split_prospect_events", {
+              method: "POST",
+              body:   JSON.stringify({ p_event_ids: eventIds }),
+            });
+          } catch (err) {
+            btnEl.disabled = false;
+            btnEl.textContent = prevLabel;
+            alert("Couldn't split: " + (err.message || err));
+            return;
+          }
+
+          const groupIdValue = (typeof newGroupId === "string")
+            ? newGroupId
+            : (newGroupId && typeof newGroupId === "object" ? Object.values(newGroupId)[0] : null);
+
+          // Mirror locally: stamp the split events with the new group_id
+          // on their canonical event records, then rebuild the source
+          // prospect's events list (minus the split ones) and create a
+          // brand-new prospect for the split-off events.
+          const canonical = findCanonical(prospect);
+          if (canonical) {
+            const splitSet = new Set(eventIds);
+            const splitEvents = [];
+            const remaining   = [];
+            for (const e of canonical.events) {
+              if (splitSet.has(e.id)) {
+                e.merge_group_id = groupIdValue;
+                splitEvents.push(e);
+              } else {
+                remaining.push(e);
+              }
+            }
+            canonical.events = remaining;
+            // If remaining empty (operator split off everything — guarded
+            // by syncSplitBar but defensive here), drop the prospect.
+            if (remaining.length === 0) {
+              const idx = state.allProspects.indexOf(canonical);
+              if (idx >= 0) state.allProspects.splice(idx, 1);
+            } else {
+              Object.assign(canonical, rollup(canonical.events));
+            }
+            // Build a new prospect from the split events.
+            const newProspect = {
+              key:            `g:${groupIdValue}`,
+              name:           splitEvents[0]?.prospect_name || "",
+              email:          "",
+              phone:          "",
+              company:        "",
+              title:          "",
+              profile_url:    null,
+              sales_nav_url:  null,
+              linkedin_id:    null,
+              merge_group_id: groupIdValue,
+              events:         splitEvents,
+            };
+            for (const r of splitEvents) {
+              if (!newProspect.email         && r.email)         newProspect.email         = r.email;
+              if (!newProspect.phone         && r.phone)         newProspect.phone         = r.phone;
+              if (!newProspect.company       && r.company)       newProspect.company       = r.company;
+              if (!newProspect.title         && r.title)         newProspect.title         = r.title;
+              if (!newProspect.profile_url   && r.profile_url)   newProspect.profile_url   = r.profile_url;
+              if (!newProspect.sales_nav_url && r.sales_nav_url) newProspect.sales_nav_url = r.sales_nav_url;
+              if (!newProspect.linkedin_id   && r.linkedin_id)   newProspect.linkedin_id   = r.linkedin_id;
+            }
+            Object.assign(newProspect, rollup(splitEvents));
+            state.allProspects.push(newProspect);
+          }
+
+          state.splitMode = null;
+          btnEl.disabled = false;
+          btnEl.textContent = prevLabel;
+          rerender();
         }
 
         // Tiny CSS-attribute escaper for use inside querySelector strings

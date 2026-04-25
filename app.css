@@ -3318,6 +3318,86 @@ body.login-body {
 }
 
 /* ====================================================================
+   Manual merge/split overrides
+   ====================================================================
+   Two affordances:
+     - Merge: surfaces in the bulk bar (already styled) when 2+
+       prospects are selected. The .btn-primary class supplies most of
+       the look; we just nudge spacing here.
+     - Split: timeline-scoped — operator clicks "Split events…" in the
+       timeline head, the .pr-timeline-cell gets .pr-split-mode, and
+       this CSS reveals per-event checkboxes + a sticky split bar.
+   ==================================================================== */
+
+.pr-bulk-action.btn-primary {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+.pr-bulk-action.btn-primary:hover:not(:disabled) {
+  background: var(--navy-dark);
+  border-color: var(--navy-dark);
+}
+
+/* Per-event split checkbox — hidden at rest, revealed when the parent
+   .pr-timeline-cell has .pr-split-mode. */
+.pr-event-split-check {
+  display: none;
+  align-items: center;
+  cursor: pointer;
+  margin-right: 4px;
+}
+.pr-event-split-check input {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--navy);
+  margin: 0;
+}
+.pr-split-mode .pr-event-split-check {
+  display: inline-flex;
+}
+
+/* The split bar — top-of-timeline action panel. Hidden when
+   .pr-split-mode is absent. Appears between the timeline head and the
+   <ol> of events when active. */
+.pr-split-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  background: rgba(99, 102, 241, .08);
+  border: 1px solid rgba(99, 102, 241, .25);
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--navy);
+}
+.pr-split-mode .pr-split-bar {
+  display: flex;
+}
+.pr-split-bar-label {
+  font-weight: 500;
+  flex: 1;
+}
+.pr-split-bar-count {
+  font-weight: 600;
+  color: #4338ca;
+  font-variant-numeric: tabular-nums;
+}
+.pr-split-confirm:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+/* While split mode is active, dim the regular per-event hover actions
+   (X / pencil) so the operator's eye stays on the checkboxes. */
+.pr-split-mode .pr-event-actions {
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+/* ====================================================================
    Site-wide footer for legal links
    ====================================================================
    Lives at the bottom of every signed-in dashboard page (dashboard,

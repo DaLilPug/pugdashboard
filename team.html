@@ -538,6 +538,21 @@
             const tail = cnt != null ? ` and ${esc(cnt)} event${cnt === 1 ? "" : "s"}` : "";
             return `${actor} deleted prospect ${name}${tail}`;
           }
+          case "prospect.merged": {
+            const cnt  = Number.isFinite(p.event_count) ? p.event_count : null;
+            const name = p.canonical_name
+              ? `into <strong>${esc(p.canonical_name)}</strong>`
+              : "into one prospect";
+            const tail = cnt != null ? ` (${esc(cnt)} event${cnt === 1 ? "" : "s"})` : "";
+            return `${actor} merged prospects ${name}${tail}`;
+          }
+          case "prospect.split": {
+            const cnt = Number.isFinite(p.event_count) ? p.event_count : null;
+            const tail = cnt != null
+              ? `${esc(cnt)} event${cnt === 1 ? "" : "s"}`
+              : "events";
+            return `${actor} split off ${tail} into a new prospect`;
+          }
 
           default:
             return `${actor} performed <code>${esc(ev.action)}</code>`;
