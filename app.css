@@ -3284,3 +3284,51 @@ body.login-body {
 .pr-table th.sorted-desc .sort-caret {
   color: var(--navy);
 }
+
+/* ====================================================================
+   Site-wide footer for legal links
+   ====================================================================
+   Lives at the bottom of every signed-in dashboard page (dashboard,
+   account, team, platform-admin). terms.html and privacy.html bring
+   their own self-contained footers so they don't rely on app.css. */
+
+.app-footer {
+  padding: 18px 28px 22px;
+  border-top: 1px solid var(--gray-100);
+  font-size: 12px;
+  color: var(--gray-400);
+  text-align: center;
+  background: #fff;
+  margin-top: 40px;
+}
+.app-footer a {
+  color: var(--gray-400);
+  text-decoration: none;
+}
+.app-footer a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.app-footer .sep {
+  margin: 0 8px;
+  color: var(--gray-200);
+  user-select: none;
+}
+
+/* Click-wrap consent line at the bottom of the login card. Style is
+   intentionally subdued — visible enough for legal notice, quiet enough
+   not to compete with the primary action. */
+.login-legal {
+  font-size: 11px;
+  color: var(--gray-400);
+  text-align: center;
+  margin-top: 14px;
+  line-height: 1.5;
+}
+.login-legal a {
+  color: var(--gray-400);
+  text-decoration: underline;
+}
+.login-legal a:hover {
+  color: var(--accent);
+}

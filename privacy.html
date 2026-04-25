@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Uptown Creation</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Self-contained styles — see terms.html for the same rationale.
+       Mirrored verbatim so the two legal docs render identically and
+       can be archived as a pair. */
+    :root {
+      --navy:        #0f2138;
+      --navy-soft:   #1c3550;
+      --navy-2:      #4b5b6e;
+      --gray-50:     #f7f8fa;
+      --gray-100:    #eef0f3;
+      --gray-200:    #d8dde3;
+      --gray-300:    #b6bdc6;
+      --gray-400:    #6f7989;
+      --text:        #15212b;
+      --text-soft:   #4a5562;
+      --accent:      #2d7ab8;
+      --max-w:       760px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: #fff;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+      color: #fff;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header img { height: 30px; width: auto; display: block; }
+    .header-wordmark-top {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    .header-wordmark-bot {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.78);
+      margin-top: 2px;
+    }
+    .header-spacer { flex: 1; }
+    .header a {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .header a:hover { color: #fff; text-decoration: underline; }
+
+    .draft-banner {
+      background: #fff7e0;
+      border-bottom: 1px solid #f3d27a;
+      color: #6b4c00;
+      font-size: 13px;
+      padding: 10px 28px;
+      text-align: center;
+    }
+
+    main {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 56px 24px 96px;
+    }
+
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.01em;
+      margin: 0 0 6px;
+    }
+    .effective-date {
+      font-size: 13px;
+      color: var(--gray-400);
+      margin-bottom: 36px;
+    }
+    h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 36px 0 10px;
+      letter-spacing: 0.01em;
+    }
+    h2 .num {
+      display: inline-block;
+      width: 28px;
+      color: var(--gray-300);
+      font-weight: 600;
+    }
+    h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 14.5px;
+      font-weight: 600;
+      color: var(--navy);
+      margin: 22px 0 8px;
+    }
+    p, ul, ol { margin: 0 0 14px; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--accent); }
+    strong { color: var(--text); font-weight: 600; }
+
+    .toc {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-bottom: 40px;
+    }
+    .toc-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 8px;
+    }
+    .toc ol {
+      columns: 2;
+      column-gap: 28px;
+      margin: 0;
+      padding-left: 22px;
+      font-size: 13.5px;
+    }
+    .toc li { margin-bottom: 4px; }
+    .toc a {
+      color: var(--text-soft);
+      text-decoration: none;
+    }
+    .toc a:hover { color: var(--accent); text-decoration: underline; }
+    @media (max-width: 600px) { .toc ol { columns: 1; } }
+
+    table.subprocessors {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 13.5px;
+    }
+    table.subprocessors th,
+    table.subprocessors td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    table.subprocessors th {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    footer {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 24px 56px;
+      border-top: 1px solid var(--gray-100);
+      padding-top: 20px;
+      font-size: 12.5px;
+      color: var(--gray-400);
+    }
+    @media print {
+      .header, .draft-banner, footer a[href^="#"] { display: none; }
+      main { padding: 0; max-width: none; }
+      .toc { background: none; border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <img src="assets/logo-white.png" alt="Uptown" />
+    <div>
+      <div class="header-wordmark-top">UPTOWN</div>
+      <div class="header-wordmark-bot">Creation, LLC</div>
+    </div>
+    <div class="header-spacer"></div>
+    <a href="dashboard.html">← Dashboard</a>
+  </header>
+
+  <div class="draft-banner">
+    <strong>DRAFT.</strong> This Privacy Policy is a working draft and has not yet been reviewed by counsel.
+  </div>
+
+  <main>
+    <h1>Privacy Policy</h1>
+    <p class="effective-date">Effective date: <strong>April 25, 2026</strong></p>
+
+    <p>This Privacy Policy describes how <strong>Uptown Creation, LLC</strong> (&ldquo;<strong>Uptown</strong>,&rdquo; &ldquo;<strong>we</strong>,&rdquo; &ldquo;<strong>us</strong>,&rdquo; or &ldquo;<strong>our</strong>&rdquo;) collects, uses, and shares information when you use our web dashboard at <a href="https://dashboard.uptown.com">dashboard.uptown.com</a>, our Uptown Outreach Tracker browser extension, and any related services (collectively, the &ldquo;<strong>Service</strong>&rdquo;).</p>
+
+    <p>This policy is incorporated into our <a href="terms.html">Terms of Service</a>. Capitalized terms not defined here have the meaning given in the Terms.</p>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#s1">Information We Collect</a></li>
+        <li><a href="#s2">How We Use Information</a></li>
+        <li><a href="#s3">Legal Bases (EEA / UK)</a></li>
+        <li><a href="#s4">How We Share Information</a></li>
+        <li><a href="#s5">Subprocessors</a></li>
+        <li><a href="#s6">Data Retention</a></li>
+        <li><a href="#s7">Security</a></li>
+        <li><a href="#s8">Your Rights</a></li>
+        <li><a href="#s9">Cookies &amp; Tracking</a></li>
+        <li><a href="#s10">Children</a></li>
+        <li><a href="#s11">International Transfers</a></li>
+        <li><a href="#s12">California Residents</a></li>
+        <li><a href="#s13">LinkedIn-Sourced Data</a></li>
+        <li><a href="#s14">Changes</a></li>
+        <li><a href="#s15">Contact</a></li>
+      </ol>
+    </div>
+
+    <h2 id="s1"><span class="num">1.</span>Information We Collect</h2>
+
+    <h3>Information you provide</h3>
+    <ul>
+      <li><strong>Account information:</strong> name, email address, organization, password, and role.</li>
+      <li><strong>Outreach activity you log:</strong> connection requests, messages sent, follow-ups, prospect names, titles, companies, message bodies, response text, sentiment classifications, and meeting outcomes.</li>
+      <li><strong>Prospect data:</strong> names, titles, companies, LinkedIn profile URLs, Sales Navigator URLs, and any contact information (email, phone) you choose to add.</li>
+      <li><strong>Configuration:</strong> message templates, follow-up cadence, AI reply instructions, and account settings.</li>
+      <li><strong>Communications with us:</strong> emails or support requests you send.</li>
+    </ul>
+
+    <h3>Information collected automatically</h3>
+    <ul>
+      <li><strong>Usage data:</strong> pages viewed, features used, timestamps, and basic device information (browser, operating system).</li>
+      <li><strong>Authentication tokens:</strong> issued by our authentication provider so you stay signed in across sessions.</li>
+      <li><strong>Audit logs:</strong> records of administrative actions taken in your organization (invites, role changes, account creation, outreach edits/deletes) for security and compliance.</li>
+    </ul>
+
+    <h3>Information collected via the browser extension</h3>
+    <p>The Uptown Outreach Tracker Chrome extension reads the contents of the LinkedIn pages you actively view in order to (a) extract prospect details from Sales Navigator search results when you choose to log them, (b) extract the contents of LinkedIn message threads you have open when you choose to log a response, and (c) draft AI suggested replies to messages you have read. The extension does not browse LinkedIn on your behalf, send messages on your behalf, or run in the background outside of LinkedIn pages.</p>
+
+    <h2 id="s2"><span class="num">2.</span>How We Use Information</h2>
+    <p>We use the information we collect to:</p>
+    <ul>
+      <li>Provide, operate, and maintain the Service;</li>
+      <li>Authenticate users and protect against unauthorized access;</li>
+      <li>Generate the analytics, dashboards, and benchmarking insights that are the core of the Service;</li>
+      <li>Power AI features, such as suggested replies and outreach analysis (see &sect;5 for the providers involved);</li>
+      <li>Send transactional communications (account, billing, security);</li>
+      <li>Send service updates and, where you opt in, product news;</li>
+      <li>Investigate and prevent fraud, abuse, and violations of our <a href="terms.html">Terms of Service</a>;</li>
+      <li>Comply with legal obligations;</li>
+      <li>In de-identified, aggregated form, to improve the Service.</li>
+    </ul>
+    <p>We do not sell your personal information, and we do not use Customer Data to train third-party generative AI models for purposes other than serving you.</p>
+
+    <h2 id="s3"><span class="num">3.</span>Legal Bases (EEA / UK)</h2>
+    <p>If you are located in the European Economic Area or the United Kingdom, our legal bases for processing your information are:</p>
+    <ul>
+      <li><strong>Performance of a contract</strong> (providing the Service you signed up for);</li>
+      <li><strong>Legitimate interests</strong> (operating, securing, and improving the Service);</li>
+      <li><strong>Consent</strong> (where required, e.g., marketing emails or non-essential cookies);</li>
+      <li><strong>Legal obligation</strong> (when we must retain or disclose information to comply with law).</li>
+    </ul>
+
+    <h2 id="s4"><span class="num">4.</span>How We Share Information</h2>
+    <ul>
+      <li><strong>Within your organization.</strong> Other operators in your organization may see Customer Data scoped to the accounts they have access to, and organization admins may see audit-log activity for the organization.</li>
+      <li><strong>Subprocessors.</strong> We share information with the service providers listed in &sect;5 to host, secure, and operate the Service.</li>
+      <li><strong>Legal compliance.</strong> We may disclose information if we believe in good faith that it is required by law, court order, or other legal process, or to protect the rights, property, or safety of Uptown, our users, or the public.</li>
+      <li><strong>Business transfers.</strong> If we are involved in a merger, acquisition, financing, or sale of assets, your information may be transferred as part of that transaction. We will provide notice before your information becomes subject to a different privacy policy.</li>
+      <li><strong>With your consent.</strong> For any other purpose disclosed at the time you provide the information.</li>
+    </ul>
+    <p>We do not sell or rent your personal information to third parties for advertising.</p>
+
+    <h2 id="s5"><span class="num">5.</span>Subprocessors</h2>
+    <p>We rely on the following third-party providers to deliver the Service. Each provider is contractually obligated to protect your information.</p>
+    <table class="subprocessors">
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Purpose</th>
+          <th>Data location</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Supabase, Inc.</td>
+          <td>Hosted PostgreSQL database, authentication, file storage</td>
+          <td>United States</td>
+        </tr>
+        <tr>
+          <td>GitHub, Inc.</td>
+          <td>Static dashboard hosting (GitHub Pages)</td>
+          <td>United States</td>
+        </tr>
+        <tr>
+          <td>Anthropic, PBC</td>
+          <td>AI features (suggested replies, outreach analysis)</td>
+          <td>United States</td>
+        </tr>
+        <tr>
+          <td>Google LLC (Chrome Web Store)</td>
+          <td>Distribution of the browser extension</td>
+          <td>United States</td>
+        </tr>
+        <tr>
+          <td>Stripe, Inc. (when billing is enabled)</td>
+          <td>Payment processing</td>
+          <td>United States</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="s6"><span class="num">6.</span>Data Retention</h2>
+    <p>We retain Customer Data for as long as your account is active and as needed to provide the Service. After your account is closed:</p>
+    <ul>
+      <li><strong>Account information and Customer Data</strong> are deleted within ninety (90) days, except where we are required to retain them by law or where a backup retention window has not yet elapsed (typically up to thirty (30) additional days).</li>
+      <li><strong>Audit logs</strong> may be retained longer for security, fraud-prevention, and legal-compliance purposes.</li>
+      <li><strong>De-identified, aggregated data</strong> may be retained indefinitely.</li>
+    </ul>
+    <p>You can request deletion of your account at any time by emailing <a href="mailto:austin@uptown.com">austin@uptown.com</a>.</p>
+
+    <h2 id="s7"><span class="num">7.</span>Security</h2>
+    <p>We use commercially reasonable administrative, technical, and physical safeguards to protect your information, including:</p>
+    <ul>
+      <li>Encryption in transit (HTTPS / TLS);</li>
+      <li>Encryption at rest for stored Customer Data;</li>
+      <li>Database row-level security so each operator can only access data within their organization and the accounts they have been granted;</li>
+      <li>Audit logging of administrative actions;</li>
+      <li>Access controls and authentication via our identity provider.</li>
+    </ul>
+    <p>No system is perfectly secure. If you become aware of a security issue, please contact us at <a href="mailto:austin@uptown.com">austin@uptown.com</a>.</p>
+
+    <h2 id="s8"><span class="num">8.</span>Your Rights</h2>
+    <p>Depending on where you live, you may have the right to:</p>
+    <ul>
+      <li><strong>Access</strong> the personal information we hold about you;</li>
+      <li><strong>Correct</strong> inaccurate information;</li>
+      <li><strong>Delete</strong> your information (subject to legal exceptions);</li>
+      <li><strong>Port</strong> your information in a machine-readable format;</li>
+      <li><strong>Object</strong> to or restrict certain processing;</li>
+      <li><strong>Withdraw consent</strong> where processing is based on consent;</li>
+      <li><strong>Lodge a complaint</strong> with a supervisory authority.</li>
+    </ul>
+    <p>To exercise any of these rights, email <a href="mailto:austin@uptown.com">austin@uptown.com</a>. We will respond within the timeframe required by applicable law.</p>
+
+    <h2 id="s9"><span class="num">9.</span>Cookies &amp; Tracking</h2>
+    <p>We use cookies and similar storage mechanisms (browser <code>localStorage</code>, Chrome extension <code>storage</code>) for essential purposes:</p>
+    <ul>
+      <li><strong>Authentication.</strong> Keeping you signed in.</li>
+      <li><strong>Preferences.</strong> Remembering your selected account, sort order, filters, and similar UI state.</li>
+    </ul>
+    <p>We do not currently use third-party advertising cookies, cross-site tracking pixels, or analytics cookies that fingerprint individual users.</p>
+
+    <h2 id="s10"><span class="num">10.</span>Children</h2>
+    <p>The Service is not directed to children under 18, and we do not knowingly collect personal information from children. If you believe a child has provided us with personal information, please contact us so we can delete it.</p>
+
+    <h2 id="s11"><span class="num">11.</span>International Transfers</h2>
+    <p>Uptown is based in the United States and our subprocessors are listed in &sect;5. If you access the Service from outside the U.S., your information will be transferred to and processed in the U.S. By using the Service, you consent to that transfer. We rely on appropriate safeguards (such as standard contractual clauses) where required by law.</p>
+
+    <h2 id="s12"><span class="num">12.</span>California Residents</h2>
+    <p>If you are a California resident, you have the rights described in &sect;8 above. We do not sell or share personal information for cross-context behavioral advertising. For requests, contact <a href="mailto:austin@uptown.com">austin@uptown.com</a>. You may also designate an authorized agent to make a request on your behalf, subject to verification.</p>
+
+    <h2 id="s13"><span class="num">13.</span>LinkedIn-Sourced Data</h2>
+    <p>The browser extension extracts publicly visible information from LinkedIn pages that you, while signed in to your own LinkedIn account, choose to load and log. We do not bypass LinkedIn's access controls, and we do not collect data about LinkedIn users with whom you have not interacted through your normal LinkedIn use.</p>
+    <p>Uptown is not affiliated with LinkedIn Corporation. If you are a LinkedIn user whose information appears in a customer's Uptown account and you wish to be removed, please contact the customer directly. If you cannot reach them, we will assist where reasonable; email <a href="mailto:austin@uptown.com">austin@uptown.com</a>.</p>
+
+    <h2 id="s14"><span class="num">14.</span>Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. If we make material changes, we will provide reasonable notice (for example, by email or via the dashboard). The updated policy takes effect on the date posted unless otherwise stated.</p>
+
+    <h2 id="s15"><span class="num">15.</span>Contact</h2>
+    <p>Questions or requests about this Privacy Policy? Contact us at:</p>
+    <p>
+      <strong>Uptown Creation, LLC</strong><br />
+      Email: <a href="mailto:austin@uptown.com">austin@uptown.com</a>
+    </p>
+  </main>
+
+  <footer>
+    &copy; 2026 Uptown Creation, LLC · <a href="terms.html">Terms of Service</a> · <a href="dashboard.html">Dashboard</a>
+  </footer>
+
+</body>
+</html>
