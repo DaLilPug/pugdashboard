@@ -3967,6 +3967,16 @@
         backdrop.setAttribute("aria-modal", "true");
         backdrop.setAttribute("aria-label", "Log follow-up outcome");
         const metaLine = [row.title, row.company].filter(Boolean).join(" · ");
+        // Default due date for the Schedule-follow-up section. Inlined
+        // (vs reusing initProspects' defaultFollowupDate) because that
+        // helper is closed over the Prospects-tab IIFE and isn't
+        // visible from this initFollowups scope. Calling it here would
+        // throw a ReferenceError and prevent the modal from opening.
+        const dueDateDefault = (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 7);
+          return d.toISOString().slice(0, 10);
+        })();
         backdrop.innerHTML = `
           <div class="fu-modal">
             <button type="button" class="fu-modal-close" data-action="modal-cancel" aria-label="Close">×</button>
@@ -3997,15 +4007,13 @@
               </button>
             </div>
 
-            <div class="fu-modal-actions">
-              <button type="button" class="btn-secondary fu-modal-cancel" data-action="modal-cancel">Cancel</button>
-              <button type="button" class="btn-primary fu-modal-log-response" data-action="modal-log-response" disabled>Log response</button>
-            </div>
+            <button type="button" class="fu-modal-log-response" data-action="modal-log-response" disabled>Log response</button>
+            <div class="fu-modal-hint">Logs as a response and exits the follow-up sequence.</div>
 
             <div class="fu-modal-divider"><span>or schedule a follow-up</span></div>
 
             <label class="fu-modal-label" for="fu-modal-fu-date">Due date</label>
-            <input id="fu-modal-fu-date" type="date" class="fu-modal-fu-date" value="${esc(defaultFollowupDate())}" />
+            <input id="fu-modal-fu-date" type="date" class="fu-modal-fu-date" value="${esc(dueDateDefault)}" />
 
             <label class="fu-modal-label" for="fu-modal-fu-msg">Optional message</label>
             <textarea id="fu-modal-fu-msg" class="fu-modal-fu-msg" placeholder="Leave blank if you'll write it later…"></textarea>
@@ -4022,10 +4030,7 @@
               When ON, ends ${ row.source === "manual" ? "this scheduled task" : "this prospect's current cadence" } so no more steps fire. They can still re-enter a cadence later (e.g. on a future positive reply).
             </div>
 
-            <div class="fu-modal-actions">
-              <button type="button" class="btn-secondary fu-modal-cancel" data-action="modal-cancel">Cancel</button>
-              <button type="button" class="btn-primary fu-modal-add-fu" data-action="modal-add-followup">Schedule follow-up</button>
-            </div>
+            <button type="button" class="fu-modal-add-fu" data-action="modal-add-followup">Schedule follow-up</button>
           </div>
         `;
         document.body.appendChild(backdrop);

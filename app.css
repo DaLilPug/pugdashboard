@@ -1817,22 +1817,36 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .fu-modal-pill-neu.selected { background: #fff4e5; border-color: #b87400; color: #8a5700; }
 .fu-modal-pill-neg.selected { background: #fde8e8; border-color: #9a2c1f; color: #7a1e14; }
 
-.fu-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 18px;
-}
-.fu-modal-cancel,
+/* Log response + Schedule follow-up — full-width navy buttons that
+   visually echo the Meeting Booked button's layout (block, 100%
+   width, same padding rhythm) just in navy instead of green. The
+   inline X in the top-right serves as Cancel, so explicit Cancel
+   buttons would be redundant. */
 .fu-modal-log-response,
 .fu-modal-add-fu {
+  display: block;
+  width: 100%;
+  background: var(--navy);
+  color: #fff;
+  border: 1px solid var(--navy);
   border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 12.5px;
+  padding: 11px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-  transition: all 120ms ease;
+  margin-top: 14px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.fu-modal-log-response:hover:not(:disabled),
+.fu-modal-add-fu:hover:not(:disabled) {
+  background: var(--navy-dark, #0a1827);
+  border-color: var(--navy-dark, #0a1827);
+}
+.fu-modal-log-response:disabled,
+.fu-modal-add-fu:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Schedule-follow-up section (third option in the modal). Same
