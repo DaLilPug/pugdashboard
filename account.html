@@ -716,6 +716,12 @@
             handleSaveEventEdit(evEditForm);
             return;
           }
+          const addFollowupForm = e.target.closest("form[data-action='submit-add-followup']");
+          if (addFollowupForm) {
+            e.preventDefault();
+            handleAddFollowup(addFollowupForm);
+            return;
+          }
         });
 
         // Native checkbox change events: the input fires `change` after the
@@ -1368,6 +1374,7 @@
                 <button class="btn-secondary pr-action" data-action="show-info-form" type="button">Edit info</button>
                 ${meetingBtn}
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
+                <button class="btn-secondary pr-action" data-action="show-add-followup-form" type="button" title="Schedule a one-off follow-up reminder for this prospect">Add follow-up</button>
                 ${p.events.length >= 2 ? `<button class="btn-secondary pr-action" data-action="enter-split-mode" type="button" title="Peel events off this prospect into a new prospect">Split events…</button>` : ""}
               </div>
             </div>
@@ -1450,6 +1457,30 @@
                   <button type="button" class="btn-secondary pr-action" data-action="hide-response-form">Cancel</button>
                   <button type="submit" class="btn-primary pr-action">Log response</button>
                 </div>
+              </div>
+            </form>
+
+            <!-- Add-follow-up form — hidden by default, shown when "Add
+                 follow-up" is clicked. Submit creates a type=followup
+                 outreach row with the chosen date + optional message.
+                 Default date = 7 days out (a reasonable "remind me later"
+                 default; operator can change it). For prospects already
+                 in cadence this counts as a completed step and shifts
+                 the next computed step forward; for prospects not in
+                 cadence the row just lives on the timeline as a future-
+                 dated event. -->
+            <form class="pr-add-followup-form hidden" data-action="submit-add-followup" autocomplete="off">
+              <div class="pr-followup-form-row">
+                <label class="pr-followup-field">
+                  <span class="pr-form-label">Due date</span>
+                  <input type="date" name="pr_followup_date" required value="${esc(defaultFollowupDate())}" />
+                </label>
+              </div>
+              <textarea class="pr-followup-text" rows="3" name="pr_followup_message"
+                        placeholder="Optional message you plan to send (leave blank if you'll write it later)…"></textarea>
+              <div class="pr-followup-form-buttons">
+                <button type="button" class="btn-secondary pr-action" data-action="hide-add-followup-form">Cancel</button>
+                <button type="submit" class="btn-primary pr-action">Add follow-up</button>
               </div>
             </form>
 
@@ -2004,6 +2035,36 @@
             form.reset();
             return;
           }
+
+          if (action === "show-add-followup-form") {
+            clickEvt.preventDefault();
+            const form = timelineRow.querySelector(".pr-add-followup-form");
+            if (!form) return;
+            // Hide other forms so only one is open at a time.
+            timelineRow.querySelectorAll(".pr-info-form, .pr-response-form").forEach(f => f.classList.add("hidden"));
+            form.classList.remove("hidden");
+            const dateInput = form.querySelector("input[type='date']");
+            if (dateInput) dateInput.focus();
+            return;
+          }
+          if (action === "hide-add-followup-form") {
+            clickEvt.preventDefault();
+            const form = timelineRow.querySelector(".pr-add-followup-form");
+            if (!form) return;
+            form.classList.add("hidden");
+            form.reset();
+            return;
+          }
+        }
+
+        // Default date for the Add-follow-up form — 7 days from today.
+        // Returned as YYYY-MM-DD for the <input type="date"> value.
+        // A week feels like the right "remind me later" default; the
+        // operator can change it.
+        function defaultFollowupDate() {
+          const d = new Date();
+          d.setDate(d.getDate() + 7);
+          return d.toISOString().slice(0, 10);
         }
 
         async function handleLogMeeting(btn, prospect) {
@@ -2062,6 +2123,58 @@
             submitBtn.disabled = false;
             submitBtn.textContent = prevLabel;
             alert("Couldn't log response: " + (err.message || err));
+          }
+        }
+
+        // Logs a manually-scheduled follow-up. Per Austin's design
+        // (Option A): create a future-dated `followup` outreach row
+        // with the chosen date + optional message. For prospects in
+        // cadence this counts as a completed step and shifts the next
+        // computed step forward (rare case — Austin: "this will likely
+        // be used for people not already in cadence"). For prospects
+        // without an anchor it's just a future-dated event in the
+        // timeline.
+        async function handleAddFollowup(form) {
+          const timelineRow = form.closest(".pr-timeline-row");
+          const idx = Number(timelineRow.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          const date = (form.querySelector("input[name='pr_followup_date']")?.value || "").trim();
+          const msg  = (form.querySelector("textarea[name='pr_followup_message']")?.value || "").trim();
+          if (!date) return;
+
+          // Convert YYYY-MM-DD to a timestamptz at noon local. Noon
+          // (rather than midnight) keeps the date displayed-as-picked
+          // across most timezones — midnight would risk drifting back
+          // a day in negative-UTC zones.
+          const occurredAt = `${date}T12:00:00`;
+
+          const submitBtn = form.querySelector("button[type='submit']");
+          const prevLabel = submitBtn ? submitBtn.textContent : "";
+          if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Saving…"; }
+
+          try {
+            const payload = buildOutreachPayload(prospect, {
+              type:         "followup",
+              occurred_at:  occurredAt,
+              message_sent: msg || null,
+            });
+            const created = await sb.sbFetch("/rest/v1/outreach", {
+              method:  "POST",
+              body:    JSON.stringify([payload]),
+              headers: { Prefer: "return=representation" },
+            });
+            applyNewEvents(prospect, created);
+            // Clear the form for next use, then re-render the timeline.
+            form.classList.add("hidden");
+            form.reset();
+            const dateInput = form.querySelector("input[type='date']");
+            if (dateInput) dateInput.value = defaultFollowupDate();
+            reopenAfterMutation(prospect);
+          } catch (err) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = prevLabel; }
+            alert("Couldn't add follow-up: " + (err.message || err));
           }
         }
 

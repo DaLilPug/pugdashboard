@@ -2355,6 +2355,65 @@ body.login-body {
   align-items: center;
   flex-wrap: wrap;
 }
+
+/* Add-follow-up form — mirrors .pr-response-form's container styling
+   so the two forms read as siblings (one for "they responded", one
+   for "I'll send another later"). Date picker on top, optional
+   message textarea below, action buttons at bottom-right. */
+.pr-add-followup-form {
+  margin-top: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pr-add-followup-form.hidden { display: none; }
+.pr-followup-form-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pr-followup-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pr-followup-field input[type="date"] {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  outline: none;
+}
+.pr-followup-field input[type="date"]:focus {
+  border-color: var(--navy);
+}
+.pr-followup-text {
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  resize: vertical;
+  min-height: 56px;
+  box-sizing: border-box;
+}
+.pr-followup-text:focus {
+  outline: none;
+  border-color: var(--navy);
+}
+.pr-followup-form-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
 .pr-sentiment-picker {
   display: flex;
   gap: 10px;
