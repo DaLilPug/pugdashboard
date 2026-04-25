@@ -125,7 +125,6 @@
             </div>
             <input id="pr-search" class="pr-search" type="search"
                    placeholder="Search name, company, title…" autocomplete="off" />
-            <button id="pr-copy"   class="btn-secondary pr-export" type="button" title="Copy the visible prospects as TSV (paste into Sheets / Excel)">Copy</button>
             <button id="pr-export" class="btn-secondary pr-export" type="button">Export CSV</button>
           </div>
         </div>
@@ -575,7 +574,6 @@
         const statusEl    = document.getElementById("pr-status-filter");
         const sentimentEl = document.getElementById("pr-sentiment-filter");
         const exportBtn   = document.getElementById("pr-export");
-        const copyBtn     = document.getElementById("pr-copy");
         const metaEl      = document.getElementById("pr-meta");
         const wrapEl      = document.getElementById("pr-table-wrap");
 
@@ -655,28 +653,6 @@
         });
 
         exportBtn.addEventListener("click", () => exportCsv(state.filtered));
-
-        // Copy button — TSV to clipboard. 1.4s "Copied!" feedback then
-        // restore. Falls back to CSV download if clipboard write fails
-        // (e.g. permission denied) so the operator never gets stuck.
-        copyBtn.addEventListener("click", async () => {
-          const prevLabel = copyBtn.textContent;
-          copyBtn.disabled = true;
-          try {
-            const n = await copyToClipboard(state.filtered);
-            copyBtn.textContent = `Copied ${fmtInt(n)}!`;
-            setTimeout(() => {
-              copyBtn.textContent = prevLabel;
-              copyBtn.disabled    = false;
-            }, 1400);
-          } catch (err) {
-            copyBtn.textContent = prevLabel;
-            copyBtn.disabled    = false;
-            console.warn("clipboard write failed:", err);
-            alert("Couldn't copy to clipboard. Falling back to CSV download.");
-            exportCsv(state.filtered);
-          }
-        });
 
         // Delegated click handler — survives timeline re-renders.
         //
@@ -1126,8 +1102,9 @@
         // prospects are checked. Empty string when nothing is selected,
         // so it doesn't take up vertical space.
         //
-        // Merge button only appears when 2+ prospects are selected (a
-        // single-prospect "merge" is a no-op). Delete is always shown.
+        // Order: Clear · Copy · Merge · Delete. Copy is always shown
+        // (works for any selection size); Merge only when 2+ selected
+        // (a single-prospect "merge" is a no-op); Delete is always shown.
         function renderBulkBar(count, prospects) {
           if (!count) return "";
           const mergeBtn = count >= 2
@@ -1137,6 +1114,7 @@
             <div class="pr-bulk-bar" role="region" aria-label="Bulk actions">
               <span class="pr-bulk-count">${fmtInt(count)} prospect${count === 1 ? "" : "s"} selected</span>
               <button class="btn-secondary pr-bulk-action" data-action="bulk-clear-selection" type="button">Clear</button>
+              <button class="btn-secondary pr-bulk-action" data-action="bulk-copy-selection" type="button" title="Copy the selected prospects as TSV (paste into Sheets / Excel)">Copy ${fmtInt(count)}</button>
               ${mergeBtn}
               <button class="btn-danger pr-bulk-action" data-action="bulk-delete-prospects" type="button">Delete ${fmtInt(count)}</button>
             </div>
@@ -1372,9 +1350,22 @@
             meeting_booked: "Meeting booked",
           }[e.type] || e.type;
 
-          // Responses carry the body on `response`; outgoing messages
-          // carry it on `message_sent`. Historical imports have neither.
-          const body = e.response || e.message_sent || "";
+          // Responses carry TWO body fields: message_sent (the outreach
+          // we sent that triggered the response — captured by the
+          // extension at log-time) and response (the prospect's reply).
+          // Outgoing types only carry message_sent. Historical imports
+          // have neither.
+          //
+          // For response rows we render both fields with labels so the
+          // operator can see the message + reply pair side-by-side.
+          // For outgoing types we render the single message_sent field
+          // unlabeled (matches the prior behavior — labels would feel
+          // overdesigned for a single-field event).
+          const isResponse = e.type === "response";
+          const body = isResponse
+            ? (e.response || "")
+            : (e.message_sent || "");
+          const pairedMessage = isResponse ? (e.message_sent || "") : "";
 
           // Sentiment rendering for response rows:
           //   - If the row has an id (all real DB rows do) and the current
@@ -1423,29 +1414,50 @@
 
           // Inline edit form. Hidden by default; "Edit" toggles
           // .pr-event-editing on the <li> which CSS uses to swap views.
-          // Response edits include sentiment radios alongside the body
-          // textarea; outgoing-message types only edit the body.
+          // For response events: separate Message Sent + Response
+          // textareas + sentiment radios — the operator can fix either
+          // half of the captured pair. For outgoing types: a single
+          // Message Sent textarea.
           let editForm = "";
           if (editable) {
             const cur = e.response_sentiment || "";
-            const sentimentRadios = e.type === "response"
-              ? `<div class="pr-event-edit-sent">
+            if (isResponse) {
+              const sentimentRadios = `
+                <div class="pr-event-edit-sent">
                   <label><input type="radio" name="ev-sent-${esc(e.id)}" value="positive" ${cur === "positive" ? "checked" : ""}> positive</label>
                   <label><input type="radio" name="ev-sent-${esc(e.id)}" value="neutral"  ${cur === "neutral"  ? "checked" : ""}> neutral</label>
                   <label><input type="radio" name="ev-sent-${esc(e.id)}" value="negative" ${cur === "negative" ? "checked" : ""}> negative</label>
                   <label><input type="radio" name="ev-sent-${esc(e.id)}" value=""         ${cur === ""         ? "checked" : ""}> —</label>
-                </div>`
-              : "";
-            editForm = `
-              <form class="pr-event-edit-form" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
-                <textarea class="pr-event-edit-text" name="body" rows="3">${esc(body)}</textarea>
-                ${sentimentRadios}
-                <div class="pr-event-edit-actions">
-                  <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
-                  <button type="submit" class="btn-primary pr-action">Save</button>
                 </div>
-              </form>
-            `;
+              `;
+              editForm = `
+                <form class="pr-event-edit-form pr-event-edit-form-response" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
+                  <label class="pr-event-edit-field">
+                    <span class="pr-event-edit-label">Message sent</span>
+                    <textarea class="pr-event-edit-text" name="message_sent" rows="3" placeholder="The outreach you sent that triggered this response">${esc(pairedMessage)}</textarea>
+                  </label>
+                  <label class="pr-event-edit-field">
+                    <span class="pr-event-edit-label">Response</span>
+                    <textarea class="pr-event-edit-text" name="response" rows="3" placeholder="What the prospect wrote back">${esc(body)}</textarea>
+                  </label>
+                  ${sentimentRadios}
+                  <div class="pr-event-edit-actions">
+                    <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
+                    <button type="submit" class="btn-primary pr-action">Save</button>
+                  </div>
+                </form>
+              `;
+            } else {
+              editForm = `
+                <form class="pr-event-edit-form" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
+                  <textarea class="pr-event-edit-text" name="message_sent" rows="3">${esc(body)}</textarea>
+                  <div class="pr-event-edit-actions">
+                    <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
+                    <button type="submit" class="btn-primary pr-action">Save</button>
+                  </div>
+                </form>
+              `;
+            }
           }
 
           // Split-mode checkbox — hidden by default, revealed by CSS
@@ -1470,6 +1482,29 @@
             ? `<span class="pr-event-date pr-event-date-editable" data-action="edit-event-date" data-event-id="${esc(e.id)}" data-iso="${esc(isoDate)}" title="Click to change the date">${esc(fmtDate(e.occurred_at))}</span>`
             : `<span class="pr-event-date">${esc(fmtDate(e.occurred_at))}</span>`;
 
+          // Body rendering. Response events render the paired message
+          // (above) and response (below) with labels so the operator
+          // can scan the exchange. Outgoing types render the single
+          // body unlabeled.
+          let bodyHtml = "";
+          if (isResponse) {
+            const msgPart  = pairedMessage
+              ? `<div class="pr-event-body pr-event-body-msg">
+                   <span class="pr-event-body-label">Message sent</span>
+                   <div class="pr-event-body-text">${esc(pairedMessage)}</div>
+                 </div>`
+              : "";
+            const respPart = body
+              ? `<div class="pr-event-body pr-event-body-resp">
+                   <span class="pr-event-body-label">Response</span>
+                   <div class="pr-event-body-text">${esc(body)}</div>
+                 </div>`
+              : "";
+            bodyHtml = msgPart + respPart;
+          } else if (body) {
+            bodyHtml = `<div class="pr-event-body">${esc(body)}</div>`;
+          }
+
           return `
             <li class="pr-event pr-event-${esc(e.type)}" data-event-id="${esc(e.id || "")}">
               <div class="pr-event-head">
@@ -1479,7 +1514,7 @@
                 ${sentTag}
                 ${actions}
               </div>
-              ${body ? `<div class="pr-event-body">${esc(body)}</div>` : ""}
+              ${bodyHtml}
               ${editForm}
             </li>
           `;
@@ -1505,13 +1540,16 @@
           ];
 
           const rows = prospects.map(p => {
-            // Most-recent outgoing message body across the message-like
-            // event types. pickLatest walks the events list (already
-            // sorted ASC by occurred_at via buildProspects) from the end.
+            // Most-recent message body — checks ANY event type, not just
+            // outgoing ones. The extension's convo-mode "Log Response"
+            // flow saves the paired sent message on the response event
+            // itself (extension content.js), so the highest-value
+            // message_sent value frequently lives on type='response'
+            // rows. Filtering to outgoing-only (as the prior version did)
+            // missed the most useful data — the initial outreach that
+            // actually got a reply.
             const latestMessage = pickLatest(p.events, e =>
-              (e.type === "message" || e.type === "followup" ||
-               e.type === "retargeting" || e.type === "inmail")
-              && (e.message_sent || "").trim() !== ""
+              (e.message_sent || "").trim() !== ""
             )?.message_sent || "";
             const latestResponse = pickLatest(p.events, e =>
               e.type === "response" && (e.response || "").trim() !== ""
@@ -1673,6 +1711,11 @@
             handleBulkMergeProspects(actionEl);
             return;
           }
+          if (action === "bulk-copy-selection") {
+            clickEvt.preventDefault();
+            handleBulkCopySelection(actionEl);
+            return;
+          }
 
           // ---- Per-event actions (timeline-row scoped) ---------------
           const timelineRow = actionEl.closest(".pr-timeline-row");
@@ -1706,11 +1749,26 @@
             clickEvt.preventDefault();
             const li = actionEl.closest(".pr-event");
             if (!li) return;
+            const eventId = li.dataset.eventId;
             li.classList.remove("pr-event-editing");
-            // Restore textarea to its initial value so cancel == discard.
-            const ta = li.querySelector(".pr-event-edit-text");
-            const body = li.querySelector(".pr-event-body");
-            if (ta && body) ta.value = body.textContent;
+            // Restore form fields from canonical event state (cancel ==
+            // discard). Response events have separate message_sent +
+            // response textareas plus a sentiment radio; outgoing types
+            // have a single message_sent textarea. Restore whatever's
+            // present.
+            const canonical = findCanonical(prospect);
+            const ev = canonical ? canonical.events.find(x => x.id === eventId) : null;
+            if (ev) {
+              const msgEl  = li.querySelector("textarea[name='message_sent']");
+              const respEl = li.querySelector("textarea[name='response']");
+              if (msgEl)  msgEl.value  = ev.message_sent || "";
+              if (respEl) respEl.value = ev.response     || "";
+              if (ev.type === "response" && eventId) {
+                const cur = ev.response_sentiment || "";
+                const radio = li.querySelector(`input[name="ev-sent-${cssEsc(eventId)}"][value="${cur}"]`);
+                if (radio) radio.checked = true;
+              }
+            }
             return;
           }
 
@@ -2024,12 +2082,20 @@
           const ev = canonical ? canonical.events.find(e => e.id === eventId) : null;
           if (!ev) return;
 
-          const textVal = (form.querySelector(".pr-event-edit-text")?.value || "");
-
           const changes = {};
           if (eventType === "response") {
-            // Edit body + sentiment for response events.
-            if (textVal !== (ev.response || "")) changes.response = textVal;
+            // Response events have a TWO-textarea form: message_sent
+            // (the outreach we sent) + response (their reply), plus
+            // sentiment radios. Diff each field separately so we only
+            // PATCH what actually changed.
+            const msgEl  = form.querySelector("textarea[name='message_sent']");
+            const respEl = form.querySelector("textarea[name='response']");
+            const msgVal  = msgEl  ? msgEl.value  : "";
+            const respVal = respEl ? respEl.value : "";
+
+            if (msgVal  !== (ev.message_sent || "")) changes.message_sent = msgVal;
+            if (respVal !== (ev.response     || "")) changes.response     = respVal;
+
             const sentRadio = form.querySelector(`input[name="ev-sent-${cssEsc(eventId)}"]:checked`);
             const sentVal   = sentRadio ? sentRadio.value : null;
             // sentVal "" (the dash radio) → store null; matches the schema
@@ -2038,7 +2104,10 @@
             const oldSent = ev.response_sentiment || null;
             if (newSent !== oldSent) changes.response_sentiment = newSent;
           } else {
-            // message / followup / retargeting / inmail — edit message_sent
+            // message / followup / retargeting / inmail — single
+            // textarea named message_sent.
+            const ta = form.querySelector("textarea[name='message_sent']");
+            const textVal = ta ? ta.value : "";
             if (textVal !== (ev.message_sent || "")) changes.message_sent = textVal;
           }
 
@@ -2233,6 +2302,37 @@
             const summary = failed.slice(0, 3).map(f => `• ${f.name}: ${f.err}`).join("\n");
             const more    = failed.length > 3 ? `\n…and ${failed.length - 3} more` : "";
             alert(`${failed.length} delete${failed.length === 1 ? "" : "s"} failed:\n${summary}${more}`);
+          }
+        }
+
+        // Bulk copy: TSV the currently-selected prospects to clipboard.
+        // Same row builder as Export CSV so the columns match exactly.
+        // 1.4s "Copied N!" feedback on the button. Falls back to a CSV
+        // download if clipboard write is denied (rare, but happens
+        // under Permissions-Policy or in non-secure contexts).
+        async function handleBulkCopySelection(btnEl) {
+          const keys = Array.from(state.selected);
+          if (!keys.length) return;
+          const targets = keys
+            .map(k => state.allProspects.find(p => p.key === k))
+            .filter(Boolean);
+          if (!targets.length) return;
+
+          const prevLabel = btnEl.textContent;
+          btnEl.disabled = true;
+          try {
+            const n = await copyToClipboard(targets);
+            btnEl.textContent = `Copied ${fmtInt(n)}!`;
+            setTimeout(() => {
+              btnEl.textContent = prevLabel;
+              btnEl.disabled    = false;
+            }, 1400);
+          } catch (err) {
+            btnEl.textContent = prevLabel;
+            btnEl.disabled    = false;
+            console.warn("clipboard write failed:", err);
+            alert("Couldn't copy to clipboard. Falling back to CSV download.");
+            exportCsv(targets);
           }
         }
 

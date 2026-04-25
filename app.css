@@ -3193,6 +3193,52 @@ body.login-body {
   gap: 8px;
 }
 
+/* Labeled body sections — used on response events to show the paired
+   "Message sent" and "Response" alongside each other. Outgoing-type
+   events keep their single unlabeled .pr-event-body block. */
+.pr-event-body-msg,
+.pr-event-body-resp {
+  margin-top: 6px;
+  display: block;
+}
+.pr-event-body-resp {
+  margin-top: 8px;
+}
+.pr-event-body-label {
+  display: block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+  margin-bottom: 2px;
+}
+.pr-event-body-text {
+  font-size: 12px;
+  color: var(--navy);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Stacked Message sent / Response edit fields on response events.
+   Each field gets a label; the form is wider than the single-field
+   case to give long messages room to breathe. */
+.pr-event-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pr-event-edit-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--gray-400);
+}
+
 /* ---- prospect checkbox column ------------------------------------- */
 
 .pr-col-check {
