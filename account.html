@@ -154,6 +154,14 @@
               <button class="pr-chip"        data-sentiment="none"     type="button">Unclassified</button>
             </div>
           </div>
+          <div class="pr-filter-group">
+            <span class="pr-filter-label">Tasks</span>
+            <div class="pr-filter-chips" id="pr-task-filter">
+              <button class="pr-chip active" data-task="all"   type="button">All</button>
+              <button class="pr-chip"        data-task="has"   type="button">Has follow-up</button>
+              <button class="pr-chip"        data-task="none"  type="button">No follow-up</button>
+            </div>
+          </div>
         </div>
 
         <div id="pr-meta" class="pr-meta"></div>
@@ -212,11 +220,20 @@
 
     <!-- =================== CADENCE ==================== -->
     <section id="panel-cadence" class="sub-panel hidden">
+      <!-- Two cadences per account:
+           1. Follow-up Cadence — kicked off by the initial 'message'
+              event, fires steps until response / meeting / cancel.
+           2. Positive Response Cadence — kicked off when a response
+              with sentiment='positive' is logged. Goal: book a
+              meeting. Exits on meeting_booked / cadence_cancelled.
+           Both share the same editor UI; data lives in different
+           clients columns (cadence_days / cadence_templates vs
+           positive_cadence_days / positive_cadence_templates). -->
       <div class="cad-editor">
         <div class="cad-head">
-          <h2>Cadence steps</h2>
+          <h2>Follow-up Cadence</h2>
           <p class="page-sub">
-            Templates support <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
+            Steps fire after the initial message. Templates support <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
             Changes apply only to this account.
           </p>
         </div>
@@ -227,6 +244,23 @@
         <div class="cad-actions">
           <button id="cad-save" class="cad-save" type="button" disabled>Save</button>
           <span   id="cad-feedback" class="cad-feedback"></span>
+        </div>
+      </div>
+
+      <div class="cad-editor cad-editor-positive">
+        <div class="cad-head">
+          <h2>Positive Response Cadence</h2>
+          <p class="page-sub">
+            Steps fire after a positive response, aiming to book a meeting. Days are counted from the positive response, not the original message.
+          </p>
+        </div>
+        <div id="cad-steps-positive" class="cad-steps">
+          <div class="loading">Loading cadence…</div>
+        </div>
+        <button id="cad-add-positive"  class="cad-add"  type="button">+ Add step</button>
+        <div class="cad-actions">
+          <button id="cad-save-positive" class="cad-save" type="button" disabled>Save</button>
+          <span   id="cad-feedback-positive" class="cad-feedback"></span>
         </div>
       </div>
     </section>
@@ -284,7 +318,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates,positive_cadence_days,positive_cadence_templates,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -592,6 +626,7 @@
         const searchEl    = document.getElementById("pr-search");
         const statusEl    = document.getElementById("pr-status-filter");
         const sentimentEl = document.getElementById("pr-sentiment-filter");
+        const taskEl      = document.getElementById("pr-task-filter");
         const exportBtn   = document.getElementById("pr-export");
         const metaEl      = document.getElementById("pr-meta");
         const wrapEl      = document.getElementById("pr-table-wrap");
@@ -600,6 +635,7 @@
         const LAST_TF        = `account_${clientId}_pr_tf`;
         const LAST_STATUS    = `account_${clientId}_pr_status`;
         const LAST_SENTIMENT = `account_${clientId}_pr_sentiment`;
+        const LAST_TASK      = `account_${clientId}_pr_task`;
         const LAST_SORT_BY   = `account_${clientId}_pr_sort_by`;
         const LAST_SORT_DIR  = `account_${clientId}_pr_sort_dir`;
 
@@ -607,6 +643,8 @@
           tf:        localStorage.getItem(LAST_TF)        || "all",
           status:    localStorage.getItem(LAST_STATUS)    || "all",
           sentiment: localStorage.getItem(LAST_SENTIMENT) || "all",
+          task:      ["all","has","none"].includes(localStorage.getItem(LAST_TASK))
+                       ? localStorage.getItem(LAST_TASK) : "all",
           // sortBy/sortDir = null means "default" — sort by last_touch DESC.
           // Three-state header click cycle: desc → asc → clear (back to default).
           sortBy:    localStorage.getItem(LAST_SORT_BY)   || null,
@@ -614,6 +652,11 @@
           search:    "",
           allProspects: null, // populated once after fetch
           filtered:     [],   // current view after applyFilters
+          // Set of identifier keys ("id:<linkedin_id>" / "url:<lower>" /
+          // "sn:<lower>") that have at least one active task in
+          // tasks_due. Built once per loadAll alongside the prospects
+          // fetch. Used by applyFilters when state.task !== "all".
+          taskKeys:  new Set(),
           // Spreadsheet-style multi-select on the prospect table.
           // Stores prospect.key strings (stable across re-renders).
           // lastCheckedKey enables shift+click range select.
@@ -630,6 +673,7 @@
         activatePill(pillsEl, state.tf);
         setChipActive(statusEl,    "status",    state.status);
         setChipActive(sentimentEl, "sentiment", state.sentiment);
+        setChipActive(taskEl,      "task",      state.task);
 
         // ---- events --------------------------------------------------
 
@@ -657,6 +701,15 @@
           state.sentiment = btn.dataset.sentiment;
           localStorage.setItem(LAST_SENTIMENT, state.sentiment);
           setChipActive(sentimentEl, "sentiment", state.sentiment);
+          rerender();
+        });
+
+        taskEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".pr-chip");
+          if (!btn) return;
+          state.task = btn.dataset.task;
+          localStorage.setItem(LAST_TASK, state.task);
+          setChipActive(taskEl, "task", state.task);
           rerender();
         });
 
@@ -887,18 +940,53 @@
             // included so we can PATCH individual rows (sentiment + info
             // edits) by primary key; email + phone are pulled for both
             // the grouping waterfall and the timeline head display.
-            const rows = await sb.sbFetchAll(
-              `/rest/v1/outreach?` +
-              `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id` +
-              `&client_id=eq.${encodeURIComponent(clientId)}` +
-              `&order=occurred_at.asc`
-            );
+            //
+            // Parallel: pull tasks_due so the "Has follow-up" filter
+            // can match prospects against active task identifiers.
+            const [rows, tasks] = await Promise.all([
+              sb.sbFetchAll(
+                `/rest/v1/outreach?` +
+                `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id` +
+                `&client_id=eq.${encodeURIComponent(clientId)}` +
+                `&order=occurred_at.asc`
+              ),
+              sb.sbFetch(
+                `/rest/v1/tasks_due?client_id=eq.${encodeURIComponent(clientId)}&select=linkedin_id,profile_url,sales_nav_url`
+              ).catch(() => []), // tasks_due missing on a fresh DB → graceful fallback
+            ]);
             state.allProspects = buildProspects(rows);
+            state.taskKeys = buildTaskKeys(tasks || []);
           } catch (err) {
             wrapEl.innerHTML = `<div class="placeholder"><strong>Couldn't load prospects</strong>${esc(err.message || "")}</div>`;
             return;
           }
           rerender();
+        }
+
+        // Build the lookup Set used by applyFilters to test whether a
+        // prospect has an active task. Each task contributes up to 3
+        // identifier keys (linkedin_id / profile_url / sales_nav_url),
+        // matched against the prospect's identifiers in the same shape.
+        function buildTaskKeys(tasks) {
+          const keys = new Set();
+          for (const t of tasks) {
+            if (t.linkedin_id)   keys.add(`id:${t.linkedin_id}`);
+            if (t.profile_url)   keys.add(`url:${t.profile_url.toLowerCase()}`);
+            if (t.sales_nav_url) keys.add(`sn:${t.sales_nav_url.toLowerCase()}`);
+          }
+          return keys;
+        }
+
+        // True iff this prospect's identifiers intersect the task
+        // identifier Set. Matches across linkedin_id / profile_url /
+        // sales_nav_url so a task with only one of those still maps
+        // back to a prospect with a different one.
+        function prospectHasTask(p) {
+          if (!state.taskKeys || !state.taskKeys.size) return false;
+          if (p.linkedin_id   && state.taskKeys.has(`id:${p.linkedin_id}`))                  return true;
+          if (p.profile_url   && state.taskKeys.has(`url:${p.profile_url.toLowerCase()}`))   return true;
+          if (p.sales_nav_url && state.taskKeys.has(`sn:${p.sales_nav_url.toLowerCase()}`))  return true;
+          return false;
         }
 
         function rerender() {
@@ -1139,6 +1227,11 @@
             if (s.sentiment !== "all") {
               if (s.sentiment === "none"  && p.sentiment)              return false;
               if (s.sentiment !== "none"  && p.sentiment !== s.sentiment) return false;
+            }
+            if (s.task !== "all") {
+              const has = prospectHasTask(p);
+              if (s.task === "has"  && !has) return false;
+              if (s.task === "none" &&  has) return false;
             }
             if (q) {
               const hay = `${p.name} ${p.company} ${p.title}`.toLowerCase();
@@ -3331,9 +3424,16 @@
       // linkedin_id, which is the unique identifier within a client
       // and also what followups_due returns. Persists to localStorage
       // so an operator's preferred view sticks across reloads.
-      const FU_VIEW_KEY = `account_${clientId}_fu_view`;
+      const FU_VIEW_KEY        = `account_${clientId}_fu_view`;
+      const FU_SOURCE_KEY      = `account_${clientId}_fu_source`;
       const fuState = {
         view:     localStorage.getItem(FU_VIEW_KEY) === "list" ? "list" : "cards",
+        // Source filter — "all" | "cadence" | "positive" | "manual".
+        // Persists per-account so an operator's "show only positive"
+        // preference sticks across reloads.
+        sourceFilter: ["cadence", "positive", "manual"].includes(localStorage.getItem(FU_SOURCE_KEY))
+          ? localStorage.getItem(FU_SOURCE_KEY)
+          : "all",
         selected: new Set(),
         rows:     [],
         // Anchor key for shift+click range select in list view (same
@@ -3387,7 +3487,29 @@
 
       function renderFollowups() {
         const root = document.getElementById("fu-root");
-        const rows = fuState.rows;
+        const allRows = fuState.rows;
+
+        // Apply source filter. We iterate fuState.rows preserving the
+        // original index so per-row click handlers (open, sent, cancel,
+        // edit-due, edit-log) keep doing fuState.rows[idx] correctly
+        // even with a filter active. Tuples = { row, idx } shape.
+        const tuples = allRows
+          .map((row, idx) => ({ row, idx }))
+          .filter(t => fuState.sourceFilter === "all" || t.row.source === fuState.sourceFilter);
+        const filtered = tuples.map(t => t.row); // legacy alias for empty-state check
+
+        // Compute counts per source for the pill labels (so operators
+        // can see "47 cadence · 2 positive · 3 manual" at a glance).
+        const counts = {
+          all:      allRows.length,
+          cadence:  allRows.filter(r => r.source === "cadence").length,
+          positive: allRows.filter(r => r.source === "positive").length,
+          manual:   allRows.filter(r => r.source === "manual").length,
+        };
+        const pillBtn = (key, label) => `
+          <button class="fu-source-pill ${fuState.sourceFilter === key ? "active" : ""}${key !== "all" ? " fu-source-pill-" + key : ""}"
+                  data-fu-source="${key}" type="button">${label} <span class="fu-source-pill-count">${counts[key]}</span></button>
+        `;
 
         const toolbar = `
           <div class="fu-toolbar">
@@ -3395,15 +3517,23 @@
               <button class="fu-view-btn ${fuState.view === "cards" ? "active" : ""}" data-fu-view="cards" type="button">Cards</button>
               <button class="fu-view-btn ${fuState.view === "list"  ? "active" : ""}" data-fu-view="list"  type="button">List</button>
             </div>
-            <span class="fu-toolbar-count">${rows.length} follow-up${rows.length === 1 ? "" : "s"} queued</span>
+            <div class="fu-source-pills" role="group" aria-label="Filter by source">
+              ${pillBtn("all",      "All")}
+              ${pillBtn("cadence",  "Follow-up")}
+              ${pillBtn("positive", "Positive")}
+              ${pillBtn("manual",   "Manual")}
+            </div>
+            <span class="fu-toolbar-count">${filtered.length} of ${allRows.length}</span>
           </div>
         `;
 
-        if (!rows.length) {
+        if (!filtered.length) {
           root.innerHTML = toolbar + `
             <div class="placeholder">
-              <strong>No follow-ups queued</strong>
-              Log a <b>Message</b> in the extension to start a sequence.
+              <strong>${fuState.sourceFilter === "all" ? "No follow-ups queued" : "No follow-ups match this filter"}</strong>
+              ${fuState.sourceFilter === "all"
+                  ? "Log a <b>Message</b> in the extension to start a sequence."
+                  : "Switch to All to see everything queued."}
             </div>`;
           wireFollowupRoot();
           return;
@@ -3411,24 +3541,27 @@
 
         const bulk = renderFuBulkBar();
         const body = fuState.view === "list"
-          ? renderFollowupListView(rows)
-          : renderFollowupCardsView(rows);
+          ? renderFollowupListView(tuples)
+          : renderFollowupCardsView(tuples);
 
         root.innerHTML = toolbar + bulk + body;
         wireFollowupRoot();
       }
 
-      function renderFollowupCardsView(rows) {
+      function renderFollowupCardsView(tuples) {
+        // tuples: [{ row, idx }] where idx is the position in
+        // fuState.rows (preserved through the source filter so click
+        // handlers can still look up by index).
         const now  = Date.now();
         const tEnd = new Date(); tEnd.setHours(23,59,59,999);
         const overdue  = [];
         const today    = [];
         const upcoming = [];
-        rows.forEach((r, idx) => {
-          const due = new Date(r.due_at).getTime();
-          if      (due < now)                 overdue.push({ r, idx });
-          else if (due <= tEnd.getTime())     today.push({ r, idx });
-          else                                upcoming.push({ r, idx });
+        tuples.forEach(t => {
+          const due = new Date(t.row.due_at).getTime();
+          if      (due < now)                 overdue.push(t);
+          else if (due <= tEnd.getTime())     today.push(t);
+          else                                upcoming.push(t);
         });
 
         const section = (title, entries, tone) => entries.length
@@ -3436,7 +3569,7 @@
                <div class="fu-section-head fu-section-${tone}">
                  ${esc(title)} <span class="fu-count">${entries.length}</span>
                </div>
-               <div class="fu-list">${entries.map(e => renderFollowupCard(e.r, e.idx)).join("")}</div>
+               <div class="fu-list">${entries.map(t => renderFollowupCard(t.row, t.idx)).join("")}</div>
              </section>`
           : "";
 
@@ -3448,10 +3581,13 @@
       function renderFollowupCard(r, idx) {
         const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
         const due   = formatDueLabel(r.due_at);
-        const isManual = r.source === "manual";
+        const isManual   = r.source === "manual";
+        const isPositive = r.source === "positive";
         const stepText = isManual
           ? "Manual task"
-          : `Step ${r.step_index} · day ${r.step_day}`;
+          : isPositive
+            ? `Positive · step ${r.step_index} · day ${r.step_day}`
+            : `Step ${r.step_index} · day ${r.step_day}`;
         const tpl   = r.template
           ? esc(truncate(renderTemplate(r.template, r), 180))
           : (isManual
@@ -3459,7 +3595,7 @@
               : `<span class="fu-notemplate">No template set for this step.</span>`);
         // Click-to-edit due date — works on BOTH cadence and manual
         // tasks but with different semantics:
-        //   cadence: PATCH anchor's cadence_snooze_days (cascades to
+        //   cadence/positive: PATCH anchor's cadence_snooze_days (cascades to
         //            every later step in the sequence)
         //   manual:  UPDATE scheduled_followups.due_at directly
         // The handler dispatches based on r.source.
@@ -3467,13 +3603,17 @@
         const dueHtml = (r.anchor_id || isManual)
           ? `<button class="fu-due fu-due-editable" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole sequence forward"}">${esc(due)}</button>`
           : `<div class="fu-due">${esc(due)}</div>`;
-        // Small "manual" badge so operators can tell at a glance which
-        // tasks come from the cadence vs. ones they scheduled by hand.
+        // Small badge so operators can tell at a glance whether a task
+        // comes from the regular cadence, the positive response cadence,
+        // or a manual one-off TODO.
         const badge = isManual
           ? `<span class="fu-source-badge fu-source-manual" title="Manually scheduled task (not from cadence)">Manual</span>`
-          : "";
+          : isPositive
+            ? `<span class="fu-source-badge fu-source-positive" title="Positive response cadence — booking the meeting">Positive</span>`
+            : "";
+        const rowClass = isManual ? "fu-row-manual" : isPositive ? "fu-row-positive" : "";
         return `
-          <article class="fu-row${isManual ? " fu-row-manual" : ""}">
+          <article class="fu-row${rowClass ? " " + rowClass : ""}">
             <div class="fu-row-head">
               <div class="fu-name">${esc(r.prospect_name)} ${badge}</div>
               <div class="fu-row-head-right">
@@ -3497,11 +3637,13 @@
       // List view — same data, denser table layout, with a checkbox
       // column for bulk selection. Bulk delete fans out cancellation
       // RPCs / DELETEs to drop multiple sequences/tasks at once.
-      function renderFollowupListView(rows) {
-        const visibleKeys = rows.map(fuRowKey);
+      // tuples: [{ row, idx }] where idx is the position in
+      // fuState.rows (preserved through the source filter).
+      function renderFollowupListView(tuples) {
+        const visibleKeys = tuples.map(t => fuRowKey(t.row));
         const allSel = visibleKeys.length > 0 && visibleKeys.every(k => fuState.selected.has(k));
         const someSel = !allSel && visibleKeys.some(k => fuState.selected.has(k));
-        const body = rows.map((r, idx) => renderFollowupListRow(r, idx)).join("");
+        const body = tuples.map(t => renderFollowupListRow(t.row, t.idx)).join("");
         return `
           <div class="fu-list-wrap">
             <table class="fu-table">
@@ -3530,8 +3672,9 @@
       function renderFollowupListRow(r, idx) {
         const meta  = [r.title, r.company].filter(Boolean).join(" · ") || "—";
         const due   = formatDueLabel(r.due_at);
-        const isManual = r.source === "manual";
-        const step  = isManual ? "Manual" : `Step ${r.step_index} · day ${r.step_day}`;
+        const isManual   = r.source === "manual";
+        const isPositive = r.source === "positive";
+        const step  = isManual ? "Manual" : isPositive ? `Positive · step ${r.step_index}` : `Step ${r.step_index} · day ${r.step_day}`;
         const key = fuRowKey(r);
         const isChecked = fuState.selected.has(key);
         const isoDue = (r.due_at || "").slice(0, 10);
@@ -3539,12 +3682,18 @@
           ? `<button class="fu-due-editable fu-due-list-btn" data-action="edit-due" data-idx="${idx}" data-iso="${esc(isoDue)}" type="button" title="${isManual ? "Click to change this task's due date" : "Click to push the whole sequence forward"}">${esc(due)}</button>`
           : esc(due);
         const cancelTitle = isManual ? "Delete this scheduled task" : "Cancel this follow-up sequence";
+        const rowClass = isManual ? "fu-row-manual" : isPositive ? "fu-row-positive" : "";
+        const inlineBadge = isManual
+          ? ` <span class="fu-source-badge fu-source-manual">Manual</span>`
+          : isPositive
+            ? ` <span class="fu-source-badge fu-source-positive">Positive</span>`
+            : "";
         return `
-          <tr class="fu-list-row${isChecked ? " selected" : ""}${isManual ? " fu-row-manual" : ""}" data-key="${esc(key)}">
+          <tr class="fu-list-row${isChecked ? " selected" : ""}${rowClass ? " " + rowClass : ""}" data-key="${esc(key)}">
             <td class="fu-col-check" data-action="toggle-fu-row" data-idx="${idx}" data-key="${esc(key)}">
               <input type="checkbox" class="fu-check" tabindex="-1" ${isChecked ? "checked" : ""} aria-label="Select ${esc(r.prospect_name || "follow-up")}" />
             </td>
-            <td class="fu-col-name"><strong>${esc(r.prospect_name || "—")}</strong>${isManual ? ` <span class="fu-source-badge fu-source-manual">Manual</span>` : ""}</td>
+            <td class="fu-col-name"><strong>${esc(r.prospect_name || "—")}</strong>${inlineBadge}</td>
             <td class="fu-col-meta">${esc(meta)}</td>
             <td class="fu-col-step">${esc(step)}</td>
             <td class="fu-col-due">${dueHtml}</td>
@@ -3594,6 +3743,21 @@
             // Switching views resets selection — list-view selections
             // don't have a UI surface in cards view (and vice versa
             // would just confuse).
+            fuState.selected.clear();
+            renderFollowups();
+            return;
+          }
+
+          // Source filter pill (All / Follow-up / Positive / Manual)
+          const sourceBtn = e.target.closest("[data-fu-source]");
+          if (sourceBtn) {
+            fuState.sourceFilter = sourceBtn.dataset.fuSource;
+            localStorage.setItem(FU_SOURCE_KEY, fuState.sourceFilter);
+            // Drop any selections that filter out so the bulk-bar
+            // count doesn't lie about what'd actually be cancelled.
+            // (rerender drops them too via the loadFollowups pass,
+            // but selecting+filtering in quick succession would let
+            // the orphan keys linger.)
             fuState.selected.clear();
             renderFollowups();
             return;
@@ -4119,15 +4283,40 @@
       // ================= CADENCE ======================================
 
       function initCadence() {
-        const stepsEl    = document.getElementById("cad-steps");
-        const addBtn     = document.getElementById("cad-add");
-        const saveBtn    = document.getElementById("cad-save");
-        const feedbackEl = document.getElementById("cad-feedback");
+        // Two independent editors: regular follow-up cadence (kicked
+        // off by the initial 'message' event) and positive response
+        // cadence (kicked off by a positive response). Same UI, same
+        // logic — different clients columns. mountCadenceEditor is
+        // factored to take the editor scope so both editors live as
+        // independent state machines.
+        mountCadenceEditor({
+          stepsId:    "cad-steps",
+          addId:      "cad-add",
+          saveId:     "cad-save",
+          feedbackId: "cad-feedback",
+          daysCol:    "cadence_days",
+          tplCol:     "cadence_templates",
+        });
+        mountCadenceEditor({
+          stepsId:    "cad-steps-positive",
+          addId:      "cad-add-positive",
+          saveId:     "cad-save-positive",
+          feedbackId: "cad-feedback-positive",
+          daysCol:    "positive_cadence_days",
+          tplCol:     "positive_cadence_templates",
+        });
+      }
+
+      function mountCadenceEditor(cfg) {
+        const stepsEl    = document.getElementById(cfg.stepsId);
+        const addBtn     = document.getElementById(cfg.addId);
+        const saveBtn    = document.getElementById(cfg.saveId);
+        const feedbackEl = document.getElementById(cfg.feedbackId);
 
         // Mutable working copy of (day, template) pairs. Save flushes
-        // back to clients.cadence_days / clients.cadence_templates.
-        const days      = Array.isArray(client.cadence_days)      ? [...client.cadence_days]      : [];
-        const templates = Array.isArray(client.cadence_templates) ? [...client.cadence_templates] : [];
+        // back to the configured clients columns.
+        const days      = Array.isArray(client[cfg.daysCol]) ? [...client[cfg.daysCol]] : [];
+        const templates = Array.isArray(client[cfg.tplCol])  ? [...client[cfg.tplCol]]  : [];
         // Pad shorter array so index-paired rendering is stable.
         while (templates.length < days.length) templates.push("");
 
@@ -4189,17 +4378,20 @@
           feedbackEl.className = "cad-feedback";
           feedbackEl.textContent = "Saving…";
           try {
+            const patch = {};
+            patch[cfg.daysCol] = cleanDays;
+            patch[cfg.tplCol]  = cleanTpls;
             await sb.sbFetch(
               `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
               {
                 method: "PATCH",
-                body:   JSON.stringify({ cadence_days: cleanDays, cadence_templates: cleanTpls }),
+                body:   JSON.stringify(patch),
                 headers:{ Prefer: "return=minimal" },
               }
             );
-            // Update our local snapshot so re-render doesn't flash stale values.
-            client.cadence_days      = cleanDays;
-            client.cadence_templates = cleanTpls;
+            // Update local snapshot so a re-render doesn't flash stale values.
+            client[cfg.daysCol] = cleanDays;
+            client[cfg.tplCol]  = cleanTpls;
             dirty = false;
             saveBtn.disabled = true;
             feedbackEl.className = "cad-feedback ok";
