@@ -177,14 +177,27 @@
               <th class="num sortable" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="responses">Responses<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="positives">Positives<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="posRespRate">Pos. resp. rate<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="meetings">Meetings<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="bookRate">Booking rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="posBookRate">Pos. booking rate<span class="sort-caret"></span></th>
               <th class="trend">Trend</th>
+              <!-- Expand toggle reveals the 4 "Additional outreach"
+                   columns. Default: collapsed. Click flips → ↔ ← and
+                   the table gets .show-extras which un-hides the
+                   .extra-col cells. -->
+              <th class="col-extras-toggle" aria-label="Show additional outreach columns">
+                <button id="extras-toggle" class="extras-toggle" type="button" aria-expanded="false">→</button>
+              </th>
+              <th class="num sortable extra-col" data-sort="regularFollowups">Regular FU<span class="sort-caret"></span></th>
+              <th class="num sortable extra-col" data-sort="positiveFollowups">Positive FU<span class="sort-caret"></span></th>
+              <th class="num sortable extra-col" data-sort="inmails">InMails<span class="sort-caret"></span></th>
+              <th class="num sortable extra-col" data-sort="retargeting">Retargeting<span class="sort-caret"></span></th>
               <th class="col-actions" aria-label="Row actions"></th>
             </tr>
           </thead>
           <tbody id="client-tbody">
-            <tr><td colspan="14" class="loading">Loading…</td></tr>
+            <tr><td colspan="21" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -438,7 +451,15 @@
       const seatUsageEl    = document.getElementById("seat-usage");
       const showArchivedEl = document.getElementById("show-archived");
       // 13 data columns + the trailing row-actions column = 14.
-      const colspan    = 14;
+      // Total column count, used by loading + empty-state rows that
+       // span the full table width. Kept in sync with the <thead>:
+       //   1 Account, 2 Company, 3 Start, 4 End, 5 Status,
+       //   6 Connections, 7 Messages, 8 Acc.rate, 9 Responses,
+       //   10 Resp.rate, 11 Positives, 12 Pos.resp.rate, 13 Meetings,
+       //   14 Pos.booking, 15 Trend, 16 Extras-toggle,
+       //   17 RegularFU, 18 PositiveFU, 19 InMails, 20 Retargeting,
+       //   21 Actions.
+      const colspan    = 21;
 
       // ---- persisted filter state ---------------------------------------
 
@@ -588,6 +609,24 @@
       //     "insufficient_privilege" Postgres error, also translated.
       const addBtnEl = document.getElementById("add-account-btn");
       if (addBtnEl) addBtnEl.addEventListener("click", onAddAccount);
+
+      // "Show additional outreach" toggle. Lives in the table header
+      // immediately right of Trend. Click flips → ↔ ← and toggles
+      // .show-extras on the table; CSS handles the actual reveal of
+      // the extra-col columns. The data is already computed + rendered
+      // (display:none, not detached) so flipping is instantaneous.
+      // stopPropagation guards the row-click handler — though the
+      // button's in <thead>, sortable headers above pick up clicks too.
+      const extrasToggleEl = document.getElementById("extras-toggle");
+      if (extrasToggleEl) {
+        extrasToggleEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const tableEl = document.getElementById("client-table");
+          const expanded = tableEl.classList.toggle("show-extras");
+          extrasToggleEl.setAttribute("aria-expanded", expanded ? "true" : "false");
+          extrasToggleEl.textContent = expanded ? "←" : "→";
+        });
+      }
 
       // Lazily resolved on first use. Most users belong to one org; if
       // they're admin of multiple, we pick the first row and (later)
@@ -866,8 +905,19 @@
 
         let rows = [];
         try {
+          // response_sentiment + linkedin_id are needed for the
+          // positive-funnel metrics and the regular-vs-positive followup
+          // classification. Both are short fields (a sentiment string +
+          // a slug-like id) so the payload bump is minor relative to
+          // the original three columns.
+          //
+          // order=occurred_at.asc matters for the followup classifier:
+          // metricsFor's anchor map needs to see positive-response rows
+          // before any subsequent followups on the same prospect. ASC
+          // ordering at the DB ensures that without an extra in-memory
+          // sort pass.
           rows = await sb.sbFetchAll(
-            `/rest/v1/outreach?select=client_id,type,occurred_at${qs}`
+            `/rest/v1/outreach?select=client_id,type,occurred_at,response_sentiment,linkedin_id${qs}&order=occurred_at.asc`
           );
         } catch (err) {
           tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load outreach: ${esc(err.message)}</td></tr>`;
@@ -1162,14 +1212,24 @@
               <span class="editable-value">${c.endDate ? esc(fmtDate(c.endDate)) : `<span class="editable-empty">— set —</span>`}</span>
             </td>
             <td class="status-cell">${statusHtml}</td>
-            <td class="num">${fmtInt(c.connections)}</td>
-            <td class="num">${fmtInt(c.messages)}</td>
-            <td class="num ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
-            <td class="num">${fmtInt(c.responses)}</td>
-            <td class="num ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
-            <td class="num">${fmtInt(c.meetings)}</td>
-            <td class="num ${rateClass(c.bookRate)}">${fmtPct(c.bookRate)}</td>
-            <td class="trend">${sparkline(c.trend)}</td>
+            <td class="num drill">${fmtInt(c.connections)}</td>
+            <td class="num drill">${fmtInt(c.messages)}</td>
+            <td class="num drill ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
+            <td class="num drill">${fmtInt(c.responses)}</td>
+            <td class="num drill ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
+            <td class="num drill">${fmtInt(c.positives)}</td>
+            <td class="num drill ${rateClass(c.posRespRate)}">${fmtPct(c.posRespRate)}</td>
+            <td class="num drill">${fmtInt(c.meetings)}</td>
+            <td class="num drill ${rateClass(c.posBookRate)}">${fmtPct(c.posBookRate)}</td>
+            <td class="trend drill">${sparkline(c.trend)}</td>
+            <!-- Empty cell under the header's expand toggle keeps the
+                 column track aligned. The chevron itself is purely a
+                 header affordance — rows show data in the extra cols. -->
+            <td class="drill col-extras-spacer"></td>
+            <td class="num drill extra-col">${fmtInt(c.regularFollowups)}</td>
+            <td class="num drill extra-col">${fmtInt(c.positiveFollowups)}</td>
+            <td class="num drill extra-col">${fmtInt(c.inmails)}</td>
+            <td class="num drill extra-col">${fmtInt(c.retargeting)}</td>
             <td class="col-actions">${actionsHtml}</td>
           </tr>
         `;
@@ -1425,25 +1485,64 @@
 
       // ---- metrics + helpers --------------------------------------------
 
+      // metricsFor mirrors account.html's metricsFor so the main
+      // dashboard's table + KPI strip read the same way as each account's
+      // own Period Comparison. Followups split into regular vs positive
+      // by per-prospect anchor (a followup with a prior positive
+      // response on the same linkedin_id is positive; everything else
+      // is regular). Manual scheduled-followup completions roll into
+      // regular by virtue of having no prior positive on most prospects.
+      //
+      // ⚠️ Caller must pass rows in occurred_at-ASC order for the
+      // anchor logic to work (Postgres returns ASC by default for
+      // unordered SELECTs but the dashboard doesn't sort explicitly —
+      // sortRows below in the per-client loop ensures it).
       function metricsFor(rs) {
-        const counts = { connection: 0, message: 0, response: 0, meeting_booked: 0 };
+        const counts = {
+          connection: 0, message: 0, response: 0, meeting_booked: 0,
+          followup: 0, retargeting: 0, inmail: 0,
+        };
+        let positives = 0;
+        let regularFollowups  = 0;
+        let positiveFollowups = 0;
+        const positiveAnchor = new Map(); // linkedin_id → ISO ts
         const trend = Array(12).fill(0); // last 12 weeks, oldest → newest
         const now = Date.now();
         for (const r of rs) {
           if (counts[r.type] != null) counts[r.type]++;
+          if (r.type === "response" && r.response_sentiment === "positive") {
+            positives++;
+            if (r.linkedin_id && !positiveAnchor.has(r.linkedin_id)) {
+              positiveAnchor.set(r.linkedin_id, r.occurred_at);
+            }
+          }
+          if (r.type === "followup") {
+            const anchor = r.linkedin_id ? positiveAnchor.get(r.linkedin_id) : null;
+            if (anchor && r.occurred_at > anchor) positiveFollowups++;
+            else                                  regularFollowups++;
+          }
           const weeksAgo = Math.floor(
             (now - new Date(r.occurred_at).getTime()) / (7 * 86400000)
           );
           if (weeksAgo >= 0 && weeksAgo < 12) trend[11 - weeksAgo]++;
         }
         return {
-          connections: counts.connection,
-          messages:    counts.message,
-          responses:   counts.response,
-          meetings:    counts.meeting_booked,
-          accRate:     rate(counts.message,         counts.connection),
-          respRate:    rate(counts.response,        counts.message),
-          bookRate:    rate(counts.meeting_booked,  counts.response),
+          connections:  counts.connection,
+          messages:     counts.message,
+          responses:    counts.response,
+          meetings:     counts.meeting_booked,
+          positives,
+          accRate:      rate(counts.message,         counts.connection),
+          respRate:     rate(counts.response,        counts.message),
+          posRespRate:  rate(positives,              counts.response),
+          // Pos. Booking Rate (meetings/positives) replaces the old
+          // bookRate (meetings/responses). Aligns with the canonical
+          // funnel metric on the per-account dashboard.
+          posBookRate:  rate(counts.meeting_booked,  positives),
+          regularFollowups,
+          positiveFollowups,
+          inmails:      counts.inmail,
+          retargeting:  counts.retargeting,
           trend,
         };
       }
@@ -1451,15 +1550,25 @@
       function rate(num, den) { return den ? num / den : null; }
 
       function renderKpiStrip(root, nClients, t) {
+        // Order + labels match account.html's per-account KPI cards so
+        // the org-wide totals read the same way as the drill-in:
+        //   Accounts → Connections → Messages → Acceptance rate →
+        //   Responses → Response rate → Positives → Pos. resp. rate →
+        //   Meetings → Pos. booking rate.
+        // Pos. booking rate uses meetings/positives (not meetings/responses);
+        // the funnel reads cleanly across all three rates that share the
+        // "Pos." prefix.
         const cards = [
-          ["Accounts",        String(nClients)],
-          ["Connections",     fmtInt(t.connections)],
-          ["Messages",        fmtInt(t.messages)],
-          ["Acceptance rate", fmtPct(t.accRate)],
-          ["Responses",       fmtInt(t.responses)],
-          ["Response rate",   fmtPct(t.respRate)],
-          ["Meetings",        fmtInt(t.meetings)],
-          ["Booking rate",    fmtPct(t.bookRate)],
+          ["Accounts",          String(nClients)],
+          ["Connections",       fmtInt(t.connections)],
+          ["Messages",          fmtInt(t.messages)],
+          ["Acceptance rate",   fmtPct(t.accRate)],
+          ["Responses",         fmtInt(t.responses)],
+          ["Response rate",     fmtPct(t.respRate)],
+          ["Positives",         fmtInt(t.positives)],
+          ["Pos. resp. rate",   fmtPct(t.posRespRate)],
+          ["Meetings",          fmtInt(t.meetings)],
+          ["Pos. booking rate", fmtPct(t.posBookRate)],
         ];
         root.innerHTML = cards.map(([label, value]) => `
           <div class="kpi-card">

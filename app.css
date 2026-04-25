@@ -4380,3 +4380,137 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .login-legal a:hover {
   color: var(--accent);
 }
+
+/* ==============================================================
+   Account Performance — drill-zone POP + extras toggle
+   ==============================================================
+   Scoped to #client-table (the dashboard's account table) so the
+   other tables that share .client-table — #org-table on
+   platform-admin, #member-table / #invite-table on team — are
+   untouched.
+
+   Goals:
+   - Make the data cells (Connections … Trend) read as a clearly
+     clickable region. Operator clicks them to drill into the
+     per-account dashboard, and the visual cue should match.
+   - Toggle to expand the "Additional Outreach" columns (Regular FU,
+     Positive FU, InMails, Retargeting) that mirror the per-account
+     Period Comparison table. Default-collapsed so the table stays
+     readable for the common case. */
+
+#client-table tbody td.drill {
+  /* Subtle navy tint always-on so the drill zone reads as a single
+     "card" running through each row, distinct from the edit-zone on
+     the left (Account/Company/dates/Status) and the Archive-zone on
+     the right. */
+  background: rgba(1, 58, 82, 0.025);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: background .15s ease;
+}
+#client-table tbody tr:hover td.drill {
+  background: rgba(1, 58, 82, 0.10);
+}
+/* Override the broad .client-table tbody tr:hover navy-light tint —
+   we want hover to feel like an "elevation" on the drill zone, not a
+   wash across the whole row. The non-drill cells still get a softer
+   tint below so the row reads as a cohesive unit. */
+#client-table tbody tr:hover {
+  background: transparent;
+}
+#client-table tbody tr:hover td:not(.drill):not(.col-actions) {
+  background: rgba(1, 58, 82, 0.04);
+}
+/* Soft inset+drop shadow on hover so the row visibly "lifts". Pure
+   visual cue — no transform/translate that would jitter the table
+   layout. */
+#client-table tbody tr:hover td.drill {
+  box-shadow:
+    0 1px 0 rgba(1, 58, 82, 0.10) inset,
+    0 -1px 0 rgba(1, 58, 82, 0.10) inset;
+}
+#client-table tbody tr:hover td.drill:first-of-type {
+  box-shadow:
+    0 1px 0 rgba(1, 58, 82, 0.10) inset,
+    0 -1px 0 rgba(1, 58, 82, 0.10) inset,
+    1px 0 0 rgba(1, 58, 82, 0.10) inset;
+}
+#client-table tbody tr:hover td.drill:last-of-type {
+  box-shadow:
+    0 1px 0 rgba(1, 58, 82, 0.10) inset,
+    0 -1px 0 rgba(1, 58, 82, 0.10) inset,
+    -1px 0 0 rgba(1, 58, 82, 0.10) inset;
+}
+
+/* Per-row chevron in the col-extras-spacer cell. Lives at the far
+   right of the drill zone (just before the Archive button column),
+   faint always, brighter + slight rightward shift on hover — a
+   classic "click here to drill in" affordance. */
+#client-table tbody td.col-extras-spacer::after {
+  content: "›";
+  display: inline-block;
+  color: rgba(1, 58, 82, 0.30);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  transition: color .15s ease, transform .15s ease;
+}
+#client-table tbody tr:hover td.col-extras-spacer::after {
+  color: var(--navy);
+  transform: translateX(2px);
+}
+
+/* The col-extras-spacer + col-extras-toggle column is narrow — just
+   enough to host the chevron / the header toggle pill. */
+#client-table th.col-extras-toggle,
+#client-table td.col-extras-spacer {
+  width: 36px;
+  text-align: center;
+  padding: 4px;
+}
+
+/* Hidden additional outreach columns. .show-extras on the table
+   reveals them. We render the cells (display:none, not detached)
+   so flipping is instantaneous and the data is already in the DOM
+   when the operator opens the panel — no second render pass. */
+#client-table th.extra-col,
+#client-table td.extra-col {
+  display: none;
+}
+#client-table.show-extras th.extra-col,
+#client-table.show-extras td.extra-col {
+  display: table-cell;
+}
+
+/* The "→" / "←" expand pill in the header. Subtle dashed ring,
+   tints navy on hover. Mirrors the popup's streak-toggle styling
+   so the two affordances feel like the same family of control. */
+.extras-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px dashed rgba(1, 58, 82, 0.35);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gray-400);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+.extras-toggle:hover {
+  color: var(--navy);
+  border-color: var(--navy);
+  border-style: solid;
+  background: rgba(1, 58, 82, 0.04);
+}
+.extras-toggle:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
