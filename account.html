@@ -3652,7 +3652,7 @@
               <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open thread</button>
               <button class="fu-btn"                data-action="copy"     data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
               <button class="fu-btn fu-btn-success" data-action="sent"     data-idx="${idx}" type="button">Mark sent</button>
-              <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log response or meeting…" aria-label="Log response or meeting">✎</button>
+              <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log meeting, response, or schedule a follow-up" aria-label="Log additional action">+</button>
             </div>
           </article>
         `;
@@ -3724,7 +3724,7 @@
             <td class="fu-col-actions">
               <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open</button>
               <button class="fu-btn fu-btn-success" data-action="sent"     data-idx="${idx}" type="button">Mark sent</button>
-              <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log response or meeting…" aria-label="Log response or meeting">✎</button>
+              <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log meeting, response, or schedule a follow-up" aria-label="Log additional action">+</button>
               <button class="fu-cancel"             data-action="cancel"   data-idx="${idx}" type="button" title="${cancelTitle}" aria-label="${cancelTitle}">×</button>
             </td>
           </tr>
@@ -4001,6 +4001,31 @@
               <button type="button" class="btn-secondary fu-modal-cancel" data-action="modal-cancel">Cancel</button>
               <button type="button" class="btn-primary fu-modal-log-response" data-action="modal-log-response" disabled>Log response</button>
             </div>
+
+            <div class="fu-modal-divider"><span>or schedule a follow-up</span></div>
+
+            <label class="fu-modal-label" for="fu-modal-fu-date">Due date</label>
+            <input id="fu-modal-fu-date" type="date" class="fu-modal-fu-date" value="${esc(defaultFollowupDate())}" />
+
+            <label class="fu-modal-label" for="fu-modal-fu-msg">Optional message</label>
+            <textarea id="fu-modal-fu-msg" class="fu-modal-fu-msg" placeholder="Leave blank if you'll write it later…"></textarea>
+
+            <label class="fu-modal-toggle-row">
+              <span class="fu-modal-toggle-text">End current cadence</span>
+              <span class="cad-toggle">
+                <input type="checkbox" class="cad-toggle-input fu-modal-end-current" checked />
+                <span class="cad-toggle-track" aria-hidden="true"><span class="cad-toggle-thumb"></span></span>
+                <span class="cad-toggle-label">Yes</span>
+              </span>
+            </label>
+            <div class="fu-modal-hint fu-modal-hint-left">
+              When ON, ends ${ row.source === "manual" ? "this scheduled task" : "this prospect's current cadence" } so no more steps fire. They can still re-enter a cadence later (e.g. on a future positive reply).
+            </div>
+
+            <div class="fu-modal-actions">
+              <button type="button" class="btn-secondary fu-modal-cancel" data-action="modal-cancel">Cancel</button>
+              <button type="button" class="btn-primary fu-modal-add-fu" data-action="modal-add-followup">Schedule follow-up</button>
+            </div>
           </div>
         `;
         document.body.appendChild(backdrop);
@@ -4008,7 +4033,19 @@
         const respTa     = backdrop.querySelector(".fu-modal-response");
         const logRespBtn = backdrop.querySelector(".fu-modal-log-response");
         const pills      = backdrop.querySelectorAll(".fu-modal-pill");
+        const fuDateEl   = backdrop.querySelector(".fu-modal-fu-date");
+        const fuMsgEl    = backdrop.querySelector(".fu-modal-fu-msg");
+        const fuEndEl    = backdrop.querySelector(".fu-modal-end-current");
+        const fuAddBtn   = backdrop.querySelector(".fu-modal-add-fu");
         respTa.focus();
+
+        // Live label flip for the End-current-cadence slider.
+        if (fuEndEl) {
+          const lbl = fuEndEl.closest(".cad-toggle")?.querySelector(".cad-toggle-label");
+          fuEndEl.addEventListener("change", () => {
+            if (lbl) lbl.textContent = fuEndEl.checked ? "Yes" : "No";
+          });
+        }
 
         let chosenSentiment = null;
         const refreshLogBtn = () => {
@@ -4092,6 +4129,63 @@
             } catch (err) {
               btn.disabled = false;
               alert("Couldn't log response: " + (err.message || err));
+            }
+            return;
+          }
+
+          if (action === "modal-add-followup") {
+            // Schedule a one-off follow-up task. Optional: end the
+            // current cadence first (default ON per Austin) — for
+            // cadence/positive sources we log a cadence_cancelled
+            // event; for manual sources we delete the scheduled row.
+            // After ending (or skipping), insert the new manual task.
+            const date = (fuDateEl?.value || "").trim();
+            if (!date) { alert("Pick a due date."); return; }
+            const msg = (fuMsgEl?.value || "").trim();
+            const endCurrent = fuEndEl?.checked;
+            fuAddBtn.disabled = true;
+            try {
+              if (endCurrent) {
+                if (row.source === "manual" && row.task_id) {
+                  await sb.sbFetch(
+                    `/rest/v1/scheduled_followups?id=eq.${encodeURIComponent(row.task_id)}`,
+                    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+                  );
+                } else {
+                  // Cadence + positive: log cadence_cancelled. The view
+                  // treats it as a sequence-exit alongside response /
+                  // meeting_booked. Doesn't prevent re-entry on a future
+                  // positive reply or new message anchor.
+                  await logFollowupAction(row, "cadence_cancelled");
+                }
+              }
+
+              // Insert the new scheduled task. Same shape as
+              // handleAddFollowup on the Prospects tab.
+              const dueAt = `${date}T12:00:00`;
+              const payload = {
+                client_id:     clientId,
+                operator_id:   session.user.id,
+                prospect_name: row.prospect_name || "",
+                company:       row.company       || null,
+                title:         row.title         || null,
+                linkedin_id:   row.linkedin_id   || null,
+                profile_url:   row.profile_url   || null,
+                sales_nav_url: row.sales_nav_url || null,
+                due_at:        dueAt,
+                template:      msg || null,
+              };
+              await sb.sbFetch("/rest/v1/scheduled_followups", {
+                method:  "POST",
+                body:    JSON.stringify([payload]),
+                headers: { Prefer: "return=minimal" },
+              });
+
+              closeFollowupLogModal();
+              await loadFollowups();
+            } catch (err) {
+              fuAddBtn.disabled = false;
+              alert("Couldn't schedule follow-up: " + (err.message || err));
             }
             return;
           }

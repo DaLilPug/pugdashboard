@@ -1274,14 +1274,14 @@ body.login-body {
 }
 .fu-notemplate { color: var(--gray-400); font-style: italic; }
 
-/* Editable preview textarea on follow-up cards. Looks like the static
-   .fu-preview at rest (same surface-2 background + radius); on focus
-   the border deepens to navy so the operator sees they're editing.
-   Mirrors the extension's .sn-fu-preview-edit. */
+/* Editable preview textarea on follow-up cards. Soft grey border at
+   rest (matches the extension's .sn-fu-preview-edit) so it reads as
+   a textarea but isn't visually loud. Focus deepens the border to
+   navy + lifts the background to white. */
 textarea.fu-preview-edit {
   width: 100%;
-  background: var(--surface-2);
-  border: 1px solid transparent;
+  background: #fff;
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
   padding: 8px 10px;
   font-family: inherit;
@@ -1293,13 +1293,9 @@ textarea.fu-preview-edit {
   resize: vertical;
   box-sizing: border-box;
   outline: none;
-  transition: border-color 100ms ease, background 100ms ease;
+  transition: border-color 100ms ease;
 }
-textarea.fu-preview-edit:hover { border-color: var(--gray-200); }
-textarea.fu-preview-edit:focus {
-  border-color: var(--navy);
-  background: #fff;
-}
+textarea.fu-preview-edit:focus { border-color: var(--navy); }
 
 .fu-actions {
   display: flex;
@@ -1828,7 +1824,8 @@ textarea.fu-preview-edit:focus {
   margin-top: 18px;
 }
 .fu-modal-cancel,
-.fu-modal-log-response {
+.fu-modal-log-response,
+.fu-modal-add-fu {
   border-radius: 6px;
   padding: 8px 16px;
   font-size: 12.5px;
@@ -1836,6 +1833,48 @@ textarea.fu-preview-edit:focus {
   cursor: pointer;
   font-family: inherit;
   transition: all 120ms ease;
+}
+
+/* Schedule-follow-up section (third option in the modal). Same
+   spacing rhythm as the response section. The end-current-cadence
+   slider sits in a label row aligned right. */
+.fu-modal-fu-date,
+.fu-modal-fu-msg {
+  width: 100%;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--navy);
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+.fu-modal-fu-msg {
+  resize: vertical;
+  min-height: 64px;
+  max-height: 200px;
+  line-height: 1.4;
+}
+.fu-modal-fu-date:focus,
+.fu-modal-fu-msg:focus { border-color: var(--navy); }
+
+.fu-modal-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  gap: 10px;
+}
+.fu-modal-toggle-text {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy);
+}
+.fu-modal-hint-left {
+  text-align: left;
+  margin-bottom: 0;
 }
 
 /* ---- list view ------------------------------------------------- */
