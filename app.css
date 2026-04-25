@@ -1181,6 +1181,40 @@ body.login-body {
   font-weight: 600;
 }
 
+/* Subtle "+" / "−" pill that gates the optional series (regular
+   followups, positive followups, inmails, retargeting). Sits inline
+   right after Meetings booked. Default: dim gray ring, no fill. Hover:
+   tints navy so it's discoverable without being loud. */
+.legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin-left: -4px; /* hugs the last default item */
+  border: 1px dashed rgba(1, 58, 82, 0.30);
+  border-radius: 50%;
+  background: transparent;
+  color: #6e7a87;
+  font-family: Montserrat, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.legend-toggle:hover {
+  color: var(--navy, #013A52);
+  border-color: rgba(1, 58, 82, 0.55);
+  background: rgba(1, 58, 82, 0.04);
+}
+.legend-toggle:focus-visible {
+  outline: 2px solid var(--navy, #013A52);
+  outline-offset: 2px;
+}
+
 /* ==============================================================
    Follow-ups tab (mirrors extension sidebar pattern)
    ============================================================== */
@@ -2380,7 +2414,7 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   border-collapse: collapse;
   font-family: Inter, sans-serif;
   font-size: 13px;
-  min-width: 620px;
+  min-width: 760px;
 }
 .period-table th,
 .period-table td {
@@ -2418,6 +2452,52 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .period-table .period-all {
   background: rgba(1, 58, 82, 0.03);
   font-weight: 700;
+}
+
+/* Funnel rate rows (Acceptance / Response / Pos. Response / Pos. Booking)
+   pop a touch above the count rows around them: bold the row label, add
+   a tabular-nums weight, and lay a soft inset shadow that runs the full
+   width of the row so the eye reads it as a "stand-out" line. The shadow
+   uses a top + bottom inset so it brackets the row without changing its
+   height. */
+.period-table tr.period-rate-row > th,
+.period-table tr.period-rate-row > td {
+  font-weight: 700;
+  background: rgba(1, 58, 82, 0.035);
+  box-shadow:
+    inset 0  1px 0 rgba(1, 58, 82, 0.10),
+    inset 0 -1px 0 rgba(1, 58, 82, 0.10),
+    0 1px 2px rgba(1, 58, 82, 0.06);
+}
+.period-table tr.period-rate-row > th {
+  color: var(--navy, #013A52);
+}
+/* When a rate cell is in the All-Time column, layer the period-all tint
+   on top of the rate-row tint without doubling up the shadow. */
+.period-table tr.period-rate-row > td.period-all {
+  background: rgba(1, 58, 82, 0.06);
+}
+
+/* "Additional Outreach" section divider row. Sits between the funnel
+   rows (Pos. Booking Rate) and the supplementary count rows (regular
+   followups, positive followups, inmails, retargeting). Italic gray
+   label, no hover, slight top gap so it reads as a divider. */
+.period-table tr.period-section-row {
+  background: transparent;
+}
+.period-table tr.period-section-row:hover {
+  background: transparent;
+}
+.period-table tr.period-section-row > th {
+  padding: 18px 10px 6px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 10px;
+  font-weight: 700;
+  color: #8899a6;
+  font-family: Montserrat, sans-serif;
+  border-bottom: 1px dashed rgba(1, 58, 82, 0.10);
+  background: transparent;
 }
 
 /* Cell layout: main value + delta chip right-aligned. Chip hugs the value

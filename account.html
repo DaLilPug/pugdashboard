@@ -447,8 +447,13 @@
             // sbFetchAll (not sbFetch) to bypass PostgREST's 1000-row cap —
             // matt-roush alone has 3000+ rows, so plain sbFetch silently
             // truncates and the KPIs / chart lie.
+            // linkedin_id is needed so metricsFor can classify each
+            // `followup` event as regular vs positive: a followup whose
+            // prospect has a prior positive response counts as a
+            // positive-cadence step. Without linkedin_id we can't draw
+            // that line per-prospect.
             allRows = await sb.sbFetchAll(
-              `/rest/v1/outreach?select=type,occurred_at,response_sentiment&client_id=eq.${encodeURIComponent(clientId)}&order=occurred_at.asc`
+              `/rest/v1/outreach?select=type,occurred_at,response_sentiment,linkedin_id&client_id=eq.${encodeURIComponent(clientId)}&order=occurred_at.asc`
             );
           } catch (err) {
             kpiEl.innerHTML     = `<div class="placeholder"><strong>Couldn't load outreach</strong>${esc(err.message || "")}</div>`;
@@ -475,43 +480,71 @@
         function drawChart(canvas, rows) {
           if (typeof Chart === "undefined") return;
 
-          // Bucket by day, accumulate counts by type. Track positive
-          // responses separately as a 5th series.
+          // Bucket by day, accumulate counts by type. Followups split
+          // into regular vs positive based on a per-prospect positive
+          // anchor (same logic metricsFor uses). Rows arrive sorted by
+          // occurred_at ASC, so a single pass is enough.
+          const positiveAnchor = new Map(); // linkedin_id → ISO ts
           const byDay = new Map();
+          const emptyBucket = () => ({
+            connection:0, message:0, response:0, positive:0, meeting_booked:0,
+            regularFollowup:0, positiveFollowup:0, inmail:0, retargeting:0,
+          });
           for (const r of rows) {
             const d = dayKey(r.occurred_at);
-            const bucket = byDay.get(d) || { connection:0, message:0, response:0, positive:0, meeting_booked:0 };
-            if (bucket[r.type] != null) bucket[r.type]++;
-            if (r.type === "response" && r.response_sentiment === "positive") bucket.positive++;
+            const bucket = byDay.get(d) || emptyBucket();
+            if (r.type === "connection")     bucket.connection++;
+            if (r.type === "message")        bucket.message++;
+            if (r.type === "response")       bucket.response++;
+            if (r.type === "meeting_booked") bucket.meeting_booked++;
+            if (r.type === "inmail")         bucket.inmail++;
+            if (r.type === "retargeting")    bucket.retargeting++;
+            if (r.type === "response" && r.response_sentiment === "positive") {
+              bucket.positive++;
+              if (r.linkedin_id && !positiveAnchor.has(r.linkedin_id)) {
+                positiveAnchor.set(r.linkedin_id, r.occurred_at);
+              }
+            }
+            if (r.type === "followup") {
+              const anchor = r.linkedin_id ? positiveAnchor.get(r.linkedin_id) : null;
+              if (anchor && r.occurred_at > anchor) bucket.positiveFollowup++;
+              else                                  bucket.regularFollowup++;
+            }
             byDay.set(d, bucket);
           }
           const days = Array.from(byDay.keys()).sort();
 
-          const series = { connection:0, message:0, response:0, positive:0, meeting_booked:0 };
-          const pts = { connection:[], message:[], response:[], positive:[], meeting_booked:[] };
+          const series = {
+            connection:0, message:0, response:0, positive:0, meeting_booked:0,
+            regularFollowup:0, positiveFollowup:0, inmail:0, retargeting:0,
+          };
+          const pts = {
+            connection:[], message:[], response:[], positive:[], meeting_booked:[],
+            regularFollowup:[], positiveFollowup:[], inmail:[], retargeting:[],
+          };
           for (const d of days) {
             const b = byDay.get(d);
-            series.connection     += b.connection;
-            series.message        += b.message;
-            series.response       += b.response;
-            series.positive       += b.positive;
-            series.meeting_booked += b.meeting_booked;
-            pts.connection.push(series.connection);
-            pts.message.push(series.message);
-            pts.response.push(series.response);
-            pts.positive.push(series.positive);
-            pts.meeting_booked.push(series.meeting_booked);
+            for (const k of Object.keys(series)) {
+              series[k] += b[k];
+              pts[k].push(series[k]);
+            }
           }
 
           // puglab palette — each line gets a soft filled area underneath
           // (color + '18' = ~9% alpha). fill:true stacks them visually
-          // even though each is its own area.
+          // even though each is its own area. The first 5 series are the
+          // default funnel view; the last 4 are hidden behind a "+" in
+          // the legend (default off, click to reveal).
           const SERIES = [
-            { label: "Connections",        data: pts.connection,     color: "#3b9fd4" },
-            { label: "Messages",           data: pts.message,        color: "#6B9AB8" },
-            { label: "Responses",          data: pts.response,       color: "#A8B4C4" },
-            { label: "Positive Responses", data: pts.positive,       color: "#d97706" },
-            { label: "Meetings booked",    data: pts.meeting_booked, color: "#1EB683" },
+            { label: "Connections",        data: pts.connection,       color: "#3b9fd4", hidden: false, optional: false },
+            { label: "Messages",           data: pts.message,          color: "#6B9AB8", hidden: false, optional: false },
+            { label: "Responses",          data: pts.response,         color: "#A8B4C4", hidden: false, optional: false },
+            { label: "Positive Responses", data: pts.positive,         color: "#d97706", hidden: false, optional: false },
+            { label: "Meetings booked",    data: pts.meeting_booked,   color: "#1EB683", hidden: false, optional: false },
+            { label: "Regular Follow Ups", data: pts.regularFollowup,  color: "#7C5CD3", hidden: true,  optional: true  },
+            { label: "Positive Follow Ups",data: pts.positiveFollowup, color: "#C24FA5", hidden: true,  optional: true  },
+            { label: "InMails",            data: pts.inmail,           color: "#1B7F8C", hidden: true,  optional: true  },
+            { label: "Retargeting",        data: pts.retargeting,      color: "#B07A2F", hidden: true,  optional: true  },
           ];
 
           if (chart) chart.destroy();
@@ -529,6 +562,10 @@
                 borderWidth:     2,
                 pointRadius:     days.length > 60 ? 0 : 2,
                 pointHoverRadius:4,
+                hidden:          s.hidden,
+                // Stash 'optional' on the dataset so renderLegend can
+                // partition default vs optional items.
+                _optional:       s.optional,
               })),
             },
             options: {
@@ -571,9 +608,19 @@
         // Custom legend: each dataset gets a clickable checkbox. Checked =
         // visible. Unchecked = filled-outline box (not a strike-through).
         // Keeps the label readable regardless of visibility state.
+        //
+        // Datasets flagged `_optional` (regular followups, positive
+        // followups, inmails, retargeting) are gated behind a subtle "+"
+        // button next to Meetings booked. Click "+" to expand them
+        // inline; click "−" to collapse back. Expansion state lives on
+        // the legend root so it survives chart redraws within a session.
         function renderLegend(root, chart) {
           if (!root || !chart) return;
-          root.innerHTML = chart.data.datasets.map((ds, i) => {
+          // Persist expanded state across re-renders. Default collapsed.
+          if (root.dataset.expanded == null) root.dataset.expanded = "0";
+          const expanded = root.dataset.expanded === "1";
+
+          const itemHtml = (ds, i) => {
             const visible = chart.isDatasetVisible(i);
             return `
               <label class="legend-item" data-idx="${i}">
@@ -581,8 +628,38 @@
                 <span class="legend-label" style="color:${esc(ds.borderColor)}">${esc(ds.label)}</span>
               </label>
             `;
-          }).join("");
+          };
+
+          const defaults = [];
+          const optionals = [];
+          chart.data.datasets.forEach((ds, i) => {
+            (ds._optional ? optionals : defaults).push({ ds, i });
+          });
+
+          // Toggle button — "+" when collapsed, "−" when expanded. Sits
+          // immediately to the right of the last default item (Meetings
+          // booked) per Austin's mock.
+          const toggleBtn = optionals.length
+            ? `<button type="button" class="legend-toggle" data-action="toggle" aria-label="${expanded ? 'Hide additional outreach series' : 'Show additional outreach series'}">${expanded ? '−' : '+'}</button>`
+            : "";
+
+          const defaultHtml  = defaults.map(({ ds, i }) => itemHtml(ds, i)).join("");
+          const optionalHtml = expanded
+            ? optionals.map(({ ds, i }) => itemHtml(ds, i)).join("")
+            : "";
+
+          root.innerHTML = `${defaultHtml}${toggleBtn}${optionalHtml}`;
+
           root.onclick = (e) => {
+            // Toggle button → flip expansion, redraw legend (chart
+            // datasets stay where they are; they just become reachable).
+            const toggle = e.target.closest(".legend-toggle");
+            if (toggle) {
+              e.preventDefault();
+              root.dataset.expanded = expanded ? "0" : "1";
+              renderLegend(root, chart);
+              return;
+            }
             const item = e.target.closest(".legend-item");
             if (!item) return;
             e.preventDefault();
@@ -3174,9 +3251,31 @@
       function metricsFor(rs) {
         const c = { connection:0, message:0, response:0, meeting_booked:0, followup:0, retargeting:0, inmail:0 };
         let positives = 0;
+        // Per-prospect timestamp of the first positive response. Once a
+        // prospect has gone positive, any subsequent `followup` event for
+        // that linkedin_id is a positive-cadence step. Followups before
+        // (or on prospects with no positive at all) are regular-cadence —
+        // which by Austin's spec also includes manual follow-up
+        // completions, since those overwhelmingly happen pre-positive.
+        //
+        // Caller already passes rows in occurred_at ASC order (the SELECT
+        // has order=occurred_at.asc), so a single pass is enough.
+        const positiveAnchor = new Map(); // linkedin_id → ISO timestamp
+        let regularFollowups  = 0;
+        let positiveFollowups = 0;
         for (const r of rs) {
           if (c[r.type] != null) c[r.type]++;
-          if (r.type === "response" && r.response_sentiment === "positive") positives++;
+          if (r.type === "response" && r.response_sentiment === "positive") {
+            positives++;
+            if (r.linkedin_id && !positiveAnchor.has(r.linkedin_id)) {
+              positiveAnchor.set(r.linkedin_id, r.occurred_at);
+            }
+          }
+          if (r.type === "followup") {
+            const anchor = r.linkedin_id ? positiveAnchor.get(r.linkedin_id) : null;
+            if (anchor && r.occurred_at > anchor) positiveFollowups++;
+            else                                  regularFollowups++;
+          }
         }
         return {
           connections: c.connection,
@@ -3188,6 +3287,10 @@
           respRate:    rate(c.response,       c.message),
           posRespRate: rate(positives,        c.response),
           posBookRate: rate(c.meeting_booked, positives),
+          regularFollowups,
+          positiveFollowups,
+          inmails:     c.inmail,
+          retargeting: c.retargeting,
           total:       rs.length,
         };
       }
@@ -3227,13 +3330,14 @@
       }
 
       const PERIODS = [
-        { label: "1W",  tf: "1w"  },
-        { label: "2W",  tf: "2w"  },
-        { label: "3W",  tf: "3w"  },
-        { label: "1M",  tf: "1m"  },
-        { label: "2M",  tf: "2m"  },
-        { label: "3M",  tf: "3m"  },
-        { label: "All", tf: "all" },
+        { label: "1W",   tf: "1w"  },
+        { label: "2W",   tf: "2w"  },
+        { label: "3W",   tf: "3w"  },
+        { label: "1M",   tf: "1m"  },
+        { label: "2M",   tf: "2m"  },
+        { label: "3M",   tf: "3m"  },
+        { label: "YTD",  tf: "yr"  },
+        { label: "All",  tf: "all" },
       ];
 
       // Sequential palette: earliest period gray → latest period green.
@@ -3244,7 +3348,8 @@
         "#8899a6", // 3W
         "#6B9AB8", // 1M
         "#3b9fd4", // 2M — light blue
-        "#013A52", // 3M — navy
+        "#1f6f97", // 3M — mid-navy (was #013A52, bumped to make room for YTD)
+        "#013A52", // YTD — full navy
         "#1EB683", // All Time — green
       ];
 
@@ -3356,6 +3461,14 @@
         //     (current period total). So 1W vs the week before that, 2W vs
         //     the 2 weeks before that, etc.
         //   - All Time has no delta (nothing longer to compare against).
+        // rowDefs is a mixed list of data rows + section headers. Section
+        // headers render as a single <th colspan> tr (italic gray label,
+        // small top gap) and act as a divider before the "Additional
+        // Outreach" group: regular followups, positive followups,
+        // inmails, retargeting. Per Austin's spec, manual follow-up
+        // completions roll into "Regular Follow Ups" — done in
+        // metricsFor by classifying any followup that doesn't have a
+        // prior positive response on the same prospect.
         const rowDefs = [
           { label: "Connections Sent",   key: "connections", isRate: false },
           { label: "Messages Sent",      key: "messages",    isRate: false },
@@ -3366,9 +3479,21 @@
           { label: "Pos. Response Rate", key: "posRespRate", isRate: true  },
           { label: "Meetings Booked",    key: "meetings",    isRate: false },
           { label: "Pos. Booking Rate",  key: "posBookRate", isRate: true  },
+          { sectionHeader: "Additional Outreach" },
+          { label: "Regular Follow Ups",  key: "regularFollowups",  isRate: false },
+          { label: "Positive Follow Ups", key: "positiveFollowups", isRate: false },
+          { label: "InMails",             key: "inmails",           isRate: false },
+          { label: "Retargeting",         key: "retargeting",       isRate: false },
         ];
 
-        const buildRow = ({ label, key, isRate }) => {
+        const buildRow = (def) => {
+          if (def.sectionHeader) {
+            // colspan covers the row-label column + every period column.
+            const cols = byPeriod.length + 1;
+            return `<tr class="period-section-row"><th colspan="${cols}">${esc(def.sectionHeader)}</th></tr>`;
+          }
+
+          const { label, key, isRate } = def;
           const cells = byPeriod.map((p, i) => {
             const cur  = p.m[key];
             const next = byPeriod[i + 1]?.m[key]; // next longer period
@@ -3407,7 +3532,10 @@
               </td>
             `;
           }).join("");
-          return `<tr><th>${esc(label)}</th>${cells}</tr>`;
+          // period-rate-row gets a bold label + subtle row shadow so the
+          // funnel rates pop out from the count rows around them.
+          const trCls = isRate ? "period-rate-row" : "";
+          return `<tr class="${trCls}"><th>${esc(label)}</th>${cells}</tr>`;
         };
 
         root.innerHTML = `
