@@ -174,13 +174,13 @@
               <th>Status</th>
               <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="responses">Responses<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="positives">Positives<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="posRespRate">Pos. resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="posRespRate">Pos. resp. rate<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="meetings">Meetings<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="posBookRate">Pos. booking rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="posBookRate">Pos. booking rate<span class="sort-caret"></span></th>
               <th class="trend">Trend</th>
               <!-- Expand toggle reveals the 4 "Additional outreach"
                    columns. Default: collapsed. Click flips → ↔ ← and
@@ -1214,14 +1214,14 @@
             <td class="status-cell">${statusHtml}</td>
             <td class="num drill">${fmtInt(c.connections)}</td>
             <td class="num drill">${fmtInt(c.messages)}</td>
-            <td class="num drill ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
+            <td class="num drill rate-cell ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
             <td class="num drill">${fmtInt(c.responses)}</td>
-            <td class="num drill ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
+            <td class="num drill rate-cell ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
             <td class="num drill">${fmtInt(c.positives)}</td>
-            <td class="num drill ${rateClass(c.posRespRate)}">${fmtPct(c.posRespRate)}</td>
+            <td class="num drill rate-cell ${rateClass(c.posRespRate)}">${fmtPct(c.posRespRate)}</td>
             <td class="num drill">${fmtInt(c.meetings)}</td>
-            <td class="num drill ${rateClass(c.posBookRate)}">${fmtPct(c.posBookRate)}</td>
-            <td class="trend drill">${sparkline(c.trend)}</td>
+            <td class="num drill rate-cell ${rateClass(c.posBookRate)}">${fmtPct(c.posBookRate)}</td>
+            <td class="trend drill">${sparkline(c.trendPositives, c.trendMeetings)}</td>
             <!-- Empty cell under the header's expand toggle keeps the
                  column track aligned. The chevron itself is purely a
                  header affordance — rows show data in the extra cols. -->
@@ -1497,6 +1497,15 @@
       // anchor logic to work (Postgres returns ASC by default for
       // unordered SELECTs but the dashboard doesn't sort explicitly —
       // sortRows below in the per-client loop ensures it).
+      // 30-day cumulative trend window — number of daily buckets we
+      // render in the per-row mini line chart. Each row's chart shows
+      // the cumulative count of positive responses (orange) + meetings
+      // booked (green) over the last TREND_DAYS days. Cumulative reads
+      // better than daily counts at this size: at ~3px per point a
+      // daily-flat-then-spike line is hard to read, while a slowly-
+      // climbing cumulative line communicates pace at a glance.
+      const TREND_DAYS = 30;
+
       function metricsFor(rs) {
         const counts = {
           connection: 0, message: 0, response: 0, meeting_booked: 0,
@@ -1506,8 +1515,14 @@
         let regularFollowups  = 0;
         let positiveFollowups = 0;
         const positiveAnchor = new Map(); // linkedin_id → ISO ts
-        const trend = Array(12).fill(0); // last 12 weeks, oldest → newest
-        const now = Date.now();
+        // Daily buckets aligned to local-midnight today. Index 0 is
+        // (TREND_DAYS - 1) days ago; index TREND_DAYS-1 is today.
+        const trendPositives = new Array(TREND_DAYS).fill(0);
+        const trendMeetings  = new Array(TREND_DAYS).fill(0);
+        const today = new Date();
+        const todayMidnightMs = new Date(
+          today.getFullYear(), today.getMonth(), today.getDate()
+        ).getTime();
         for (const r of rs) {
           if (counts[r.type] != null) counts[r.type]++;
           if (r.type === "response" && r.response_sentiment === "positive") {
@@ -1521,10 +1536,31 @@
             if (anchor && r.occurred_at > anchor) positiveFollowups++;
             else                                  regularFollowups++;
           }
-          const weeksAgo = Math.floor(
-            (now - new Date(r.occurred_at).getTime()) / (7 * 86400000)
-          );
-          if (weeksAgo >= 0 && weeksAgo < 12) trend[11 - weeksAgo]++;
+          // Trend bucketing — daily, anchored on today-midnight in the
+          // operator's local timezone. We snap each event to its own
+          // local-midnight FIRST (rather than just diffing raw ms) so
+          // today's 10am event and today's 11pm event both land in
+          // bucket 0 — the integer-days math otherwise sends today's
+          // events to daysAgo=-1 and drops them. Math.round absorbs
+          // the ±1h DST hiccup on the spring-forward / fall-back days.
+          const ed = new Date(r.occurred_at);
+          const eventDayMs = new Date(
+            ed.getFullYear(), ed.getMonth(), ed.getDate()
+          ).getTime();
+          const daysAgo = Math.round((todayMidnightMs - eventDayMs) / 86400000);
+          if (daysAgo >= 0 && daysAgo < TREND_DAYS) {
+            const idx = TREND_DAYS - 1 - daysAgo;
+            if (r.type === "response" && r.response_sentiment === "positive") {
+              trendPositives[idx]++;
+            }
+            if (r.type === "meeting_booked") trendMeetings[idx]++;
+          }
+        }
+        // Convert daily counts → cumulative running totals so the
+        // sparkline reads as "pace" rather than a noisy daily histogram.
+        for (let i = 1; i < TREND_DAYS; i++) {
+          trendPositives[i] += trendPositives[i - 1];
+          trendMeetings[i]  += trendMeetings[i - 1];
         }
         return {
           connections:  counts.connection,
@@ -1543,7 +1579,8 @@
           positiveFollowups,
           inmails:      counts.inmail,
           retargeting:  counts.retargeting,
-          trend,
+          trendPositives,
+          trendMeetings,
         };
       }
 
@@ -1578,14 +1615,43 @@
         `).join("");
       }
 
-      function sparkline(values, width = 80, height = 22) {
-        const max = Math.max(...values, 1);
-        const barW = width / values.length;
-        const bars = values.map((v, i) => {
-          const h = max > 0 ? (v / max) * (height - 2) : 0;
-          return `<rect x="${(i * barW).toFixed(2)}" y="${(height - h).toFixed(2)}" width="${(barW * 0.7).toFixed(2)}" height="${h.toFixed(2)}" fill="#1EB683" rx="1"/>`;
-        }).join('');
-        return `<svg class="spark" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${bars}</svg>`;
+      // Two-line cumulative mini chart for the Trend column. Mirrors
+      // the per-account dashboard's Cumulative chart at thumbnail size:
+      //   orange (#d97706) = positive responses
+      //   green  (#1EB683) = meetings booked
+      // Both series share a single y-axis (count) and the larger of
+      // the two ending values sets the scale. No axes, grid, or labels —
+      // it's a pace indicator, not a precise readout. Click the row
+      // to see the full chart on the per-account dashboard.
+      function sparkline(positives, meetings, width = 80, height = 22) {
+        const SERIES = [
+          { data: positives || [], color: "#d97706" }, // positive responses
+          { data: meetings  || [], color: "#1EB683" }, // meetings booked
+        ];
+        const len = Math.max(0, ...SERIES.map(s => s.data.length));
+        if (len < 2) {
+          // Not enough points to draw a line — render an empty SVG so
+          // the column still occupies its allotted width without a
+          // weird missing-graphic gap.
+          return `<svg class="spark" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"></svg>`;
+        }
+        // 2px breathing room on each side keeps the line from hitting
+        // the left/right edge of the cell (looks cramped when it does,
+        // especially against the row's hover shadow).
+        const padX = 2;
+        const padY = 2;
+        const max = Math.max(1, ...SERIES.flatMap(s => s.data));
+        const xStep = (width - 2 * padX) / (len - 1);
+        const yScale = v => (height - padY) - ((v / max) * (height - 2 * padY));
+        const polylines = SERIES.map(s => {
+          if (s.data.length < 2) return "";
+          const points = s.data.map(
+            (v, i) => `${(padX + i * xStep).toFixed(2)},${yScale(v).toFixed(2)}`
+          ).join(" ");
+          return `<polyline points="${points}" fill="none" stroke="${s.color}"
+                            stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+        }).join("");
+        return `<svg class="spark" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${polylines}</svg>`;
       }
 
       function activatePill(v) {

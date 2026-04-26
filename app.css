@@ -4408,8 +4408,21 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   font-variant-numeric: tabular-nums;
   transition: background .15s ease;
 }
+/* Rate cells (Acc / Resp / Pos. Resp / Pos. Booking) get a darker
+   tint so the funnel rates pop out from the count cells around them.
+   Headers also tint so the column reads as a unified vertical band.
+   The existing rate-good / rate-bad text colors layer on top. */
+#client-table tbody td.drill.rate-cell {
+  background: rgba(1, 58, 82, 0.07);
+}
+#client-table thead th.rate-cell {
+  background: rgba(1, 58, 82, 0.04);
+}
 #client-table tbody tr:hover td.drill {
   background: rgba(1, 58, 82, 0.10);
+}
+#client-table tbody tr:hover td.drill.rate-cell {
+  background: rgba(1, 58, 82, 0.14);
 }
 /* Override the broad .client-table tbody tr:hover navy-light tint —
    we want hover to feel like an "elevation" on the drill zone, not a
