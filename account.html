@@ -5281,26 +5281,38 @@
             // No operator-side Workflow setup required — same UX as
             // Zapier's "New Form Submission" trigger, which polls the
             // same way under the hood.
+            // Items come back with type="form" or type="meeting_link"
+            // and a prefixed name. We send the type on save so the
+            // polling function knows which HubSpot API to hit.
             picker.innerHTML = `
               <div class="ml-picker-row">
                 <label class="ml-label">Form / meeting link</label>
                 <select class="ml-select" data-field="form">
-                  ${items.map(it => `<option value="${esc(it.id)}" data-name="${esc(it.name)}">${esc(it.name)}${it.archived ? " (archived)" : ""}</option>`).join("")}
+                  ${items.map(it => `<option value="${esc(it.id)}" data-name="${esc(it.name)}" data-type="${esc(it.type || "form")}">${esc(it.name)}${it.archived ? " (archived)" : ""}</option>`).join("")}
                 </select>
               </div>
               <div class="ml-picker-actions">
                 <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
                 <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
               </div>
-              <p class="ml-picker-hint">Each HubSpot meeting link has an auto-generated form behind the scenes — pick the form for the meeting link you want to track. Bookings auto-log within ~5 min of submission.</p>`;
+              <p class="ml-picker-hint">Pick the form (marketing form) or meeting link (Sales Hub scheduling page) you want to track. Bookings auto-log within ~1 min of submission.</p>`;
             picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
               const fSel = picker.querySelector('[data-field="form"]');
+              const opt  = fSel.options[fSel.selectedIndex];
+              const id   = fSel.value;
+              const name = opt?.dataset.name || "";
+              const type = opt?.dataset.type || "form";
               try {
                 await sb.sbFetch("/functions/v1/mlink-admin", {
                   method: "POST",
                   body: JSON.stringify({
-                    action: "configure", integration_id: integration.id,
-                    form_id: fSel.value, form_name: fSel.options[fSel.selectedIndex]?.dataset.name || "",
+                    action:         "configure",
+                    integration_id: integration.id,
+                    type, id, name,
+                    // Backwards-compat field names — older code paths
+                    // may still read these. New code should use id/name/type.
+                    form_id:   id,
+                    form_name: name,
                   }),
                 });
                 showFeedback("Listening for bookings");
