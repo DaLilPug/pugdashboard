@@ -5075,44 +5075,28 @@
               </div>`;
           } else {
             const sr   = integ.selected_resource || {};
+            const name = sr.event_type_name || sr.form_name || "";
             const provLabel = integ.provider === "calendly" ? "Calendly" : "HubSpot";
+            const resourceWord = integ.provider === "calendly" ? "event type" : "form";
             const lastEvText = integ.last_event_at
               ? `Last booking: ${new Date(integ.last_event_at).toLocaleString()}`
               : "No bookings received yet";
 
-            if (integ.provider === "hubspot") {
-              // HubSpot uses App Webhooks at the portal level — once the
-              // operator OAuths in, every meeting booking on the
-              // connected HubSpot account auto-logs. No per-link picker
-              // or Workflow setup needed; that's why we skip the pending
-              // state entirely for HubSpot.
+            if (!name) {
               statusHtml = `
-                <div class="ml-status ml-status-listening">
-                  <span class="ml-status-badge">✓ Listening on HubSpot</span>
-                  <span class="ml-status-meta">${esc(integ.last_event_at ? lastEvText : "All meeting bookings on this HubSpot account auto-log here.")}</span>
-                  <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+                <div class="ml-status ml-status-pending">
+                  <span class="ml-status-label">${esc(provLabel)} connected — pick a ${esc(resourceWord)} to start receiving bookings.</span>
+                  <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Pick ${esc(resourceWord)}</button>
+                  <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
                 </div>`;
             } else {
-              // Calendly — keep the pick-event-type picker, since
-              // Calendly's webhook subscriptions are scoped to a single
-              // event type (or whole user/org).
-              const name = sr.event_type_name || "";
-              if (!name) {
-                statusHtml = `
-                  <div class="ml-status ml-status-pending">
-                    <span class="ml-status-label">${esc(provLabel)} connected — pick an event type to start receiving bookings.</span>
-                    <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Pick event type</button>
-                    <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
-                  </div>`;
-              } else {
-                statusHtml = `
-                  <div class="ml-status ml-status-listening">
-                    <span class="ml-status-badge">✓ Listening on Calendly: ${esc(name)}</span>
-                    <span class="ml-status-meta">${esc(lastEvText)}</span>
-                    <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change event type</button>
-                    <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
-                  </div>`;
-              }
+              statusHtml = `
+                <div class="ml-status ml-status-listening">
+                  <span class="ml-status-badge">✓ Listening on ${esc(provLabel)}: ${esc(name)}</span>
+                  <span class="ml-status-meta">${esc(lastEvText)}</span>
+                  <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change ${esc(resourceWord)}</button>
+                  <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+                </div>`;
             }
           }
           return `
@@ -5289,46 +5273,37 @@
               } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
             });
           } else {
-            // HubSpot — programmatic webhook registration isn't available
-            // for the meeting-links / scheduler API on standard tiers, so
-            // the operator finishes setup in HubSpot itself by creating a
-            // Workflow that fires on the meeting booking and sends a
-            // webhook to the URL we hand them.
-            //
-            // Used to be an alert(); replaced with an inline post-save
-            // panel that has the URL in a copyable input + numbered steps,
-            // since the alert text was hard to read and said "form
-            // submission" which is wrong for meeting links.
+            // HubSpot — operator picks a form (meeting links surface
+            // here as forms too, since each meeting link has an
+            // auto-generated form record behind the scenes). After
+            // save, our cron-driven mlink-poll-hubspot function picks
+            // up new submissions on the selected form and logs them.
+            // No operator-side Workflow setup required — same UX as
+            // Zapier's "New Form Submission" trigger, which polls the
+            // same way under the hood.
             picker.innerHTML = `
               <div class="ml-picker-row">
-                <label class="ml-label">Meeting link</label>
+                <label class="ml-label">Form / meeting link</label>
                 <select class="ml-select" data-field="form">
                   ${items.map(it => `<option value="${esc(it.id)}" data-name="${esc(it.name)}">${esc(it.name)}${it.archived ? " (archived)" : ""}</option>`).join("")}
                 </select>
               </div>
               <div class="ml-picker-actions">
-                <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save</button>
+                <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
                 <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
               </div>
-              <p class="ml-picker-hint">After saving, you'll set up a HubSpot Workflow with a webhook action — instructions follow.</p>`;
+              <p class="ml-picker-hint">Each HubSpot meeting link has an auto-generated form behind the scenes — pick the form for the meeting link you want to track. Bookings auto-log within ~5 min of submission.</p>`;
             picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
               const fSel = picker.querySelector('[data-field="form"]');
               try {
-                const res = await sb.sbFetch("/functions/v1/mlink-admin", {
+                await sb.sbFetch("/functions/v1/mlink-admin", {
                   method: "POST",
                   body: JSON.stringify({
                     action: "configure", integration_id: integration.id,
                     form_id: fSel.value, form_name: fSel.options[fSel.selectedIndex]?.dataset.name || "",
                   }),
                 });
-                if (res.webhook_url) {
-                  // Replace the picker contents with the post-save panel
-                  // — the URL displayed prominently as a copyable input,
-                  // step-by-step Workflow instructions, and a Done button.
-                  picker.innerHTML = renderHubspotPostSave(res.webhook_url);
-                  wireHubspotPostSave(picker);
-                }
-                showFeedback("Saved — set up the HubSpot Workflow next");
+                showFeedback("Listening for bookings");
                 await load();
               } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
             });
