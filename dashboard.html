@@ -875,65 +875,51 @@
         kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
 
         const [since, until] = effectiveRange();
-        const parts = [];
-        if (since) parts.push(`occurred_at=gte.${encodeURIComponent(since)}`);
-        if (until) parts.push(`occurred_at=lte.${encodeURIComponent(until)}`);
-        // Scope outreach to whichever org is active:
+
+        // Scope to whichever org is active:
         //   drill-in mode           → the target org's clients
         //   platform admin, no d-i  → their own org's clients
         //   regular admin / member  → their own org's clients
-        //
-        // RLS lets a platform admin read every outreach row in the
-        // system, so without this filter the main + drill-in views
-        // would pull megabytes of unrelated data just for the JS KPI
-        // strip to ignore it. UUIDs are URL-safe characters so no
-        // encoding. clientsCache was already scoped to the active org
-        // by the clients query above, so we piggy-back on it here.
         const outreachScopeOrg = drillInOrg || await getUserOrg();
-        if (outreachScopeOrg) {
-          if (clientsCache.length === 0) {
-            // Empty org — no outreach is possible. Render an empty
-            // state and skip the network call entirely.
-            enrichedCache = [];
-            renderKpiStrip(kpiEl, 0, metricsFor([]));
-            renderTable();
-            return;
-          }
-          parts.push(`client_id=in.(${clientsCache.map(c => c.id).join(',')})`);
-        }
-        const qs = parts.length ? `&${parts.join('&')}` : '';
-
-        let rows = [];
-        try {
-          // response_sentiment + linkedin_id are needed for the
-          // positive-funnel metrics and the regular-vs-positive followup
-          // classification. Both are short fields (a sentiment string +
-          // a slug-like id) so the payload bump is minor relative to
-          // the original three columns.
-          //
-          // order=occurred_at.asc matters for the followup classifier:
-          // metricsFor's anchor map needs to see positive-response rows
-          // before any subsequent followups on the same prospect. ASC
-          // ordering at the DB ensures that without an extra in-memory
-          // sort pass.
-          rows = await sb.sbFetchAll(
-            `/rest/v1/outreach?select=client_id,type,occurred_at,response_sentiment,linkedin_id${qs}&order=occurred_at.asc`
-          );
-        } catch (err) {
-          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load outreach: ${esc(err.message)}</td></tr>`;
+        if (outreachScopeOrg && clientsCache.length === 0) {
+          // Empty org — skip the RPC entirely.
+          enrichedCache = [];
+          renderKpiStrip(kpiEl, 0, aggregateForKpis([]));
+          renderTable();
           return;
         }
 
-        const byClient = {};
-        for (const r of rows) (byClient[r.client_id] ??= []).push(r);
+        // account_dashboard_summary RPC: one row per client with all
+        // funnel counts + a 30-day cumulative trend pair pre-computed
+        // on the server. Replaces a "fetch every outreach row, aggregate
+        // in JS" pattern that was timing out for orgs with large
+        // all-time data (Austin saw "All Time" never load after 5
+        // minutes). RLS scopes results to clients the caller can see;
+        // p_org_id is only an additional narrowing filter for drill-in
+        // mode and is otherwise null.
+        let summary = [];
+        try {
+          summary = await sb.sbFetch("/rest/v1/rpc/account_dashboard_summary", {
+            method: "POST",
+            body: JSON.stringify({
+              p_org_id: outreachScopeOrg ? outreachScopeOrg.id : null,
+              p_since:  since || null,
+              p_until:  until || null,
+            }),
+          });
+        } catch (err) {
+          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load summary: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+        const summaryById = new Map((Array.isArray(summary) ? summary : []).map(r => [r.client_id, r]));
 
         // Attach metrics to each client + derive status from end_date.
         // Mirror start_date/end_date under camelCase keys so the sort
         // comparator can read a single column name regardless of where
-        // the value originated (DB row vs. metricsFor output).
+        // the value originated (DB row vs metricsFromRpcRow output).
         const today = new Date().toISOString().slice(0, 10);
         const enriched = clientsCache.map(c => {
-          const m = metricsFor(byClient[c.id] || []);
+          const m = metricsFromRpcRow(summaryById.get(c.id));
           return {
             ...c,
             ...m,
@@ -944,7 +930,7 @@
         });
         // Stash for renderTable / re-sort without re-fetching.
         enrichedCache = enriched;
-        renderKpiStrip(kpiEl, filteredEnriched().length, metricsFor(filteredOutreach(rows)));
+        renderKpiStrip(kpiEl, filteredEnriched().length, aggregateForKpis(filteredEnriched()));
         renderTable();
       }
 
@@ -966,13 +952,6 @@
           ? (_ => true)
           : (c => c._status === statusVal);
         return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c));
-      }
-
-      function filteredOutreach(rows) {
-        // KPI strip reflects only accounts that passed the filter. We map
-        // over filteredEnriched()'s ids, then filter rows by client_id.
-        const ok = new Set(filteredEnriched().map(c => c.id));
-        return rows.filter(r => ok.has(r.client_id));
       }
 
       let enrichedCache = [];
@@ -1477,8 +1456,8 @@
       }
 
       // field names come from the DB (snake_case: start_date, end_date).
-      // Client objects also carry the same key — but metricsFor() returns
-      // camelCase fields. We keep a tolerant lookup in wireEditable.
+      // Client objects also carry the same key — but metricsFromRpcRow()
+      // returns camelCase fields. We keep a tolerant lookup in wireEditable.
       function camelify(s) {
         return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
       }
@@ -1497,91 +1476,75 @@
       // anchor logic to work (Postgres returns ASC by default for
       // unordered SELECTs but the dashboard doesn't sort explicitly —
       // sortRows below in the per-client loop ensures it).
-      // 30-day cumulative trend window — number of daily buckets we
-      // render in the per-row mini line chart. Each row's chart shows
-      // the cumulative count of positive responses (orange) + meetings
-      // booked (green) over the last TREND_DAYS days. Cumulative reads
-      // better than daily counts at this size: at ~3px per point a
-      // daily-flat-then-spike line is hard to read, while a slowly-
-      // climbing cumulative line communicates pace at a glance.
-      const TREND_DAYS = 30;
-
-      function metricsFor(rs) {
-        const counts = {
-          connection: 0, message: 0, response: 0, meeting_booked: 0,
-          followup: 0, retargeting: 0, inmail: 0,
-        };
-        let positives = 0;
-        let regularFollowups  = 0;
-        let positiveFollowups = 0;
-        const positiveAnchor = new Map(); // linkedin_id → ISO ts
-        // Daily buckets aligned to local-midnight today. Index 0 is
-        // (TREND_DAYS - 1) days ago; index TREND_DAYS-1 is today.
-        const trendPositives = new Array(TREND_DAYS).fill(0);
-        const trendMeetings  = new Array(TREND_DAYS).fill(0);
-        const today = new Date();
-        const todayMidnightMs = new Date(
-          today.getFullYear(), today.getMonth(), today.getDate()
-        ).getTime();
-        for (const r of rs) {
-          if (counts[r.type] != null) counts[r.type]++;
-          if (r.type === "response" && r.response_sentiment === "positive") {
-            positives++;
-            if (r.linkedin_id && !positiveAnchor.has(r.linkedin_id)) {
-              positiveAnchor.set(r.linkedin_id, r.occurred_at);
-            }
-          }
-          if (r.type === "followup") {
-            const anchor = r.linkedin_id ? positiveAnchor.get(r.linkedin_id) : null;
-            if (anchor && r.occurred_at > anchor) positiveFollowups++;
-            else                                  regularFollowups++;
-          }
-          // Trend bucketing — daily, anchored on today-midnight in the
-          // operator's local timezone. We snap each event to its own
-          // local-midnight FIRST (rather than just diffing raw ms) so
-          // today's 10am event and today's 11pm event both land in
-          // bucket 0 — the integer-days math otherwise sends today's
-          // events to daysAgo=-1 and drops them. Math.round absorbs
-          // the ±1h DST hiccup on the spring-forward / fall-back days.
-          const ed = new Date(r.occurred_at);
-          const eventDayMs = new Date(
-            ed.getFullYear(), ed.getMonth(), ed.getDate()
-          ).getTime();
-          const daysAgo = Math.round((todayMidnightMs - eventDayMs) / 86400000);
-          if (daysAgo >= 0 && daysAgo < TREND_DAYS) {
-            const idx = TREND_DAYS - 1 - daysAgo;
-            if (r.type === "response" && r.response_sentiment === "positive") {
-              trendPositives[idx]++;
-            }
-            if (r.type === "meeting_booked") trendMeetings[idx]++;
-          }
-        }
-        // Convert daily counts → cumulative running totals so the
-        // sparkline reads as "pace" rather than a noisy daily histogram.
-        for (let i = 1; i < TREND_DAYS; i++) {
-          trendPositives[i] += trendPositives[i - 1];
-          trendMeetings[i]  += trendMeetings[i - 1];
-        }
+      // Map one account_dashboard_summary RPC row → the camelCase
+      // shape the renderer + sort comparator already expect. The RPC
+      // does the heavy aggregate + 30-day cumulative trend on the
+      // Postgres side; this function is just a shape adapter + a
+      // recompute of the four funnel rates from the integer counts.
+      // Called once per client on rerender.
+      //
+      // Passing in `null` / `undefined` (a client with no outreach in
+      // the window — left-joined as nothing on the SQL side) yields
+      // an all-zero metrics object, same as the empty-rows case the
+      // old in-JS metricsFor produced.
+      function metricsFromRpcRow(r) {
+        const safe = r || {};
+        const connections = safe.connections        || 0;
+        const messages    = safe.messages           || 0;
+        const responses   = safe.responses          || 0;
+        const positives   = safe.positives          || 0;
+        const meetings    = safe.meetings           || 0;
         return {
-          connections:  counts.connection,
-          messages:     counts.message,
-          responses:    counts.response,
-          meetings:     counts.meeting_booked,
+          connections,
+          messages,
+          responses,
+          meetings,
           positives,
-          accRate:      rate(counts.message,         counts.connection),
-          respRate:     rate(counts.response,        counts.message),
-          posRespRate:  rate(positives,              counts.response),
-          // Pos. Booking Rate (meetings/positives) replaces the old
-          // bookRate (meetings/responses). Aligns with the canonical
-          // funnel metric on the per-account dashboard.
-          posBookRate:  rate(counts.meeting_booked,  positives),
-          regularFollowups,
-          positiveFollowups,
-          inmails:      counts.inmail,
-          retargeting:  counts.retargeting,
-          trendPositives,
-          trendMeetings,
+          inmails:           safe.inmails            || 0,
+          retargeting:       safe.retargeting        || 0,
+          regularFollowups:  safe.regular_followups  || 0,
+          positiveFollowups: safe.positive_followups || 0,
+          accRate:           rate(messages,  connections),
+          respRate:          rate(responses, messages),
+          posRespRate:       rate(positives, responses),
+          posBookRate:       rate(meetings,  positives),
+          // Postgres returns int[] which PostgREST serializes as a JSON
+          // array. Empty array (clients with zero recent activity) is
+          // safe — sparkline() handles len < 2 by rendering an empty
+          // SVG so the column still claims its width.
+          trendPositives:    safe.trend_positives || [],
+          trendMeetings:     safe.trend_meetings  || [],
         };
+      }
+
+      // Sum the count fields across every per-client metrics object,
+      // then recompute rates from the sums. Used by the KPI strip:
+      // "across all the accounts the operator picked, what's the
+      // org-wide funnel?" Recomputing rates from sums avoids the
+      // "average of averages" trap that gives nonsensical numbers
+      // when one client has 1000 connections + 30% acceptance and
+      // another has 5 connections + 100%.
+      function aggregateForKpis(perClient) {
+        const t = {
+          connections: 0, messages: 0, responses: 0, positives: 0, meetings: 0,
+          inmails: 0, retargeting: 0, regularFollowups: 0, positiveFollowups: 0,
+        };
+        for (const m of perClient) {
+          t.connections       += m.connections       || 0;
+          t.messages          += m.messages          || 0;
+          t.responses         += m.responses         || 0;
+          t.positives         += m.positives         || 0;
+          t.meetings          += m.meetings          || 0;
+          t.inmails           += m.inmails           || 0;
+          t.retargeting       += m.retargeting       || 0;
+          t.regularFollowups  += m.regularFollowups  || 0;
+          t.positiveFollowups += m.positiveFollowups || 0;
+        }
+        t.accRate     = rate(t.messages,  t.connections);
+        t.respRate    = rate(t.responses, t.messages);
+        t.posRespRate = rate(t.positives, t.responses);
+        t.posBookRate = rate(t.meetings,  t.positives);
+        return t;
       }
 
       function rate(num, den) { return den ? num / den : null; }
