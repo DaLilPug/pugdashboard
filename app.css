@@ -4556,6 +4556,75 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   line-height: 1.5;
 }
 
+/* Post-save success panel for HubSpot configure. Shows the webhook URL
+   in a copyable input + numbered steps the operator follows in their
+   HubSpot Workflows builder. Replaces the old alert() that was hard to
+   read and incorrectly said "form submission". */
+.ml-postsave {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px;
+}
+.ml-postsave-header {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f6b3c;
+}
+.ml-postsave-intro {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--navy, #013A52);
+}
+.ml-postsave-steps {
+  margin: 0 0 0 18px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--navy, #013A52);
+}
+.ml-postsave-steps li {
+  margin-bottom: 4px;
+}
+.ml-postsave-steps code {
+  background: rgba(1, 58, 82, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+}
+.ml-postsave-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin: 4px 0 4px 18px;
+}
+.ml-postsave-url {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  color: var(--navy, #013A52);
+  background: #fff;
+}
+.ml-postsave-url:focus { outline: none; border-color: var(--accent, #2d7ab8); }
+.ml-postsave-hint {
+  margin: 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-soft, #5b6673);
+  line-height: 1.5;
+}
+.ml-postsave-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
 /* ==============================================================
    Account Performance — drill-zone POP + extras toggle
    ==============================================================

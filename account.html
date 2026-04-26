@@ -5153,8 +5153,27 @@
             return;
           }
           if (action === "delete") {
-            if (!confirm("Delete this meeting link? If it's connected to an integration, the integration stays — disconnect it separately if you want to remove it.")) return;
+            // If the link has an integration, disconnect it first —
+            // otherwise the Calendly webhook subscription would stay
+            // registered with Calendly and keep firing into the void,
+            // and the OAuth tokens would sit orphaned in the DB. Past
+            // logged meeting_booked outreach rows aren't affected (those
+            // are on the prospect's timeline, not on the link itself).
+            const integ = link.integration_id ? integrations[link.integration_id] : null;
+            const provLabel = integ
+              ? (integ.provider === "calendly" ? "Calendly" : "HubSpot")
+              : null;
+            const confirmMsg = provLabel
+              ? `Delete this meeting link? Its ${provLabel} integration will also be disconnected. Past logged bookings on the Prospects tab are unaffected.`
+              : "Delete this meeting link?";
+            if (!confirm(confirmMsg)) return;
             try {
+              if (link.integration_id) {
+                await sb.sbFetch("/functions/v1/mlink-admin", {
+                  method: "POST",
+                  body: JSON.stringify({ action: "disconnect", integration_id: link.integration_id }),
+                });
+              }
               await sb.sbFetch(`/rest/v1/meeting_links?id=eq.${encodeURIComponent(link.id)}`,
                 { method: "DELETE", headers: { Prefer: "return=minimal" } });
               await load();
@@ -5253,12 +5272,19 @@
               } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
             });
           } else {
-            // HubSpot — webhook URL must be pasted manually into a HubSpot
-            // Workflow because the v3 forms API doesn't support
-            // programmatic webhook registration on standard tiers.
+            // HubSpot — programmatic webhook registration isn't available
+            // for the meeting-links / scheduler API on standard tiers, so
+            // the operator finishes setup in HubSpot itself by creating a
+            // Workflow that fires on the meeting booking and sends a
+            // webhook to the URL we hand them.
+            //
+            // Used to be an alert(); replaced with an inline post-save
+            // panel that has the URL in a copyable input + numbered steps,
+            // since the alert text was hard to read and said "form
+            // submission" which is wrong for meeting links.
             picker.innerHTML = `
               <div class="ml-picker-row">
-                <label class="ml-label">Form</label>
+                <label class="ml-label">Meeting link</label>
                 <select class="ml-select" data-field="form">
                   ${items.map(it => `<option value="${esc(it.id)}" data-name="${esc(it.name)}">${esc(it.name)}${it.archived ? " (archived)" : ""}</option>`).join("")}
                 </select>
@@ -5267,7 +5293,7 @@
                 <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save</button>
                 <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
               </div>
-              <p class="ml-picker-hint">After saving, you'll get a webhook URL to paste into a HubSpot Workflow that fires on this form's submission.</p>`;
+              <p class="ml-picker-hint">After saving, you'll set up a HubSpot Workflow with a webhook action — instructions follow.</p>`;
             picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
               const fSel = picker.querySelector('[data-field="form"]');
               try {
@@ -5279,15 +5305,74 @@
                   }),
                 });
                 if (res.webhook_url) {
-                  try { await navigator.clipboard.writeText(res.webhook_url); } catch {}
-                  alert(`Saved.\n\nNow open HubSpot → Automation → Workflows, create (or open) a workflow that runs on form submission for this form, and add a "Send a webhook" action pointing to:\n\n${res.webhook_url}\n\n(URL copied to clipboard.)`);
+                  // Replace the picker contents with the post-save panel
+                  // — the URL displayed prominently as a copyable input,
+                  // step-by-step Workflow instructions, and a Done button.
+                  picker.innerHTML = renderHubspotPostSave(res.webhook_url);
+                  wireHubspotPostSave(picker);
                 }
-                showFeedback("Saved — finish setup in HubSpot Workflows");
+                showFeedback("Saved — set up the HubSpot Workflow next");
                 await load();
               } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
             });
           }
           picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
+        }
+
+        // Post-save panel for HubSpot — explains the next step (set up a
+        // Workflow) inline rather than via an alert(). The webhook URL is
+        // shown in a readonly input with a Copy button so the operator
+        // can paste it into HubSpot's Workflow builder. Step list is the
+        // shortest reliable path through HubSpot's UI; the trigger
+        // wording matches what HubSpot calls it as of 2026.
+        function renderHubspotPostSave(webhookUrl) {
+          return `
+            <div class="ml-postsave">
+              <div class="ml-postsave-header">✓ Meeting link saved.</div>
+              <p class="ml-postsave-intro">
+                Last step — to auto-log bookings, set up a HubSpot Workflow that fires when a meeting is booked on this link:
+              </p>
+              <ol class="ml-postsave-steps">
+                <li>In HubSpot, go to <strong>Automation → Workflows</strong>.</li>
+                <li>Click <strong>+ Create workflow → From scratch → Contact-based</strong>.</li>
+                <li>Set the trigger to <strong>"When a meeting is booked"</strong> (or "Re-enroll when contact creates a meeting"), filtered to the meeting link you just picked.</li>
+                <li>Add an action: <strong>Send a webhook</strong> (HTTP request).</li>
+                <li>Method: <strong>POST</strong>. Paste this URL as the target:</li>
+              </ol>
+              <div class="ml-postsave-url-row">
+                <input class="ml-postsave-url" readonly value="${esc(webhookUrl)}" />
+                <button class="ml-btn ml-btn-primary" type="button" data-action="copy-postsave">Copy URL</button>
+              </div>
+              <ol class="ml-postsave-steps" start="6">
+                <li>In the webhook body / properties, include the contact's <code>firstname</code>, <code>lastname</code>, <code>email</code>, and <code>phone</code>.</li>
+                <li>Save and <strong>activate</strong> the workflow.</li>
+              </ol>
+              <p class="ml-postsave-hint">
+                HubSpot Workflows require Marketing Hub Professional or higher. Once active, bookings appear in this account's funnel within ~10 seconds. Test by booking a meeting on yourself.
+              </p>
+              <div class="ml-postsave-actions">
+                <button class="ml-btn ml-btn-link" type="button" data-action="postsave-done">Close</button>
+              </div>
+            </div>
+          `;
+        }
+
+        function wireHubspotPostSave(panel) {
+          panel.querySelector('[data-action="copy-postsave"]')?.addEventListener("click", async () => {
+            const input = panel.querySelector(".ml-postsave-url");
+            try {
+              await navigator.clipboard.writeText(input.value);
+              const btn = panel.querySelector('[data-action="copy-postsave"]');
+              if (btn) {
+                const orig = btn.textContent;
+                btn.textContent = "Copied";
+                setTimeout(() => { btn.textContent = orig; }, 1400);
+              }
+            } catch { showFeedback("Couldn't copy — select the URL manually", "err"); }
+          });
+          panel.querySelector('[data-action="postsave-done"]')?.addEventListener("click", () => {
+            panel.closest(".ml-picker")?.remove();
+          });
         }
 
         addBtn.addEventListener("click", async () => {
