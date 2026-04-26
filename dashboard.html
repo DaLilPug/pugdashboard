@@ -890,10 +890,12 @@
         }
 
         // account_dashboard_summary RPC: one row per client with all
-        // funnel counts + a 30-day cumulative trend pair pre-computed
-        // on the server. Replaces a "fetch every outreach row, aggregate
-        // in JS" pattern that was timing out for orgs with large
-        // all-time data (Austin saw "All Time" never load after 5
+        // funnel counts + a cumulative trend pair pre-computed on the
+        // server. Trend window matches the selected timeframe (capped
+        // at 365 days for "All Time" / very wide custom ranges).
+        // Replaces a "fetch every outreach row, aggregate in JS"
+        // pattern that was timing out for orgs with large all-time
+        // data (Austin saw "All Time" never load after 5
         // minutes). RLS scopes results to clients the caller can see;
         // p_org_id is only an additional narrowing filter for drill-in
         // mode and is otherwise null.
@@ -1464,29 +1466,21 @@
 
       // ---- metrics + helpers --------------------------------------------
 
-      // metricsFor mirrors account.html's metricsFor so the main
-      // dashboard's table + KPI strip read the same way as each account's
-      // own Period Comparison. Followups split into regular vs positive
-      // by per-prospect anchor (a followup with a prior positive
-      // response on the same linkedin_id is positive; everything else
-      // is regular). Manual scheduled-followup completions roll into
-      // regular by virtue of having no prior positive on most prospects.
-      //
-      // ⚠️ Caller must pass rows in occurred_at-ASC order for the
-      // anchor logic to work (Postgres returns ASC by default for
-      // unordered SELECTs but the dashboard doesn't sort explicitly —
-      // sortRows below in the per-client loop ensures it).
       // Map one account_dashboard_summary RPC row → the camelCase
       // shape the renderer + sort comparator already expect. The RPC
-      // does the heavy aggregate + 30-day cumulative trend on the
-      // Postgres side; this function is just a shape adapter + a
-      // recompute of the four funnel rates from the integer counts.
-      // Called once per client on rerender.
+      // does all the heavy aggregation and the cumulative trend pair
+      // on the Postgres side (matching the selected timeframe, capped
+      // at 365 days for unbounded windows); this function is just a
+      // shape adapter + a recompute of the four funnel rates from the
+      // integer counts. Called once per client on rerender.
+      //
+      // Followup classification (regular vs positive) is done in SQL
+      // via a per-prospect anchor join — see add_dashboard_summary_rpc.
       //
       // Passing in `null` / `undefined` (a client with no outreach in
       // the window — left-joined as nothing on the SQL side) yields
-      // an all-zero metrics object, same as the empty-rows case the
-      // old in-JS metricsFor produced.
+      // an all-zero metrics object so every clientsCache entry still
+      // gets a renderable row.
       function metricsFromRpcRow(r) {
         const safe = r || {};
         const connections = safe.connections        || 0;
