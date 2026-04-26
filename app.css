@@ -4382,6 +4382,181 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 
 /* ==============================================================
+   Meeting Links tab (account.html)
+   ==============================================================
+   Per-account list of up to 10 meeting links. Each card stacks:
+     - row 1: name input + delete (×)
+     - row 2: URL input + copy button
+     - status: tinted band (gray = unconfigured, amber = pending, green = listening)
+     - picker: collapsible config UI when operator clicks "Pick event type / form" */
+
+.ml-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.ml-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+  box-shadow: 0 1px 2px rgba(1, 58, 82, 0.04);
+}
+.ml-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 8px;
+}
+.ml-row:last-of-type { margin-bottom: 0; }
+
+.ml-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--navy, #013A52);
+  background: #fff;
+}
+.ml-input:focus { outline: none; border-color: var(--accent, #2d7ab8); }
+.ml-name { font-weight: 600; }
+.ml-url  { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+
+.ml-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--navy, #013A52);
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.ml-btn:hover:not(:disabled) { background: rgba(1, 58, 82, 0.05); }
+.ml-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ml-btn-primary {
+  background: var(--navy, #013A52);
+  color: #fff;
+  border-color: var(--navy, #013A52);
+}
+.ml-btn-primary:hover:not(:disabled) {
+  background: #02263a;
+  border-color: #02263a;
+}
+
+.ml-btn-link {
+  background: transparent;
+  border: none;
+  color: var(--accent, #2d7ab8);
+  padding: 6px 8px;
+  font-weight: 500;
+}
+.ml-btn-link:hover { text-decoration: underline; background: transparent; }
+
+.ml-btn-delete {
+  width: 32px;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 400;
+  color: #6e7a87;
+  border-color: var(--border);
+}
+.ml-btn-delete:hover:not(:disabled) {
+  color: #c01111;
+  border-color: #c01111;
+  background: #fff5f5;
+}
+
+.ml-btn-connect {
+  font-size: 11px;
+  background: #fff;
+  border-color: var(--accent, #2d7ab8);
+  color: var(--accent, #2d7ab8);
+}
+.ml-btn-connect:hover:not(:disabled) {
+  background: var(--accent, #2d7ab8);
+  color: #fff;
+}
+
+/* Status band — three states. Color conveys "where is this in setup?" */
+.ml-status {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.ml-status-unconfigured { background: #f6f8fb; color: #4a5763; }
+.ml-status-pending      { background: #fff8eb; color: #8a5a06; border: 1px solid rgba(138, 90, 6, 0.15); }
+.ml-status-listening    { background: #ecfdf3; color: #0f6b3c; border: 1px solid rgba(15, 107, 60, 0.15); }
+.ml-status-label { flex: 1; min-width: 200px; }
+.ml-status-badge { font-weight: 600; flex: 1; min-width: 200px; }
+.ml-status-meta  { opacity: 0.7; font-size: 11px; flex-basis: 100%; }
+
+/* Resource picker — appears below the status band when operator clicks
+   "Pick event type / form" or "Change …". Hidden by default; the JS
+   appends/removes the .ml-picker element in place. */
+.ml-picker {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: rgba(1, 58, 82, 0.03);
+  border-left: 3px solid var(--accent, #2d7ab8);
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ml-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ml-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-soft, #5b6673);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 90px;
+}
+.ml-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--navy, #013A52);
+}
+.ml-select:focus { outline: none; border-color: var(--accent, #2d7ab8); }
+.ml-picker-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ml-picker-hint {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-soft, #5b6673);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ==============================================================
    Account Performance — drill-zone POP + extras toggle
    ==============================================================
    Scoped to #client-table (the dashboard's account table) so the
