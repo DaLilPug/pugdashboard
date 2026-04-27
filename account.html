@@ -5075,28 +5075,56 @@
               </div>`;
           } else {
             const sr   = integ.selected_resource || {};
-            const name = sr.event_type_name || sr.form_name || "";
             const provLabel = integ.provider === "calendly" ? "Calendly" : "HubSpot";
-            const resourceWord = integ.provider === "calendly" ? "event type" : "form";
             const lastEvText = integ.last_event_at
               ? `Last booking: ${new Date(integ.last_event_at).toLocaleString()}`
               : "No bookings received yet";
 
-            if (!name) {
-              statusHtml = `
-                <div class="ml-status ml-status-pending">
-                  <span class="ml-status-label">${esc(provLabel)} connected — pick a ${esc(resourceWord)} to start receiving bookings.</span>
-                  <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Pick ${esc(resourceWord)}</button>
-                  <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
-                </div>`;
+            if (integ.provider === "calendly") {
+              // Calendly path — pick a specific event type (Calendly's
+              // webhook subscription model scopes to one event type).
+              const name = sr.event_type_name || "";
+              if (!name) {
+                statusHtml = `
+                  <div class="ml-status ml-status-pending">
+                    <span class="ml-status-label">Calendly connected — pick an event type to start receiving bookings.</span>
+                    <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Pick event type</button>
+                    <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
+                  </div>`;
+              } else {
+                statusHtml = `
+                  <div class="ml-status ml-status-listening">
+                    <span class="ml-status-badge">✓ Listening on Calendly: ${esc(name)}</span>
+                    <span class="ml-status-meta">${esc(lastEvText)}</span>
+                    <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change event type</button>
+                    <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+                  </div>`;
+              }
             } else {
-              statusHtml = `
-                <div class="ml-status ml-status-listening">
-                  <span class="ml-status-badge">✓ Listening on ${esc(provLabel)}: ${esc(name)}</span>
-                  <span class="ml-status-meta">${esc(lastEvText)}</span>
-                  <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change ${esc(resourceWord)}</button>
-                  <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
-                </div>`;
+              // HubSpot path — instead of picking from a dropdown, the
+              // operator types a unique identifier word/phrase that
+              // they've added to the meeting link's event title in
+              // HubSpot. We filter incoming meeting-creation webhooks
+              // by hs_meeting_title.toLowerCase().includes(match_text).
+              // Lets agencies running multiple clients on one HubSpot
+              // account route bookings cleanly per Uptown account.
+              const matchText = sr.match_text || "";
+              if (!matchText) {
+                statusHtml = `
+                  <div class="ml-status ml-status-pending">
+                    <span class="ml-status-label">HubSpot connected — set a meeting title filter to start receiving bookings.</span>
+                    <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Set filter</button>
+                    <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
+                  </div>`;
+              } else {
+                statusHtml = `
+                  <div class="ml-status ml-status-listening">
+                    <span class="ml-status-badge">✓ Listening on HubSpot</span>
+                    <span class="ml-status-meta">Filter: meetings whose title contains <code>${esc(matchText)}</code> · ${esc(lastEvText)}</span>
+                    <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change filter</button>
+                    <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+                  </div>`;
+              }
             }
           }
           return `
@@ -5218,6 +5246,45 @@
             picker.className = "ml-picker";
             card.appendChild(picker);
           }
+
+          // HubSpot uses a text-match filter, not a picker — short-circuit
+          // the list_resources call entirely. Operator types a unique
+          // identifier word/phrase they've added to the meeting link's
+          // event title in HubSpot; we filter incoming Meeting → Created
+          // webhooks by that text.
+          if (integration.provider === "hubspot") {
+            const existing = integration.selected_resource?.match_text || "";
+            picker.innerHTML = `
+              <div class="ml-picker-row">
+                <label class="ml-label">Meeting title contains</label>
+                <input class="ml-input" data-field="match" placeholder="e.g. Discovery Call" value="${esc(existing)}" />
+              </div>
+              <div class="ml-picker-actions">
+                <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
+                <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
+              </div>
+              <p class="ml-picker-hint">In HubSpot, edit your meeting link's <strong>Event title</strong> to include a unique identifier (e.g. add <code>- Discovery Call</code> after the contact name). We'll only log meetings whose title contains the text above. Each Uptown account should use a different identifier so bookings route to the right account.</p>`;
+            picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
+              const matchText = picker.querySelector('[data-field="match"]').value.trim();
+              if (!matchText) { showFeedback("Pick a unique phrase first", "err"); return; }
+              try {
+                await sb.sbFetch("/functions/v1/mlink-admin", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    action: "configure", integration_id: integration.id,
+                    match_text: matchText,
+                  }),
+                });
+                showFeedback("Listening for bookings");
+                await load();
+              } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
+            });
+            picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
+            return;
+          }
+
+          // Calendly path — needs a list_resources call to populate
+          // the event-type dropdown.
           picker.innerHTML = `<div class="loading">Loading options…</div>`;
 
           let items = [];
@@ -5232,7 +5299,7 @@
             return;
           }
           if (items.length === 0) {
-            picker.innerHTML = `<div class="placeholder">No ${integration.provider === "calendly" ? "event types" : "forms"} found in the connected account.</div>`;
+            picker.innerHTML = `<div class="placeholder">No event types found in the connected Calendly account.</div>`;
             return;
           }
 
@@ -5275,50 +5342,10 @@
           } else {
             // HubSpot — operator picks a form (meeting links surface
             // here as forms too, since each meeting link has an
-            // auto-generated form record behind the scenes). After
-            // save, our cron-driven mlink-poll-hubspot function picks
-            // up new submissions on the selected form and logs them.
-            // No operator-side Workflow setup required — same UX as
-            // Zapier's "New Form Submission" trigger, which polls the
-            // same way under the hood.
-            // Items come back with type="form" or type="meeting_link"
-            // and a prefixed name. We send the type on save so the
-            // polling function knows which HubSpot API to hit.
-            picker.innerHTML = `
-              <div class="ml-picker-row">
-                <label class="ml-label">Form / meeting link</label>
-                <select class="ml-select" data-field="form">
-                  ${items.map(it => `<option value="${esc(it.id)}" data-name="${esc(it.name)}" data-type="${esc(it.type || "form")}">${esc(it.name)}${it.archived ? " (archived)" : ""}</option>`).join("")}
-                </select>
-              </div>
-              <div class="ml-picker-actions">
-                <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
-                <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
-              </div>
-              <p class="ml-picker-hint">Pick the form (marketing form) or meeting link (Sales Hub scheduling page) you want to track. Bookings auto-log within ~1 min of submission.</p>`;
-            picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
-              const fSel = picker.querySelector('[data-field="form"]');
-              const opt  = fSel.options[fSel.selectedIndex];
-              const id   = fSel.value;
-              const name = opt?.dataset.name || "";
-              const type = opt?.dataset.type || "form";
-              try {
-                await sb.sbFetch("/functions/v1/mlink-admin", {
-                  method: "POST",
-                  body: JSON.stringify({
-                    action:         "configure",
-                    integration_id: integration.id,
-                    type, id, name,
-                    // Backwards-compat field names — older code paths
-                    // may still read these. New code should use id/name/type.
-                    form_id:   id,
-                    form_name: name,
-                  }),
-                });
-                showFeedback("Listening for bookings");
-                await load();
-              } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
-            });
+            // HubSpot picker is handled separately above (text input
+            // for match_text, no list_resources call needed). This
+            // branch is now Calendly-only — once we add a third
+            // provider it'll need its own block here.
           }
           picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
         }
