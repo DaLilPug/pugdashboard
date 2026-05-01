@@ -1244,36 +1244,47 @@
           rerender();
         }
 
-        // Page through prospect_summary_for_client until fewer than
-        // PAGE rows come back. Supabase's PostgREST pins db-max-rows
-        // at 1000 by default for RPCs and the cap is a HARD ceiling —
-        // Range headers can request fewer rows but cannot exceed the
-        // server-side cap. Adding p_offset / p_limit params on the
-        // RPC + looping client-side is the only portable workaround.
-        // Pages run sequentially (offset depends on prior page) so
-        // total wall time = pages × ~130ms. For Josh: 12 pages ≈ 1.5s.
+        // Page through prospect_summary_for_client. PostgREST pins
+        // db-max-rows at 1000 for RPCs (a hard server-side ceiling),
+        // so we issue offset/limit'd calls and stitch results.
+        //
+        // Concurrency strategy: fire BATCH pages in parallel, stop
+        // when any page in the batch returns fewer than PAGE rows.
+        // Trades a few speculative empty calls for a major wall-time
+        // win — sequential 12-page Josh load was ~1.5s; parallelized
+        // it's ~300ms (2 batches × ~150ms).
         async function fetchAllProspectSummary(since, until) {
-          const PAGE = 1000;
-          let offset = 0;
+          const PAGE  = 1000;
+          const BATCH = 8;       // pages in flight per round
+          const MAX_PAGES = 64;  // ceiling = 64k prospects (pragmatic)
+
+          const fetchPage = (offset) => sb.sbFetch(
+            `/rest/v1/rpc/prospect_summary_for_client`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                p_client_id: clientId,
+                p_since: since ? new Date(since).toISOString() : null,
+                p_until: until,
+                p_offset: offset,
+                p_limit:  PAGE,
+              }),
+            }
+          ).then(rows => rows || []);
+
           const all = [];
-          while (true) {
-            const rows = await sb.sbFetch(
-              `/rest/v1/rpc/prospect_summary_for_client`,
-              {
-                method: "POST",
-                body: JSON.stringify({
-                  p_client_id: clientId,
-                  p_since: since ? new Date(since).toISOString() : null,
-                  p_until: until,
-                  p_offset: offset,
-                  p_limit:  PAGE,
-                }),
-              }
-            );
-            const chunk = rows || [];
-            all.push(...chunk);
-            if (chunk.length < PAGE) break;
-            offset += PAGE;
+          for (let batchStart = 0; batchStart < MAX_PAGES; batchStart += BATCH) {
+            const promises = [];
+            for (let i = 0; i < BATCH && batchStart + i < MAX_PAGES; i++) {
+              promises.push(fetchPage((batchStart + i) * PAGE));
+            }
+            const results = await Promise.all(promises);
+            let sawShort = false;
+            for (const chunk of results) {
+              all.push(...chunk);
+              if (chunk.length < PAGE) sawShort = true;
+            }
+            if (sawShort) break;
           }
           return all;
         }
