@@ -479,6 +479,15 @@
           trendsEl.innerHTML  = `<div class="loading">Loading…</div>`;
           compareEl.innerHTML = `<div class="loading">Loading…</div>`;
 
+          // Yield one microtask so the outer IIFE has a chance to
+          // finish before we touch top-level consts. selectTab(initial)
+          // fires initSummary synchronously near line 443, but PERIODS
+          // is declared at line ~3640 — without this yield, PERIODS is
+          // in TDZ and PERIODS.map() throws ReferenceError, leaving the
+          // UI stuck on "Loading…" with no visible error in the catch
+          // (which only wraps the await further down).
+          await null;
+
           // One RPC call per period — runs the aggregation server-side
           // (~150ms typical) instead of fetching every outreach row and
           // bucketing in JS. Eight calls in parallel: total wall time
