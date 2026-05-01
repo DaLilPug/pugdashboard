@@ -455,9 +455,12 @@
         let tf = localStorage.getItem(LAST_TF) || "all";
         activatePill(pillsEl, tf);
 
-        // Fetched once per account load; every timeframe + trends +
-        // comparison view derives from this single rowset.
-        let allRows = null;
+        // Per-timeframe summary cache. Populated by loadAll: one
+        // client_summary_for_period RPC call per timeframe in PERIODS,
+        // run in parallel. Each entry: { metrics, dailyBuckets } where
+        // metrics matches the legacy metricsFor() shape. Pill click
+        // re-renders from cache — no refetch.
+        let summaryByTf = null;
         let chart;
 
         pillsEl.addEventListener("click", (e) => {
@@ -466,9 +469,7 @@
           tf = btn.dataset.tf;
           localStorage.setItem(LAST_TF, tf);
           activatePill(pillsEl, tf);
-          // Pills only re-render KPIs + chart; trends/comparison always
-          // show all periods regardless of pill.
-          if (allRows) renderScoped();
+          if (summaryByTf) renderScoped();
         });
 
         loadAll();
@@ -478,38 +479,172 @@
           trendsEl.innerHTML  = `<div class="loading">Loading…</div>`;
           compareEl.innerHTML = `<div class="loading">Loading…</div>`;
 
+          // One RPC call per period — runs the aggregation server-side
+          // (~150ms typical) instead of fetching every outreach row and
+          // bucketing in JS. Eight calls in parallel: total wall time
+          // ≈ slowest single call. Replaces the prior path that paged
+          // through up to 16 sbFetchAll round trips and stalled large
+          // accounts at 60s+ on first load.
+          const calls = PERIODS.map(p => fetchSummaryForTf(p.tf));
+          let results;
           try {
-            // sbFetchAll (not sbFetch) to bypass PostgREST's 1000-row cap —
-            // matt-roush alone has 3000+ rows, so plain sbFetch silently
-            // truncates and the KPIs / chart lie.
-            // linkedin_id is needed so metricsFor can classify each
-            // `followup` event as regular vs positive: a followup whose
-            // prospect has a prior positive response counts as a
-            // positive-cadence step. Without linkedin_id we can't draw
-            // that line per-prospect.
-            allRows = await sb.sbFetchAll(
-              `/rest/v1/outreach?select=type,occurred_at,response_sentiment,linkedin_id&client_id=eq.${encodeURIComponent(clientId)}&order=occurred_at.asc`
-            );
+            results = await Promise.all(calls);
           } catch (err) {
-            kpiEl.innerHTML     = `<div class="placeholder"><strong>Couldn't load outreach</strong>${esc(err.message || "")}</div>`;
+            kpiEl.innerHTML     = `<div class="placeholder"><strong>Couldn't load summary</strong>${esc(err.message || "")}</div>`;
             trendsEl.innerHTML  = "";
             compareEl.innerHTML = "";
             return;
           }
 
+          summaryByTf = {};
+          for (let i = 0; i < PERIODS.length; i++) {
+            summaryByTf[PERIODS[i].tf] = results[i];
+          }
+
           renderScoped();
-          renderTrendsByPeriod(trendsEl, allRows);
-          renderPeriodComparison(compareEl, allRows);
+          renderTrendsByPeriodCached(trendsEl, summaryByTf);
+          renderPeriodComparisonCached(compareEl, summaryByTf);
+        }
+
+        // Fetch one timeframe via the client_summary_for_period RPC.
+        // Returns { metrics, dailyBuckets } in the shape the renderers
+        // expect. Daily buckets come back as an array of {day, ...counts}
+        // objects ordered by day ASC — drawChart consumes them directly.
+        async function fetchSummaryForTf(tfKey) {
+          const since = cutoffFor(tfKey);
+          const rows = await sb.sbFetch(
+            `/rest/v1/rpc/client_summary_for_period`,
+            {
+              method: "POST",
+              body: JSON.stringify({
+                p_client_id: clientId,
+                p_since: since ? new Date(since).toISOString() : null,
+                p_until: null,
+              }),
+            }
+          );
+          // Functions returning a TABLE come back as an array; expect 1 row.
+          const r = (rows && rows[0]) || {};
+          const conn = Number(r.connections) || 0;
+          const msg  = Number(r.messages)    || 0;
+          const resp = Number(r.responses)   || 0;
+          const pos  = Number(r.positives)   || 0;
+          const meet = Number(r.meetings)    || 0;
+          return {
+            metrics: {
+              connections:       conn,
+              messages:          msg,
+              responses:         resp,
+              positives:         pos,
+              meetings:          meet,
+              inmails:           Number(r.inmails)            || 0,
+              retargeting:       Number(r.retargeting)        || 0,
+              regularFollowups:  Number(r.regular_followups)  || 0,
+              positiveFollowups: Number(r.positive_followups) || 0,
+              accRate:     rate(msg,  conn),
+              respRate:    rate(resp, msg),
+              posRespRate: rate(pos,  resp),
+              posBookRate: rate(meet, pos),
+              total:       conn + msg + resp + meet + (Number(r.inmails) || 0) + (Number(r.retargeting) || 0) + (Number(r.regular_followups) || 0) + (Number(r.positive_followups) || 0),
+            },
+            dailyBuckets: r.daily_buckets || [],
+          };
         }
 
         function renderScoped() {
-          const scoped = filterByTf(allRows, tf);
-          renderKpis(kpiEl, metricsFor(scoped));
+          const entry = summaryByTf[tf];
+          if (!entry) return;
+          renderKpis(kpiEl, entry.metrics);
           if (typeof Chart === "undefined") {
-            setTimeout(() => drawChart(canvas, scoped), 200);
+            setTimeout(() => drawChartFromBuckets(canvas, entry.dailyBuckets), 200);
           } else {
-            drawChart(canvas, scoped);
+            drawChartFromBuckets(canvas, entry.dailyBuckets);
           }
+        }
+
+        // Cumulative line chart from per-day buckets returned by the
+        // client_summary_for_period RPC. Each bucket has counts for
+        // all 9 series; we walk in date order accumulating per series.
+        // Days with zero events for a series simply carry the prior
+        // running total — no synthetic zero-fill needed.
+        function drawChartFromBuckets(canvas, buckets) {
+          if (typeof Chart === "undefined") return;
+          const days = buckets.map(b => b.day);
+          const series = {
+            connection:0, message:0, response:0, positive:0, meeting:0,
+            reg_followup:0, pos_followup:0, inmail:0, retargeting:0,
+          };
+          const pts = {
+            connection:[], message:[], response:[], positive:[], meeting:[],
+            reg_followup:[], pos_followup:[], inmail:[], retargeting:[],
+          };
+          for (const b of buckets) {
+            for (const k of Object.keys(series)) {
+              series[k] += (b[k] || 0);
+              pts[k].push(series[k]);
+            }
+          }
+
+          const SERIES = [
+            { label: "Connections",         data: pts.connection,    color: "#3b9fd4", hidden: false, optional: false },
+            { label: "Messages",            data: pts.message,       color: "#6B9AB8", hidden: false, optional: false },
+            { label: "Responses",           data: pts.response,      color: "#A8B4C4", hidden: false, optional: false },
+            { label: "Positive Responses",  data: pts.positive,      color: "#d97706", hidden: false, optional: false },
+            { label: "Meetings booked",     data: pts.meeting,       color: "#1EB683", hidden: false, optional: false },
+            { label: "Regular Follow Ups",  data: pts.reg_followup,  color: "#7C5CD3", hidden: true,  optional: true  },
+            { label: "Positive Follow Ups", data: pts.pos_followup,  color: "#C24FA5", hidden: true,  optional: true  },
+            { label: "InMails",             data: pts.inmail,        color: "#1B7F8C", hidden: true,  optional: true  },
+            { label: "Retargeting",         data: pts.retargeting,   color: "#B07A2F", hidden: true,  optional: true  },
+          ];
+
+          if (chart) chart.destroy();
+          chart = new Chart(canvas, {
+            type: "line",
+            data: {
+              labels: days,
+              datasets: SERIES.map(s => ({
+                label:           s.label,
+                data:            s.data,
+                borderColor:     s.color,
+                backgroundColor: s.color + "18",
+                fill:            true,
+                tension:         0.35,
+                borderWidth:     2,
+                pointRadius:     days.length > 60 ? 0 : 2,
+                pointHoverRadius:4,
+                hidden:          s.hidden,
+                _optional:       s.optional,
+              })),
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              interaction: { mode: "index", intersect: false },
+              plugins: {
+                legend:  { display: false },
+                tooltip: { titleFont: { family: "Montserrat" }, bodyFont: { family: "Inter" } },
+              },
+              scales: {
+                x: {
+                  ticks: {
+                    font: { family: "Inter", size: 10 },
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 10,
+                    callback: function(value) {
+                      const raw = this.getLabelForValue(value);
+                      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(raw));
+                      return m ? `${m[2]}/${m[3]}/${m[1]}` : raw;
+                    },
+                  },
+                  grid: { display: false },
+                },
+                y: { beginAtZero: true, ticks: { font: { family: "Inter", size: 10 } }, grid: { color: "rgba(1,58,82,.06)" } },
+              },
+            },
+          });
+
+          renderLegend(document.getElementById("sum-legend"), chart);
         }
 
         function drawChart(canvas, rows) {
@@ -1095,27 +1230,7 @@
           const until = null;  // open-ended on the right
           try {
             const [rows, tasks] = await Promise.all([
-              sb.sbFetch(
-                `/rest/v1/rpc/prospect_summary_for_client`,
-                {
-                  method: "POST",
-                  // Range header overrides Supabase's default 1000-row cap
-                  // on RPC responses. Big accounts (Josh: 11k prospects)
-                  // would otherwise be silently truncated. 99,999 is a
-                  // pragmatic ceiling — past that we'd want pagination
-                  // and probably some prospect-archive feature.
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Range-Unit":   "items",
-                    "Range":        "0-99999",
-                  },
-                  body: JSON.stringify({
-                    p_client_id: clientId,
-                    p_since: since ? new Date(since).toISOString() : null,
-                    p_until: until,
-                  }),
-                }
-              ),
+              fetchAllProspectSummary(since, until),
               sb.sbFetch(
                 `/rest/v1/tasks_due?client_id=eq.${encodeURIComponent(clientId)}&select=linkedin_id,profile_url,sales_nav_url`
               ).catch(() => []), // tasks_due missing on a fresh DB → graceful fallback
@@ -1127,6 +1242,40 @@
             return;
           }
           rerender();
+        }
+
+        // Page through prospect_summary_for_client until fewer than
+        // PAGE rows come back. Supabase's PostgREST pins db-max-rows
+        // at 1000 by default for RPCs and the cap is a HARD ceiling —
+        // Range headers can request fewer rows but cannot exceed the
+        // server-side cap. Adding p_offset / p_limit params on the
+        // RPC + looping client-side is the only portable workaround.
+        // Pages run sequentially (offset depends on prior page) so
+        // total wall time = pages × ~130ms. For Josh: 12 pages ≈ 1.5s.
+        async function fetchAllProspectSummary(since, until) {
+          const PAGE = 1000;
+          let offset = 0;
+          const all = [];
+          while (true) {
+            const rows = await sb.sbFetch(
+              `/rest/v1/rpc/prospect_summary_for_client`,
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  p_client_id: clientId,
+                  p_since: since ? new Date(since).toISOString() : null,
+                  p_until: until,
+                  p_offset: offset,
+                  p_limit:  PAGE,
+                }),
+              }
+            );
+            const chunk = rows || [];
+            all.push(...chunk);
+            if (chunk.length < PAGE) break;
+            offset += PAGE;
+          }
+          return all;
         }
 
         // Map an RPC row → the camelCase shape the renderer + mutation
@@ -1224,22 +1373,7 @@
         async function refreshProspect(prospectId) {
           if (!prospectId) return;
           const since = cutoffFor(state.tf);
-          const rows = await sb.sbFetch(
-            `/rest/v1/rpc/prospect_summary_for_client`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Range-Unit":   "items",
-                "Range":        "0-99999",
-              },
-              body: JSON.stringify({
-                p_client_id: clientId,
-                p_since: since ? new Date(since).toISOString() : null,
-                p_until: null,
-              }),
-            }
-          );
+          const rows = await fetchAllProspectSummary(since, null);
           const updated = (rows || []).find(r => r.id === prospectId);
           const idx = state.allProspects.findIndex(p => p.id === prospectId);
           if (!updated) {
@@ -3513,11 +3647,35 @@
         "#1EB683", // All Time — green
       ];
 
+      // Wrapper for the cached path: takes summaryByTf {tf → {metrics, ...}}
+      // and renders the same trends-by-period strip the legacy
+      // renderTrendsByPeriod produced from raw rows. Internally just
+      // delegates after pre-building the byPeriod array.
+      function renderTrendsByPeriodCached(root, summaryByTf) {
+        const byPeriod = PERIODS.map(p => ({
+          ...p,
+          m: (summaryByTf[p.tf] && summaryByTf[p.tf].metrics) || metricsFor([]),
+        }));
+        renderTrendsByPeriodFromBy(root, byPeriod);
+      }
+
+      function renderPeriodComparisonCached(root, summaryByTf) {
+        const byPeriod = PERIODS.map(p => ({
+          ...p,
+          m: (summaryByTf[p.tf] && summaryByTf[p.tf].metrics) || metricsFor([]),
+        }));
+        renderPeriodComparisonFromBy(root, byPeriod);
+      }
+
       function renderTrendsByPeriod(root, allRows) {
         const byPeriod = PERIODS.map(p => ({
           ...p,
           m: metricsFor(filterByTf(allRows, p.tf)),
         }));
+        renderTrendsByPeriodFromBy(root, byPeriod);
+      }
+
+      function renderTrendsByPeriodFromBy(root, byPeriod) {
 
         // puglab shows 4 rate trend charts. Booking Rate (meetings/responses)
         // is intentionally NOT shown here — Pos. Booking Rate is the canonical
@@ -3610,6 +3768,10 @@
           ...p,
           m: metricsFor(filterByTf(allRows, p.tf)),
         }));
+        renderPeriodComparisonFromBy(root, byPeriod);
+      }
+
+      function renderPeriodComparisonFromBy(root, byPeriod) {
 
         // 9 rows matching puglab. For each cell (except All) we show a delta
         // chip from rollingBadge():
