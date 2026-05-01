@@ -808,7 +808,12 @@
           state.tf = btn.dataset.tf;
           localStorage.setItem(LAST_TF, state.tf);
           activatePill(pillsEl, state.tf);
-          rerender();
+          // Timeframe shapes the RPC's scoped counts, so we refetch
+          // rather than rescope client-side. Cached events on each
+          // prospect (if any) are preserved by adoptProspectRow's
+          // event copy in refreshProspect — but loadAll discards them
+          // since the prospect set itself may differ across windows.
+          loadAll();
         });
 
         statusEl.addEventListener("click", (e) => {
@@ -849,7 +854,10 @@
           }, 180);
         });
 
-        exportBtn.addEventListener("click", () => exportCsv(state.filtered));
+        exportBtn.addEventListener("click", async () => {
+          await ensureEventsLoadedForMany(state.filtered);
+          exportCsv(state.filtered);
+        });
 
         // Delegated click handler — survives timeline re-renders.
         //
@@ -870,6 +878,19 @@
           const row = e.target.closest(".pr-row");
           if (!row) return;
           toggleTimeline(row);
+        });
+
+        // Hover-prefetch: by the time the user clicks, events are
+        // typically already cached. Listener is delegated on wrapEl
+        // (single bind) and only fires once per hover via mouseenter.
+        wrapEl.addEventListener("mouseover", (e) => {
+          const row = e.target.closest(".pr-row");
+          if (!row) return;
+          // Skip if already entered this row in the current hover (the
+          // mouseover event also fires on inner element transitions).
+          if (row.dataset.prefetched === "1") return;
+          row.dataset.prefetched = "1";
+          prefetchEventsOnHover(row);
         });
 
         // Form submits (response log + info edit). Distinct from clicks
@@ -1049,7 +1070,7 @@
           const ev = canonical ? canonical.events.find(x => x.id === eventId) : null;
           if (ev) {
             ev[field] = newValue;
-            Object.assign(canonical, rollup(canonical.events));
+            Object.assign(canonical, summarizeEvents(canonical.events, cutoffFor(state.tf)));
           }
           el.dataset.original = newValue;
         }
@@ -1059,33 +1080,169 @@
         loadAll();
 
         async function loadAll() {
+          // Server-side aggregation via prospect_summary_for_client RPC:
+          // returns one row per prospect with rollups already scoped to
+          // the active timeframe. Replaces the previous fetch-every-row +
+          // client-side union-find clustering path. Prospect identity +
+          // counts come from the SQL trigger that maintains the prospects
+          // table on every outreach change.
+          //
+          // Events for a given prospect are NOT fetched up front — they
+          // load lazily when a row is expanded (see ensureEventsLoaded).
+          // tasks_due remains a separate small fetch for the "Has
+          // follow-up" filter.
+          const since = cutoffFor(state.tf);
+          const until = null;  // open-ended on the right
           try {
-            // One big fetch with every column the table + timeline uses.
-            // sbFetchAll pages past PostgREST's 1000-row cap. `id` is
-            // included so we can PATCH individual rows (sentiment + info
-            // edits) by primary key; email + phone are pulled for both
-            // the grouping waterfall and the timeline head display.
-            //
-            // Parallel: pull tasks_due so the "Has follow-up" filter
-            // can match prospects against active task identifiers.
             const [rows, tasks] = await Promise.all([
-              sb.sbFetchAll(
-                `/rest/v1/outreach?` +
-                `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id` +
-                `&client_id=eq.${encodeURIComponent(clientId)}` +
-                `&order=occurred_at.asc`
+              sb.sbFetch(
+                `/rest/v1/rpc/prospect_summary_for_client`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    p_client_id: clientId,
+                    p_since: since ? new Date(since).toISOString() : null,
+                    p_until: until,
+                  }),
+                }
               ),
               sb.sbFetch(
                 `/rest/v1/tasks_due?client_id=eq.${encodeURIComponent(clientId)}&select=linkedin_id,profile_url,sales_nav_url`
               ).catch(() => []), // tasks_due missing on a fresh DB → graceful fallback
             ]);
-            state.allProspects = buildProspects(rows);
+            state.allProspects = (rows || []).map(adoptProspectRow);
             state.taskKeys = buildTaskKeys(tasks || []);
           } catch (err) {
             wrapEl.innerHTML = `<div class="placeholder"><strong>Couldn't load prospects</strong>${esc(err.message || "")}</div>`;
             return;
           }
           rerender();
+        }
+
+        // Map an RPC row → the camelCase shape the renderer + mutation
+        // handlers expect. Mirrors the old buildProspects() output. Keeps
+        // p.key in sync with p.id so existing selection / canonical-lookup
+        // code paths keep working.
+        //
+        // events stays null until ensureEventsLoaded fetches them.
+        function adoptProspectRow(r) {
+          return {
+            id:             r.id,
+            key:            r.id,           // prospect.id is now the canonical key
+            name:           r.name || "",
+            email:          r.email || "",
+            phone:          r.phone || "",
+            company:        r.company || "",
+            title:          r.title || "",
+            linkedin_id:    r.linkedin_id    || null,
+            profile_url:    r.profile_url    || null,
+            sales_nav_url:  r.sales_nav_url  || null,
+            merge_group_id: r.merge_group_id || null,
+            counts: {
+              connection:     r.connection_count   || 0,
+              message:        r.message_count      || 0,
+              response:       r.response_count     || 0,
+              meeting_booked: r.meeting_count      || 0,
+              followup:       r.followup_count     || 0,
+              retargeting:    r.retargeting_count  || 0,
+              inmail:         r.inmail_count       || 0,
+            },
+            positives:    r.positive_count || 0,
+            eventCount:   r.event_count    || 0,
+            first_touch:  r.first_touch    || null,
+            last_touch:   r.last_touch     || null,
+            status:       r.status         || "other",
+            sentiment:    r.sentiment      || null,
+            sentiment_at: r.sentiment_at   || null,
+            events:       null,    // lazy: loaded on demand by ensureEventsLoaded
+          };
+        }
+
+        // Lazy-load this prospect's full event list. Cached on the
+        // prospect object once fetched; re-call after a mutation to
+        // refresh. Triggered automatically by toggleTimeline (on
+        // expand) and by any mutation path that needs event-level
+        // detail (bulk delete, edit info, split mode).
+        async function ensureEventsLoaded(p, force = false) {
+          if (!p) return [];
+          if (p.events && !force) return p.events;
+          const rows = await sb.sbFetch(
+            `/rest/v1/outreach?` +
+            `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
+            `&prospect_id=eq.${encodeURIComponent(p.id)}` +
+            `&order=occurred_at.asc`
+          );
+          p.events = rows || [];
+          return p.events;
+        }
+
+        // Bulk-load events for many prospects in one round-trip. Used
+        // by Export CSV / Copy to Clipboard so we don't issue N separate
+        // requests when the user exports a filtered list. Skips
+        // prospects whose events are already cached.
+        async function ensureEventsLoadedForMany(prospects) {
+          const need = prospects.filter(p => p && !p.events);
+          if (!need.length) return;
+          // Chunk to keep the URL under PostgREST/server limits. ~200
+          // prospect_ids per request is comfortably under typical caps.
+          const chunkSize = 200;
+          for (let i = 0; i < need.length; i += chunkSize) {
+            const chunk = need.slice(i, i + chunkSize);
+            const idList = chunk.map(p => p.id).join(",");
+            const rows = await sb.sbFetchAll(
+              `/rest/v1/outreach?` +
+              `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
+              `&prospect_id=in.(${idList})` +
+              `&order=occurred_at.asc`
+            );
+            // Bucket events back onto their prospects.
+            const byProspect = new Map(chunk.map(p => [p.id, []]));
+            for (const r of (rows || [])) {
+              const arr = byProspect.get(r.prospect_id);
+              if (arr) arr.push(r);
+            }
+            for (const p of chunk) p.events = byProspect.get(p.id) || [];
+          }
+        }
+
+        // Refresh ONE prospect's row in state.allProspects after a
+        // server-side mutation. Calls the same RPC as loadAll but
+        // filters server-side (cheap: indexed by client_id + the where
+        // clause prunes to one prospect). Replaces the prospect in
+        // state.allProspects in place; if the prospect drops out of
+        // the current timeframe (no events left in window), removes it.
+        async function refreshProspect(prospectId) {
+          if (!prospectId) return;
+          const since = cutoffFor(state.tf);
+          const rows = await sb.sbFetch(
+            `/rest/v1/rpc/prospect_summary_for_client`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                p_client_id: clientId,
+                p_since: since ? new Date(since).toISOString() : null,
+                p_until: null,
+              }),
+            }
+          );
+          const updated = (rows || []).find(r => r.id === prospectId);
+          const idx = state.allProspects.findIndex(p => p.id === prospectId);
+          if (!updated) {
+            // Prospect has no events in the current window. Drop from state.
+            if (idx >= 0) state.allProspects.splice(idx, 1);
+            return;
+          }
+          const next = adoptProspectRow(updated);
+          // Preserve any cached events; they'll be refetched separately
+          // by callers that need event-level detail.
+          if (idx >= 0) {
+            next.events = state.allProspects[idx].events;
+            state.allProspects[idx] = next;
+          } else {
+            state.allProspects.push(next);
+          }
         }
 
         // Build the lookup Set used by applyFilters to test whether a
@@ -1147,26 +1304,14 @@
 
         // ---- data ----------------------------------------------------
 
-        // Group rows into prospects by union-find over every identifier a
-        // row carries — NOT a first-match waterfall. Two rows belong to
-        // the same prospect if they share ANY identifier:
-        //   linkedin_id, profile_url, sales_nav_url, email, or name
-        //   (trimmed + lowercased).
-        //
-        // This bridges the common case where different import sources
-        // record different subsets of fields. Example: Exports tab has
-        // profile_url + name; Meetings tab has email + name; Responses
-        // tab has name only. A strict waterfall puts each in its own
-        // bucket (no shared primary ID). Union-find pulls them together
-        // through the shared name.
-        //
-        // Tradeoff: two genuinely different "John Smith"s at the same
-        // client whose rows carry no other identifier will false-merge.
-        // Acceptable for a pilot — you can eyeball company/title/URLs in
-        // the expanded timeline to spot it. The alternative (splitting)
-        // hides real data (Bill Hennessy example: one prospect showing
-        // as 3 rows in the CSV with meetings and responses disconnected).
-        function buildProspects(rows) {
+        // Clustering moved to the database (see add_prospects_table.sql).
+        // The trigger on outreach assigns a prospect_id to every row and
+        // maintains the prospects table; the dashboard reads pre-grouped
+        // rows via the prospect_summary_for_client RPC. The functions
+        // below — buildProspects, rollup, scopeToTimeframe — are kept
+        // only for unit-testable utility (summarizeEvents) and as
+        // identity stubs for legacy call sites that haven't migrated.
+        function _legacyBuildProspectsUnused(rows) {
           // Two-phase clustering:
           //   1. Events with a non-null merge_group_id cluster strictly
           //      by group_id — manual merges/splits override auto.
@@ -1287,39 +1432,39 @@
               p.sales_nav_url  ? `sn:${p.sales_nav_url.toLowerCase()}` :
               p.email          ? `email:${p.email.toLowerCase()}` :
                                  `name:${(p.name || "").toLowerCase()}`;
-            out.push({ ...p, ...rollup(p.events) });
+            out.push({ ...p, ...summarizeEvents(p.events, cutoffFor(state.tf)) });
           }
           return out;
         }
 
-        // Compute per-prospect summary from their event list. Called
-        // fresh whenever the timeframe changes so counts + status reflect
-        // only the scoped events.
-        function rollup(events) {
+        // Recompute the rollup fields on a single prospect from a
+        // freshly-fetched events array. Used after a mutation that
+        // touches one prospect's events to keep state.allProspects in
+        // sync without a full reload. Mirrors what the SQL trigger
+        // computes server-side; kept here so we can patch state
+        // immediately rather than waiting on a server round-trip.
+        function summarizeEvents(events, since) {
           const counts = { connection:0, message:0, response:0, meeting_booked:0, followup:0, retargeting:0, inmail:0 };
           let positives = 0;
-          let lastTouch = null;
-          let sentiment = null;
-          let sentimentDate = "";
+          let firstTouch = null;
+          let lastTouch  = null;
+          let sentiment      = null;
+          let sentimentAt    = null;
+          const cutoff = since ? new Date(since).getTime() : null;
 
           for (const e of events) {
+            if (cutoff !== null && new Date(e.occurred_at).getTime() < cutoff) continue;
             if (counts[e.type] != null) counts[e.type]++;
             if (e.type === "response" && e.response_sentiment === "positive") positives++;
-            if (!lastTouch || e.occurred_at > lastTouch) lastTouch = e.occurred_at;
+            if (!firstTouch || e.occurred_at < firstTouch) firstTouch = e.occurred_at;
+            if (!lastTouch  || e.occurred_at > lastTouch)  lastTouch  = e.occurred_at;
             if (e.type === "response" && e.response_sentiment
-                && e.occurred_at > sentimentDate) {
-              sentiment     = e.response_sentiment;
-              sentimentDate = e.occurred_at;
+                && (!sentimentAt || e.occurred_at > sentimentAt)) {
+              sentiment   = e.response_sentiment;
+              sentimentAt = e.occurred_at;
             }
           }
 
-          // Status precedence (most-advanced funnel stage wins). InMail
-          // sits below connection because connection-then-inmail is rare
-          // and connection-request acceptance is the more common starter
-          // path in practice; meeting_booked / response / message
-          // supersede both. Per Austin: "a new prospect can be created by
-          // logging an inmail, but that status should be superseded by a
-          // response or meeting booked."
           let status;
           if      (counts.meeting_booked > 0) status = "meeting";
           else if (counts.response       > 0) status = "response";
@@ -1328,21 +1473,27 @@
           else if (counts.inmail         > 0) status = "inmail";
           else                                status = "other";
 
-          return { counts, positives, last_touch: lastTouch, status, sentiment };
+          const eventCount =
+            counts.connection + counts.message + counts.response +
+            counts.meeting_booked + counts.followup + counts.retargeting +
+            counts.inmail;
+
+          return {
+            counts, positives, eventCount,
+            first_touch: firstTouch,
+            last_touch:  lastTouch,
+            status,
+            sentiment,
+            sentiment_at: sentimentAt,
+          };
         }
 
-        function scopeToTimeframe(prospects, since) {
-          if (!since) return prospects;
-          const t = new Date(since).getTime();
-          const out = [];
-          for (const p of prospects) {
-            const scoped = p.events.filter(e =>
-              new Date(e.occurred_at).getTime() >= t
-            );
-            if (!scoped.length) continue;
-            out.push({ ...p, events: scoped, ...rollup(scoped) });
-          }
-          return out;
+        // Identity passthrough — the prospect_summary_for_client RPC
+        // already scopes counts/status/sentiment to the active
+        // timeframe, so client-side filtering is no longer needed.
+        // Timeframe pill changes trigger a refetch via loadAll().
+        function scopeToTimeframe(prospects, _since) {
+          return prospects;
         }
 
         function applyFilters(prospects, s) {
@@ -1512,7 +1663,7 @@
               <td class="pr-title">${esc(p.title || "—")}</td>
               <td><span class="pr-status pr-status-${p.status}">${esc(statusLabel)}</span></td>
               <td>${sentimentHtml}</td>
-              <td class="num">${fmtInt(p.events.length)}</td>
+              <td class="num">${fmtInt(p.eventCount)}</td>
               <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
               <td class="pr-sn">${snCell}</td>
               <td class="pr-link">${liCell}</td>
@@ -1523,7 +1674,7 @@
           `;
         }
 
-        function toggleTimeline(row) {
+        async function toggleTimeline(row) {
           const idx = row.dataset.idx;
           const tbody = row.parentElement;
           const timeline = tbody.querySelector(`.pr-timeline-row[data-idx="${idx}"]`);
@@ -1544,10 +1695,37 @@
 
           if (!wasOpen) {
             const p = state.filtered[idx];
-            timeline.querySelector(".pr-timeline-cell").innerHTML = renderTimeline(p);
+            const cell = timeline.querySelector(".pr-timeline-cell");
+            // Open immediately with a loading placeholder; the events
+            // fetch is fast (<200ms typical) but we don't want a click
+            // to feel unresponsive. After load, render the full timeline.
+            cell.innerHTML = `<div class="pr-timeline-loading">Loading events…</div>`;
             timeline.classList.remove("hidden");
             row.classList.add("expanded");
+            try {
+              await ensureEventsLoaded(p);
+            } catch (err) {
+              cell.innerHTML = `<div class="placeholder">Couldn't load events: ${esc(err.message || "")}</div>`;
+              return;
+            }
+            // Guard against the user collapsing this row (or expanding
+            // a different one) while events were loading. If the row
+            // is no longer expanded we silently abandon the render.
+            if (timeline.classList.contains("hidden")) return;
+            cell.innerHTML = renderTimeline(p);
           }
+        }
+
+        // Hover-prefetch: when the user moves their mouse onto a row,
+        // start loading its events in the background. Most clicks come
+        // shortly after a hover; by the time they click, events are
+        // already cached and the timeline renders without the loading
+        // flicker. Failures are silent — the click path will retry.
+        function prefetchEventsOnHover(row) {
+          const idx = row.dataset.idx;
+          const p = state.filtered[idx];
+          if (!p || p.events) return;
+          ensureEventsLoaded(p).catch(() => {});
         }
 
         function renderTimeline(p) {
@@ -1593,7 +1771,7 @@
                 ${meetingBtn}
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
                 <button class="btn-secondary pr-action" data-action="show-add-followup-form" type="button" title="Schedule a one-off follow-up reminder for this prospect">Add follow-up</button>
-                ${p.events.length >= 2 ? `<button class="btn-secondary pr-action" data-action="enter-split-mode" type="button" title="Peel events off this prospect into a new prospect">Split events…</button>` : ""}
+                ${p.eventCount >= 2 ? `<button class="btn-secondary pr-action" data-action="enter-split-mode" type="button" title="Peel events off this prospect into a new prospect">Split events…</button>` : ""}
               </div>
             </div>
 
@@ -1650,7 +1828,7 @@
                 </label>
               </div>
               <div class="pr-info-form-footer">
-                <span class="pr-info-note">Edits apply to all ${fmtInt(p.events.length)} event row${p.events.length === 1 ? "" : "s"} for this prospect.</span>
+                <span class="pr-info-note">Edits apply to all ${fmtInt(p.eventCount)} event row${p.eventCount === 1 ? "" : "s"} for this prospect.</span>
                 <div class="pr-response-form-buttons">
                   <button type="button" class="btn-secondary pr-action" data-action="hide-info-form">Cancel</button>
                   <button type="submit" class="btn-primary pr-action">Save</button>
@@ -1952,6 +2130,7 @@
         // first match. Events are stored in ASC chronological order so
         // we iterate from the end.
         function pickLatest(events, predicate) {
+          if (!events) return null;
           for (let i = events.length - 1; i >= 0; i--) {
             if (predicate(events[i])) return events[i];
           }
@@ -2534,7 +2713,7 @@
               rerender();
               return;
             }
-            Object.assign(canonical, rollup(canonical.events));
+            Object.assign(canonical, summarizeEvents(canonical.events, cutoffFor(state.tf)));
           }
           reopenAfterMutation(prospect);
         }
@@ -2613,7 +2792,7 @@
           if ("message_sent"       in changes) ev.message_sent       = changes.message_sent;
           if ("response"           in changes) ev.response           = changes.response;
           if ("response_sentiment" in changes) ev.response_sentiment = changes.response_sentiment;
-          if (canonical) Object.assign(canonical, rollup(canonical.events));
+          if (canonical) Object.assign(canonical, summarizeEvents(canonical.events, cutoffFor(state.tf)));
           reopenAfterMutation(prospect);
         }
 
@@ -2695,7 +2874,7 @@
             if (ev) {
               ev.occurred_at = next + "T00:00:00.000Z";
             }
-            if (canonical) Object.assign(canonical, rollup(canonical.events));
+            if (canonical) Object.assign(canonical, summarizeEvents(canonical.events, cutoffFor(state.tf)));
             reopenAfterMutation(prospect);
             // reopenAfterMutation rerenders, replacing the timeline —
             // no need to manually restore the span.
@@ -2744,6 +2923,11 @@
           const targets = keys
             .map(k => state.allProspects.find(p => p.key === k))
             .filter(Boolean);
+
+          // Bulk delete needs each prospect's event IDs for the audit
+          // payload. Lazy-load them in parallel for any prospects whose
+          // events haven't been fetched yet.
+          await ensureEventsLoadedForMany(targets);
 
           const results = await Promise.allSettled(
             targets.map(p => sb.sbFetch("/rest/v1/rpc/delete_prospect_events", {
@@ -2797,6 +2981,7 @@
           const prevLabel = btnEl.textContent;
           btnEl.disabled = true;
           try {
+            await ensureEventsLoadedForMany(targets);
             const n = await copyToClipboard(targets);
             btnEl.textContent = `Copied ${fmtInt(n)}!`;
             setTimeout(() => {
@@ -2842,6 +3027,11 @@
           const prevLabel = btnEl.textContent;
           btnEl.textContent = "Merging…";
 
+          // Bulk merge needs every event ID across the selected
+          // prospects. Lazy-load events for any prospect that hasn't
+          // had its timeline expanded yet.
+          await ensureEventsLoadedForMany(targets);
+
           // Collect every event id across all selected prospects.
           const allEventIds = [];
           for (const p of targets) {
@@ -2872,45 +3062,16 @@
             return;
           }
 
-          // Mirror the server-side update locally: stamp every event with
-          // the new group_id + canonical name, fold all targets into one
-          // prospect, drop the rest from state.allProspects.
-          const groupIdValue = (typeof newGroupId === "string")
-            ? newGroupId
-            : (newGroupId && typeof newGroupId === "object" ? Object.values(newGroupId)[0] : null);
-          for (const p of targets) {
-            for (const e of p.events) {
-              e.merge_group_id = groupIdValue;
-              if (canonicalName) e.prospect_name = canonicalName;
-            }
-          }
-          // Build a fresh canonical from the union of all events. Easiest
-          // way: rebuild the whole allProspects from the underlying rows.
-          // Cheaper: collapse targets in place. Going with the cheaper
-          // path so unrelated state (e.g. other expanded timelines)
-          // doesn't get blown away by a full rebuild.
-          const allEvents = [];
-          for (const p of targets) for (const e of p.events) allEvents.push(e);
-          // Use the first target as the surviving prospect; absorb
-          // events from the others.
-          canonical.events = allEvents;
-          if (canonicalName) canonical.name = canonicalName;
-          canonical.merge_group_id = groupIdValue;
-          // Re-derive the key based on the new group_id (matches the
-          // priority in buildProspects).
-          canonical.key = `g:${groupIdValue}`;
-          Object.assign(canonical, rollup(canonical.events));
-          // Drop the absorbed prospects.
-          for (const p of others) {
-            const idx = state.allProspects.indexOf(p);
-            if (idx >= 0) state.allProspects.splice(idx, 1);
-          }
-
+          // Server side did the work: setting merge_group_id on every
+          // affected outreach row triggers the prospects re-clustering.
+          // Refetch the full prospect summary so state mirrors the
+          // post-merge truth — the survivor's id may not be the same
+          // as `canonical.id` if a different prospect won absorption.
           state.selected.clear();
           state.lastCheckedKey = null;
           btnEl.disabled = false;
           btnEl.textContent = prevLabel;
-          rerender();
+          await loadAll();
         }
 
         // Enter split mode for the currently-expanded prospect timeline.
@@ -2997,67 +3158,14 @@
             return;
           }
 
-          const groupIdValue = (typeof newGroupId === "string")
-            ? newGroupId
-            : (newGroupId && typeof newGroupId === "object" ? Object.values(newGroupId)[0] : null);
-
-          // Mirror locally: stamp the split events with the new group_id
-          // on their canonical event records, then rebuild the source
-          // prospect's events list (minus the split ones) and create a
-          // brand-new prospect for the split-off events.
-          const canonical = findCanonical(prospect);
-          if (canonical) {
-            const splitSet = new Set(eventIds);
-            const splitEvents = [];
-            const remaining   = [];
-            for (const e of canonical.events) {
-              if (splitSet.has(e.id)) {
-                e.merge_group_id = groupIdValue;
-                splitEvents.push(e);
-              } else {
-                remaining.push(e);
-              }
-            }
-            canonical.events = remaining;
-            // If remaining empty (operator split off everything — guarded
-            // by syncSplitBar but defensive here), drop the prospect.
-            if (remaining.length === 0) {
-              const idx = state.allProspects.indexOf(canonical);
-              if (idx >= 0) state.allProspects.splice(idx, 1);
-            } else {
-              Object.assign(canonical, rollup(canonical.events));
-            }
-            // Build a new prospect from the split events.
-            const newProspect = {
-              key:            `g:${groupIdValue}`,
-              name:           splitEvents[0]?.prospect_name || "",
-              email:          "",
-              phone:          "",
-              company:        "",
-              title:          "",
-              profile_url:    null,
-              sales_nav_url:  null,
-              linkedin_id:    null,
-              merge_group_id: groupIdValue,
-              events:         splitEvents,
-            };
-            for (const r of splitEvents) {
-              if (!newProspect.email         && r.email)         newProspect.email         = r.email;
-              if (!newProspect.phone         && r.phone)         newProspect.phone         = r.phone;
-              if (!newProspect.company       && r.company)       newProspect.company       = r.company;
-              if (!newProspect.title         && r.title)         newProspect.title         = r.title;
-              if (!newProspect.profile_url   && r.profile_url)   newProspect.profile_url   = r.profile_url;
-              if (!newProspect.sales_nav_url && r.sales_nav_url) newProspect.sales_nav_url = r.sales_nav_url;
-              if (!newProspect.linkedin_id   && r.linkedin_id)   newProspect.linkedin_id   = r.linkedin_id;
-            }
-            Object.assign(newProspect, rollup(splitEvents));
-            state.allProspects.push(newProspect);
-          }
-
+          // Server side reassigned merge_group_id on the split events;
+          // the trigger's UPDATE handler re-clusters them into a new
+          // prospect (or merges with an existing one if identifiers
+          // matched). Refetch so state mirrors the post-split truth.
           state.splitMode = null;
           btnEl.disabled = false;
           btnEl.textContent = prevLabel;
-          rerender();
+          await loadAll();
         }
 
         // Tiny CSS-attribute escaper for use inside querySelector strings
@@ -3126,6 +3234,10 @@
             // didn't log silently drop out of the UPDATE — we'll surface
             // that if it matters, but for the pilot (one operator) every
             // row is owned by the current user.
+            // Defensive: ensure events are loaded (the form lives inside
+            // an open timeline so they normally are, but guard against
+            // edge cases where state was repopulated mid-edit).
+            await ensureEventsLoaded(prospect);
             const ids = prospect.events.map(e => e.id).filter(Boolean);
             if (!ids.length) throw new Error("No event rows to update");
             const inList = ids.map(encodeURIComponent).join(",");
@@ -3192,7 +3304,7 @@
             if (canonical) {
               const evt = canonical.events.find(e => e.id === eventId);
               if (evt) evt.response_sentiment = next === "" ? null : next;
-              Object.assign(canonical, rollup(canonical.events));
+              Object.assign(canonical, summarizeEvents(canonical.events, cutoffFor(state.tf)));
             }
             reopenAfterMutation(prospect);
           } catch (err) {
@@ -3227,7 +3339,7 @@
           const canonical = findCanonical(prospect);
           if (!canonical) return;
           for (const row of created) canonical.events.push(row);
-          Object.assign(canonical, rollup(canonical.events));
+          Object.assign(canonical, summarizeEvents(canonical.events, cutoffFor(state.tf)));
         }
 
         // Re-render the table + re-expand the prospect's row. Uses the
