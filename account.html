@@ -1099,7 +1099,16 @@
                 `/rest/v1/rpc/prospect_summary_for_client`,
                 {
                   method: "POST",
-                  headers: { "Content-Type": "application/json" },
+                  // Range header overrides Supabase's default 1000-row cap
+                  // on RPC responses. Big accounts (Josh: 11k prospects)
+                  // would otherwise be silently truncated. 99,999 is a
+                  // pragmatic ceiling — past that we'd want pagination
+                  // and probably some prospect-archive feature.
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Range-Unit":   "items",
+                    "Range":        "0-99999",
+                  },
                   body: JSON.stringify({
                     p_client_id: clientId,
                     p_since: since ? new Date(since).toISOString() : null,
@@ -1219,7 +1228,11 @@
             `/rest/v1/rpc/prospect_summary_for_client`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                "Range-Unit":   "items",
+                "Range":        "0-99999",
+              },
               body: JSON.stringify({
                 p_client_id: clientId,
                 p_since: since ? new Date(since).toISOString() : null,
