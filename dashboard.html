@@ -877,10 +877,57 @@
         seatUsageEl.classList.toggle("near-cap", active < org.seats_paid && active >= org.seats_paid * 0.9);
       }
 
-      async function rerender() {
-        tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
-        kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
+      // Stale-while-revalidate cache for account_dashboard_summary.
+      // Supabase free-tier cold requests can take 5–10s on first hit
+      // even though the underlying query runs in <500ms; that's
+      // network/edge overhead, not Postgres. Caching last-good data
+      // in localStorage lets us paint instantly on every revisit
+      // while we refresh in the background. Cache key includes the
+      // active org and timeframe so switching scopes doesn't show
+      // stale-from-different-context data.
+      const SUMMARY_CACHE_KEY = "uptown:dashboard_summary:v1";
+      const SUMMARY_STALE_MAX_AGE_MS = 24 * 60 * 60 * 1000;  // 24h
 
+      function cacheKeyFor(orgId, since, until) {
+        return `${orgId || "none"}|${since || ""}|${until || ""}`;
+      }
+
+      function readCachedSummary(orgId, since, until) {
+        try {
+          const raw = localStorage.getItem(SUMMARY_CACHE_KEY);
+          if (!raw) return null;
+          const blob = JSON.parse(raw);
+          if (!blob || typeof blob !== "object") return null;
+          const k = cacheKeyFor(orgId, since, until);
+          const entry = blob[k];
+          if (!entry || !entry.summary || !entry.savedAt) return null;
+          if (Date.now() - entry.savedAt > SUMMARY_STALE_MAX_AGE_MS) return null;
+          return entry.summary;
+        } catch {
+          return null;
+        }
+      }
+
+      function writeCachedSummary(orgId, since, until, summary) {
+        try {
+          let blob = {};
+          try { blob = JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) || "{}"); } catch { blob = {}; }
+          blob[cacheKeyFor(orgId, since, until)] = { summary, savedAt: Date.now() };
+          // Cap to ~10 entries so localStorage doesn't bloat.
+          const keys = Object.keys(blob);
+          if (keys.length > 10) {
+            const sorted = keys
+              .map(k => ({ k, savedAt: blob[k]?.savedAt || 0 }))
+              .sort((a, b) => a.savedAt - b.savedAt);
+            for (let i = 0; i < sorted.length - 10; i++) delete blob[sorted[i].k];
+          }
+          localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(blob));
+        } catch {
+          // Quota exceeded or storage unavailable — silent failure is fine.
+        }
+      }
+
+      async function rerender() {
         const [since, until] = effectiveRange();
 
         // Scope to whichever org is active:
@@ -896,14 +943,22 @@
           return;
         }
 
+        const orgIdForCache = outreachScopeOrg ? outreachScopeOrg.id : null;
+
+        // Stale-while-revalidate: paint cached data immediately if
+        // available, then refresh from the server. Two paint passes
+        // for cached visits, one paint pass for first-cold visits.
+        const cached = readCachedSummary(orgIdForCache, since, until);
+        if (cached) {
+          paintFromSummary(cached);
+        } else {
+          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
+          kpiEl.innerHTML   = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
+        }
+
         // account_dashboard_summary RPC: one row per client with all
         // funnel counts + a cumulative trend pair pre-computed on the
-        // server. Trend window matches the selected timeframe (capped
-        // at 365 days for "All Time" / very wide custom ranges).
-        // Replaces a "fetch every outreach row, aggregate in JS"
-        // pattern that was timing out for orgs with large all-time
-        // data (Austin saw "All Time" never load after 5
-        // minutes). RLS scopes results to clients the caller can see;
+        // server. RLS scopes results to clients the caller can see;
         // p_org_id is only an additional narrowing filter for drill-in
         // mode and is otherwise null.
         let summary = [];
@@ -911,15 +966,30 @@
           summary = await sb.sbFetch("/rest/v1/rpc/account_dashboard_summary", {
             method: "POST",
             body: JSON.stringify({
-              p_org_id: outreachScopeOrg ? outreachScopeOrg.id : null,
+              p_org_id: orgIdForCache,
               p_since:  since || null,
               p_until:  until || null,
             }),
           });
         } catch (err) {
-          tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load summary: ${esc(err.message)}</td></tr>`;
+          // If we already painted from cache, leave it on screen and
+          // just log; otherwise show the error state.
+          if (!cached) {
+            tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load summary: ${esc(err.message)}</td></tr>`;
+          } else {
+            console.warn("dashboard summary refresh failed; keeping cached view:", err);
+          }
           return;
         }
+        writeCachedSummary(orgIdForCache, since, until, summary);
+        paintFromSummary(summary);
+      }
+
+      // Render the dashboard from a summary array (cached or fresh).
+      // Extracted from rerender so both paint paths share the exact
+      // same logic. Mutates enrichedCache, then calls renderKpiStrip +
+      // renderTable.
+      function paintFromSummary(summary) {
         const summaryById = new Map((Array.isArray(summary) ? summary : []).map(r => [r.client_id, r]));
 
         // Attach metrics to each client + derive status from end_date.
