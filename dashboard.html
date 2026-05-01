@@ -300,8 +300,15 @@
             link.classList.remove("hidden");
             return;
           }
+          // Scope to the current user's own row. RLS on
+          // organization_members lets any member see the full roster of
+          // their org, so a bare role=eq.admin probe would match the
+          // org's admin rows even when the signed-in user is just a
+          // member — falsely revealing the Team link.
           const rows = await sb.sbFetch(
-            "/rest/v1/organization_members?select=role&role=eq.admin&limit=1"
+            "/rest/v1/organization_members?select=role" +
+            `&operator_id=eq.${encodeURIComponent(session.user.id)}` +
+            "&role=eq.admin&limit=1"
           );
           if (rows && rows.length) {
             link.classList.remove("hidden");

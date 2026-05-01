@@ -221,8 +221,16 @@
       let org = null;
       let myAdminOrgs = [];
       try {
+        // Scope to the current user's own rows. RLS on
+        // organization_members lets any member read the full roster of
+        // their org, so a bare role=eq.admin probe would return the
+        // org's admin rows even when the signed-in user is just a
+        // member — and the no-as_org branch below would happily seat
+        // them on team.html as if they admined that org.
         const rows = await sb.sbFetch(
-          "/rest/v1/organization_members?select=role,organizations(id,name,seats_paid)&role=eq.admin"
+          "/rest/v1/organization_members?select=role,organizations(id,name,seats_paid)" +
+          `&operator_id=eq.${encodeURIComponent(session.user.id)}` +
+          "&role=eq.admin"
         );
         myAdminOrgs = (rows || [])
           .map(r => r.organizations)
