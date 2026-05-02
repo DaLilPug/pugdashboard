@@ -13,5 +13,5 @@ window.SUPABASE_CONFIG = {
   // Stripe publishable key — safe to ship to the browser. Live key
   // begins with pk_live_, test key with pk_test_. Set this when
   // Stripe is configured (see BILLING_SETUP.md).
-  stripePublishableKey: "",
+  stripePublishableKey: "pk_live_GnliOtGC76yQtYsV59tPjQga",
 };
