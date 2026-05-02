@@ -129,12 +129,6 @@
       </div>
     </div>
 
-    <div class="filter-group filter-daterange">
-      <input type="date" id="date-from" class="filter-date" aria-label="From date" />
-      <span class="filter-range-sep">to</span>
-      <input type="date" id="date-to"   class="filter-date" aria-label="To date" />
-      <button type="button" id="date-clear" class="filter-date-clear" title="Clear date range">✕</button>
-    </div>
   </div>
 
   <main class="main main-wide">
@@ -447,9 +441,6 @@
       })();
 
       const pillsEl    = document.getElementById("timeframe-pills");
-      const dateFromEl = document.getElementById("date-from");
-      const dateToEl   = document.getElementById("date-to");
-      const dateClrEl  = document.getElementById("date-clear");
       const statusEl   = document.getElementById("status-filter");
       const kpiEl      = document.getElementById("kpi-strip");
       const tableEl    = document.getElementById("client-table");
@@ -471,8 +462,6 @@
       // ---- persisted filter state ---------------------------------------
 
       const LS_TF        = "dashboard_last_timeframe";
-      const LS_FROM      = "dashboard_last_from";
-      const LS_TO        = "dashboard_last_to";
       const LS_STATUS    = "dashboard_last_status";
       const LS_SORT_KEY  = "dashboard_sort_key";
       const LS_SORT_DIR  = "dashboard_sort_dir";
@@ -513,8 +502,6 @@
 
       let tf         = localStorage.getItem(LS_TF)     || "yr";
       let statusVal  = localStorage.getItem(LS_STATUS) || "active";
-      let dateFrom   = localStorage.getItem(LS_FROM)   || "";
-      let dateTo     = localStorage.getItem(LS_TO)     || "";
       let sortKey    = localStorage.getItem(LS_SORT_KEY) || "startDate";
       let sortDir    = localStorage.getItem(LS_SORT_DIR) || "desc";
       let showArchived = localStorage.getItem(LS_SHOW_ARCH) === "1";
@@ -525,8 +512,6 @@
 
       activatePill(tf);
       statusEl.value       = statusVal;
-      dateFromEl.value     = dateFrom;
-      dateToEl.value       = dateTo;
       showArchivedEl.checked = showArchived;
 
       // ---- listeners -----------------------------------------------------
@@ -537,11 +522,6 @@
         tf = btn.dataset.tf;
         localStorage.setItem(LS_TF, tf);
         activatePill(tf);
-        // Changing timeframe clears any explicit date range so the two
-        // don't silently fight each other.
-        dateFrom = ""; dateTo = "";
-        dateFromEl.value = ""; dateToEl.value = "";
-        localStorage.setItem(LS_FROM, ""); localStorage.setItem(LS_TO, "");
         rerender();
       });
 
@@ -560,29 +540,6 @@
         localStorage.setItem(LS_SHOW_ARCH, showArchived ? "1" : "0");
         load();
       });
-
-      dateFromEl.addEventListener("change", () => { dateFrom = dateFromEl.value; localStorage.setItem(LS_FROM, dateFrom); onDateRangeChanged(); });
-      dateToEl  .addEventListener("change", () => { dateTo   = dateToEl  .value; localStorage.setItem(LS_TO,   dateTo);   onDateRangeChanged(); });
-      dateClrEl .addEventListener("click",  () => {
-        dateFrom = ""; dateTo = "";
-        dateFromEl.value = ""; dateToEl.value = "";
-        localStorage.setItem(LS_FROM, ""); localStorage.setItem(LS_TO, "");
-        rerender();
-      });
-
-      function onDateRangeChanged() {
-        // Setting an explicit range overrides the timeframe pill — clear
-        // the pill's active state visually to avoid two sources of truth.
-        if (dateFrom || dateTo) {
-          tf = "custom";
-          activatePill(tf);
-        } else if (tf === "custom") {
-          tf = "all";
-          localStorage.setItem(LS_TF, tf);
-          activatePill(tf);
-        }
-        rerender();
-      }
 
       // Click-to-sort on numeric + date column headers. Three-state cycle:
       // first click on a new column → desc. Click same column → asc. Third
@@ -1700,17 +1657,9 @@
       }
 
       function effectiveRange() {
-        // If the operator set a custom date range, it wins. Otherwise we
-        // derive from the timeframe pill. Returns [sinceIso, untilIso];
-        // either end can be null.
-        if (dateFrom || dateTo) {
-          const since = dateFrom ? new Date(dateFrom + "T00:00:00").toISOString() : null;
-          // End-of-day on the "to" boundary so "2024-11-20" includes rows
-          // logged at 11:59pm that day.
-          const until = dateTo   ? new Date(dateTo   + "T23:59:59.999").toISOString() : null;
-          return [since, until];
-        }
-        if (tf === "all" || tf === "custom") return [null, null];
+        // Derive [sinceIso, untilIso] from the timeframe pill. Either
+        // end can be null. All Time = both null.
+        if (tf === "all") return [null, null];
         // "This Year" is Jan 1 of the current year in the operator's local
         // time, converted to UTC ISO for the query. Matches the custom-range
         // convention (local-time input → UTC ISO output).
