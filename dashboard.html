@@ -104,8 +104,8 @@
       <span class="filter-label">Status</span>
       <select id="status-filter" class="filter-select">
         <option value="all">All</option>
-        <option value="active">Active only</option>
-        <option value="inactive">Inactive only</option>
+        <option value="active">Active</option>
+        <option value="inactive">Inactive</option>
       </select>
     </div>
 
@@ -512,7 +512,7 @@
       }
 
       let tf         = localStorage.getItem(LS_TF)     || "yr";
-      let statusVal  = localStorage.getItem(LS_STATUS) || "all";
+      let statusVal  = localStorage.getItem(LS_STATUS) || "active";
       let dateFrom   = localStorage.getItem(LS_FROM)   || "";
       let dateTo     = localStorage.getItem(LS_TO)     || "";
       let sortKey    = localStorage.getItem(LS_SORT_KEY) || "startDate";
