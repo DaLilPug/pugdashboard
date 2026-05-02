@@ -4771,3 +4771,132 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   outline: 2px solid var(--navy);
   outline-offset: 2px;
 }
+
+/* ============================================================
+   Billing modal (billing.js)
+   ============================================================ */
+.ub-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(1,58,82,0.55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.ub-modal {
+  background: #fff; border-radius: 10px; width: 100%; max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  font-family: Inter, system-ui, sans-serif;
+  overflow: hidden;
+}
+.ub-modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 22px; border-bottom: 1px solid rgba(1,58,82,0.08);
+}
+.ub-modal-head h2 {
+  margin: 0; font-family: Montserrat, sans-serif; font-weight: 700;
+  font-size: 18px; color: var(--navy);
+}
+.ub-modal-close {
+  background: none; border: none; font-size: 22px; line-height: 1;
+  color: #8899a6; cursor: pointer; padding: 4px 8px;
+}
+.ub-modal-close:hover { color: var(--navy); }
+.ub-modal-body { padding: 18px 22px; }
+.ub-modal-foot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 14px 22px; border-top: 1px solid rgba(1,58,82,0.08);
+  background: #f8f9fb;
+}
+.ub-modal-intro { margin: 0 0 14px; font-size: 14px; color: #4b5d6b; line-height: 1.5; }
+.ub-interval-toggle {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+}
+.ub-interval-opt {
+  border: 1.5px solid rgba(1,58,82,0.15); border-radius: 8px;
+  padding: 12px; cursor: pointer; display: block; transition: all 120ms;
+}
+.ub-interval-opt:has(input:checked) {
+  border-color: var(--navy); background: rgba(1,58,82,0.04);
+}
+.ub-interval-opt input { margin-right: 6px; }
+.ub-interval-name { font-weight: 600; color: var(--navy); display: block; }
+.ub-interval-price { font-size: 12.5px; color: #4b5d6b; display: block; margin-top: 4px; }
+.ub-interval-price em { color: #1EB683; font-style: normal; font-weight: 600; }
+.ub-qty-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.ub-qty-label { font-weight: 600; color: var(--navy); font-size: 14px; }
+.ub-qty-control { display: flex; align-items: center; gap: 0; }
+.ub-qty-btn {
+  width: 32px; height: 32px; border: 1px solid rgba(1,58,82,0.15);
+  background: #fff; cursor: pointer; font-size: 16px; color: var(--navy);
+}
+.ub-qty-btn:first-child { border-radius: 6px 0 0 6px; }
+.ub-qty-btn:last-child  { border-radius: 0 6px 6px 0; }
+.ub-qty-input {
+  width: 50px; height: 32px; text-align: center;
+  border: 1px solid rgba(1,58,82,0.15); border-left: none; border-right: none;
+  font-size: 14px; color: var(--navy); font-weight: 600;
+}
+.ub-qty-input::-webkit-inner-spin-button,
+.ub-qty-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ub-summary {
+  background: #f8f9fb; border-radius: 6px; padding: 12px 14px;
+  margin-bottom: 16px; display: flex; justify-content: space-between;
+  align-items: center;
+}
+.ub-summary-line { font-size: 13px; color: #4b5d6b; }
+.ub-summary-total { font-weight: 700; font-size: 16px; color: var(--navy); font-family: Montserrat, sans-serif; }
+.ub-card-row { margin-top: 8px; }
+.ub-card-label { font-size: 13px; font-weight: 600; color: var(--navy); display: block; margin-bottom: 6px; }
+.ub-card-element {
+  border: 1.5px solid rgba(1,58,82,0.15); border-radius: 6px;
+  padding: 12px; background: #fff;
+}
+.ub-card-error { color: #c0392b; font-size: 12.5px; margin-top: 6px; min-height: 16px; }
+.ub-btn {
+  font-family: Montserrat, sans-serif; font-weight: 600; font-size: 13px;
+  padding: 9px 16px; border-radius: 6px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.ub-btn-secondary { background: #fff; color: #4b5d6b; border-color: rgba(1,58,82,0.15); }
+.ub-btn-secondary:hover { background: #f1f4f7; }
+.ub-btn-primary { background: var(--navy); color: #fff; }
+.ub-btn-primary:hover { background: #022a3d; }
+.ub-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Subtle billing card on team.html */
+.team-billing-card {
+  background: #fff; border: 1px solid rgba(1,58,82,0.08);
+  border-radius: 8px; padding: 18px 20px; margin-top: 24px;
+  font-size: 13.5px; color: #4b5d6b;
+}
+.team-billing-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.team-billing-card-head h3 {
+  margin: 0; font-size: 14px; font-weight: 600;
+  color: var(--navy); font-family: Montserrat, sans-serif;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.team-billing-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px;
+}
+.team-billing-grid div { font-size: 13px; }
+.team-billing-grid strong { color: var(--navy); font-weight: 600; }
+.team-billing-actions {
+  display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap;
+}
+.team-billing-actions button {
+  font-family: Inter, sans-serif; font-size: 12.5px; font-weight: 500;
+  background: #fff; border: 1px solid rgba(1,58,82,0.15);
+  color: #4b5d6b; padding: 6px 11px; border-radius: 5px; cursor: pointer;
+}
+.team-billing-actions button:hover { background: #f1f4f7; color: var(--navy); }
+.team-billing-status-trial { color: #d97706; font-weight: 600; }
+.team-billing-status-active { color: #1EB683; font-weight: 600; }
+.team-billing-status-past_due,
+.team-billing-status-unpaid { color: #c0392b; font-weight: 600; }
+.team-billing-status-canceled { color: #8899a6; }
+

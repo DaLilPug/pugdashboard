@@ -155,6 +155,11 @@
         <div class="loading">Loading…</div>
       </div>
     </section>
+
+    <!-- Billing card. Hidden by default; populated by initBilling()
+         only for admins with a configured plan or a Stripe customer
+         on file. Members see nothing here. -->
+    <div id="team-billing-card" class="team-billing-card" hidden></div>
   </main>
 
   <!-- Client access modal: opens from a member row's "Manage access"
@@ -179,6 +184,7 @@
   <script src="config.js"></script>
   <script src="supabase-client.js"></script>
   <script src="auth.js"></script>
+  <script src="billing.js"></script>
   <script>
     (async function main() {
       const session = await Auth.requireAuth();
@@ -364,12 +370,107 @@
           loadInvites(),
           loadClientsAndAccess(),
           loadActivity(),
+          loadBilling(),
         ]);
         // loadMembers renders as soon as membership rows arrive, but the
         // Access column depends on clients + accessMap which come from
         // loadClientsAndAccess. Re-render once everything's settled so
         // the counts are accurate.
         if (members.length) renderMembers();
+      }
+
+      // ---- billing card (admin-only, subtle bottom-of-page) -----------
+      async function loadBilling() {
+        const card = document.getElementById("team-billing-card");
+        if (!card) return;
+        const summary = await Billing.getSummary();
+        if (!summary || !summary.is_admin) {
+          card.hidden = true;
+          return;
+        }
+        renderBilling(card, summary);
+      }
+
+      function renderBilling(card, s) {
+        const status = s.subscription_status || "none";
+        const interval = s.billing_interval || "month";
+        const unitPrice = interval === "year" ? 120 : 15;
+        const purchased = s.seats_purchased || 0;
+        const gifted    = s.seats_gifted    || 0;
+        const total     = s.seats_paid      || 0;
+        const used      = s.seats_used      || 0;
+
+        const planLine = s.has_subscription
+          ? `${purchased} paid seat${purchased === 1 ? "" : "s"} × $${unitPrice}/${interval} = $${purchased * unitPrice}/${interval}`
+          : `No active plan`;
+        const renewLine = s.current_period_end
+          ? `Renews ${new Date(s.current_period_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+          : (s.has_subscription ? "" : "");
+        const trialLine = (status === "trialing" && s.trial_end)
+          ? `Trial ends ${new Date(s.trial_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
+          : "";
+        const statusLabel = status === "none" ? "" :
+          status === "trialing"   ? `<span class="team-billing-status-trial">Trial</span>` :
+          status === "active"     ? `<span class="team-billing-status-active">Active</span>` :
+          status === "past_due"   ? `<span class="team-billing-status-past_due">Payment past due</span>` :
+          status === "unpaid"     ? `<span class="team-billing-status-unpaid">Unpaid</span>` :
+          status === "canceled"   ? `<span class="team-billing-status-canceled">Canceled</span>` :
+          `<span>${esc(status)}</span>`;
+
+        const giftedLine = gifted > 0
+          ? `<div><strong>${gifted}</strong> gifted seat${gifted === 1 ? "" : "s"} (no charge)</div>`
+          : "";
+
+        const reduceDisabled = purchased === 0;
+        const switchTo = interval === "year" ? "month" : "year";
+        const switchLabel = switchTo === "year" ? "Switch to annual" : "Switch to monthly";
+
+        card.hidden = false;
+        card.innerHTML = `
+          <div class="team-billing-card-head">
+            <h3>Billing</h3>
+            ${statusLabel}
+          </div>
+          <div class="team-billing-grid">
+            <div><strong>Plan:</strong> ${esc(planLine)}</div>
+            <div><strong>Seats:</strong> ${used} of ${total} used</div>
+            ${trialLine ? `<div>${esc(trialLine)}</div>` : ""}
+            ${renewLine && !trialLine ? `<div>${esc(renewLine)}</div>` : ""}
+            ${giftedLine}
+          </div>
+          <div class="team-billing-actions">
+            <button data-action="add-seat">+ Add seat</button>
+            <button data-action="remove-seat" ${reduceDisabled ? "disabled" : ""}>− Remove seat</button>
+            ${s.has_subscription ? `<button data-action="switch-interval">${esc(switchLabel)}</button>` : ""}
+            ${s.has_payment_method ? `<button data-action="portal">Manage payment & invoices</button>` : ""}
+          </div>
+        `;
+
+        card.querySelector("[data-action='add-seat']")?.addEventListener("click", async () => {
+          await Billing.openPurchaseModal({ minSeats: 1, onSuccess: () => loadBilling() });
+        });
+        card.querySelector("[data-action='remove-seat']")?.addEventListener("click", async () => {
+          if (!confirm("Reduce paid seats by 1? Your next invoice will be lower; no refund today.")) return;
+          try {
+            await Billing.callFn("stripe-billing-update", { action: "remove_seat", qty: 1 });
+            await loadBilling();
+          } catch (err) {
+            alert("Couldn't remove seat: " + (err.message || err));
+          }
+        });
+        card.querySelector("[data-action='switch-interval']")?.addEventListener("click", async () => {
+          const target = interval === "year" ? "month" : "year";
+          if (!confirm(`Switch to ${target}ly billing? Stripe will prorate the change on your next invoice.`)) return;
+          try {
+            await Billing.callFn("stripe-billing-update", { action: "switch_interval", interval: target });
+            await loadBilling();
+          } catch (err) {
+            alert("Couldn't switch interval: " + (err.message || err));
+          }
+        });
+        card.querySelector("[data-action='portal']")?.addEventListener("click", () => {
+          Billing.openPortal();
+        });
       }
 
       async function loadMembers() {

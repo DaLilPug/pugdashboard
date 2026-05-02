@@ -201,6 +201,7 @@
   <script src="config.js"></script>
   <script src="supabase-client.js"></script>
   <script src="auth.js"></script>
+  <script src="billing.js"></script>
   <script>
     (async function main() {
       const session = await Auth.requireAuth();
@@ -227,7 +228,26 @@
 
       const urlParams     = new URLSearchParams(window.location.search);
       const requestedOrg  = urlParams.get("as_org");
+      const requestedAction = urlParams.get("action");
       let   drillInOrg    = null;  // { id, name, seats_paid } or null when not in drill-in mode
+
+      // Open the purchase modal automatically if linked here from the
+      // extension popup with ?action=add-seat. Defer until after the
+      // initial render so Billing.js + DOM are ready.
+      if (requestedAction === "add-seat") {
+        setTimeout(() => {
+          if (window.Billing) {
+            Billing.openPurchaseModal({
+              title: "Add a seat",
+              minSeats: 1,
+              onSuccess: () => {
+                // Strip the param so a refresh doesn't reopen the modal.
+                history.replaceState(null, "", window.location.pathname);
+              },
+            });
+          }
+        }, 200);
+      }
 
       // Kick off the platform-admin probe early so we don't block the
       // page on it in the common non-admin path. await'd below before
@@ -641,6 +661,29 @@
       }
 
       async function onAddAccount() {
+        // Cap check up front — if at the seat limit, show the purchase
+        // modal (admins) or the "ask your admin" message (members)
+        // BEFORE prompting for a name. Saves the awkward UX of typing
+        // a name only to be told the seat limit was hit.
+        const summary = await (window.Billing ? Billing.getSummary() : Promise.resolve(null));
+        if (summary && summary.seats_used >= summary.seats_paid) {
+          if (summary.is_admin) {
+            await Billing.openPurchaseModal({
+              title: "Add a seat to create this account",
+              minSeats: 1,
+              onSuccess: () => {
+                // After payment lands, retry the add-account flow.
+                // Recursive call is safe — onSuccess runs once, and
+                // the next call will see the higher cap and proceed.
+                setTimeout(onAddAccount, 100);
+              },
+            });
+          } else {
+            alert("All seats are in use. Ask your organization admin to add more seats.");
+          }
+          return;
+        }
+
         const raw = window.prompt("New account name:");
         if (raw == null) return;           // cancelled
         const name = raw.trim();
