@@ -3431,6 +3431,33 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   color: #fff;
 }
 
+/* "Get the Chrome extension" link in the dashboard header. Same pill
+   shape as the team / platform-admin buttons, slightly different tone
+   so it reads as a CTA rather than a nav. Hidden by default; revealed
+   when window.SUPABASE_CONFIG.chromeExtensionUrl is set. */
+.btn-chrome-ext {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(30, 182, 131, .14);
+  border: 1px solid rgba(30, 182, 131, .35);
+  color: #b8eed8;
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn-chrome-ext:hover {
+  background: rgba(30, 182, 131, .24);
+  border-color: rgba(30, 182, 131, .55);
+  color: #fff;
+}
+
 /* ---------- Login: signup-mode switcher ---------- */
 /* Small prompt + link at the bottom of the login card that flips
    between "Sign in" and "Create account" modes without a reload. */

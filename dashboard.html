@@ -36,6 +36,11 @@
            isPlatformAdmin() returns true. Keeps the link invisible
            (and the list of orgs private) for regular customer admins. -->
       <a id="platform-admin-link" href="platform-admin.html" class="btn-platform-admin hidden">Platform admin</a>
+      <!-- Get the Chrome extension. Hidden by default; revealed via JS
+           if window.SUPABASE_CONFIG.chromeExtensionUrl is set. The URL
+           gets filled in once the Web Store review approves and we
+           know the extension id. -->
+      <a id="chrome-ext-link" href="#" target="_blank" rel="noopener" class="btn-chrome-ext hidden">Get the Chrome extension ↗</a>
       <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
     </div>
   </header>
@@ -297,6 +302,20 @@
           document.getElementById("platform-admin-link")?.classList.remove("hidden");
         }
       });
+
+      // Reveal the "Get the Chrome extension" link if a URL is set in
+      // config.js. URL gets filled in once the Chrome Web Store review
+      // approves the extension and we know its store id; until then the
+      // link stays hidden.
+      (() => {
+        const url = window.SUPABASE_CONFIG?.chromeExtensionUrl;
+        if (!url) return;
+        const link = document.getElementById("chrome-ext-link");
+        if (link) {
+          link.href = url;
+          link.classList.remove("hidden");
+        }
+      })();
 
       // Reveal the Team nav link for anyone who can actually use it.
       // Visibility rule: user admins ≥1 org, OR user is a platform admin
