@@ -885,7 +885,12 @@
       // while we refresh in the background. Cache key includes the
       // active org and timeframe so switching scopes doesn't show
       // stale-from-different-context data.
-      const SUMMARY_CACHE_KEY = "uptown:dashboard_summary:v1";
+      // v2 bump: invalidates entries written before the
+      // account_dashboard_summary All Time fast-path landed
+      // (2026-05-01). Old entries served zeros for the newly
+      // backfilled clients; bumping forces a fresh fetch on the
+      // first load post-deploy.
+      const SUMMARY_CACHE_KEY = "uptown:dashboard_summary:v2";
       const SUMMARY_STALE_MAX_AGE_MS = 24 * 60 * 60 * 1000;  // 24h
 
       function cacheKeyFor(orgId, since, until) {
