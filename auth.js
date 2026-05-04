@@ -8,12 +8,12 @@
 //     Auth.requireAuth().then(session => { /* page init */ });
 //   </script>
 //
-// requireAuth() resolves with a session or redirects to login.html
+// requireAuth() resolves with a session or redirects to /login/
 // (returning a never-resolving promise so downstream code doesn't run
 // on a page that's already leaving).
 
 (function () {
-  const LOGIN_PAGE = "login.html";
+  const LOGIN_PAGE = "/login/";
 
   async function requireAuth() {
     const session = await sb.ensureFreshSession();
@@ -67,7 +67,7 @@
     } catch (err) {
       // Don't block the page on a probe failure — just treat as
       // not-an-admin. The nav link stays hidden; if someone tried
-      // to hit platform-admin.html directly, its own guard fires.
+      // to hit /platform-admin/ directly, its own guard fires.
       console.warn("isPlatformAdmin probe failed:", err);
       _platformAdminCache = false;
     }

@@ -5,43 +5,43 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Team — Uptown</title>
-  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="/app.css" />
 </head>
 <body>
 
   <header class="header">
     <div class="header-left">
       <div class="header-logo">
-        <img src="assets/logo-white.png" alt="Uptown" />
+        <img src="/assets/logo-white.png" alt="Uptown" />
         <div class="header-wordmark">
           <div class="header-wordmark-top">UPTOWN</div>
           <div class="header-wordmark-bot">Operator Console</div>
         </div>
       </div>
       <div class="header-pipe"></div>
-      <a href="dashboard.html" class="header-breadcrumb">← Dashboard</a>
+      <a href="/dashboard/" class="header-breadcrumb">← Dashboard</a>
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
       <!-- Guides link: always visible. Leftmost utility-nav button. -->
-      <a href="guides.html" class="btn-guides-link">Guides</a>
-      <a id="platform-admin-link" href="platform-admin.html" class="btn-platform-admin hidden">Platform admin</a>
+      <a href="/guides/" class="btn-guides-link">Guides</a>
+      <a id="platform-admin-link" href="/platform-admin/" class="btn-platform-admin hidden">Platform admin</a>
       <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
     </div>
   </header>
 
-  <!-- Drill-in banner: same pattern as dashboard.html. Shown when a
+  <!-- Drill-in banner: same pattern as /dashboard/. Shown when a
        platform admin landed here via ?as_org=<uuid> so they can
        manage another org's team. -->
   <div id="drill-in-banner" class="drill-in-banner hidden" role="status" aria-live="polite">
     <span class="drill-in-text">
       Managing team for <strong id="drill-in-org-name"></strong>
     </span>
-    <a href="platform-admin.html" class="drill-in-exit">Exit to platform admin</a>
+    <a href="/platform-admin/" class="drill-in-exit">Exit to platform admin</a>
   </div>
 
   <div class="account-titlebar">
@@ -183,10 +183,10 @@
     </div>
   </div>
 
-  <script src="config.js"></script>
-  <script src="supabase-client.js"></script>
-  <script src="auth.js"></script>
-  <script src="billing.js"></script>
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script src="/auth.js"></script>
+  <script src="/billing.js"></script>
   <script>
     (async function main() {
       const session = await Auth.requireAuth();
@@ -202,7 +202,7 @@
       //   (b) Platform admin with ?as_org=<uuid> → manage that org.
       //   (c) Platform admin without ?as_org → there's no "my" org to
       //       default to (they're not necessarily a member of anything).
-      //       Send them to platform-admin.html to pick one.
+      //       Send them to /platform-admin/ to pick one.
       //
       // Members (non-admins) shouldn't reach this page. If they do
       // somehow, bounce them back to the dashboard.
@@ -234,7 +234,7 @@
         // their org, so a bare role=eq.admin probe would return the
         // org's admin rows even when the signed-in user is just a
         // member — and the no-as_org branch below would happily seat
-        // them on team.html as if they admined that org.
+        // them on /team/ as if they admined that org.
         const rows = await sb.sbFetch(
           "/rest/v1/organization_members?select=role,organizations(id,name,seats_paid)" +
           `&operator_id=eq.${encodeURIComponent(session.user.id)}` +
@@ -260,7 +260,7 @@
         // Anything else is a permission error.
         if (!isPA && !adminsRequested) {
           alert("You're not an admin of that organization. Opening your own team instead.");
-          window.location.replace("team.html");
+          window.location.replace("/team/");
           return;
         }
         try {
@@ -269,7 +269,7 @@
           );
           if (!rows || !rows.length) {
             alert("That organization wasn't found.");
-            window.location.replace(isPA ? "platform-admin.html" : "team.html");
+            window.location.replace(isPA ? "/platform-admin/" : "/team/");
             return;
           }
           org = { id: rows[0].id, name: rows[0].name, seats_paid: rows[0].seats_paid };
@@ -288,7 +288,7 @@
           document.title = `${org.name} team — Uptown`;
         } catch (err) {
           alert(`Couldn't load that organization: ${err.message}`);
-          window.location.replace(isPA ? "platform-admin.html" : "team.html");
+          window.location.replace(isPA ? "/platform-admin/" : "/team/");
           return;
         }
       } else {
@@ -298,10 +298,10 @@
         if (!myAdminOrgs.length) {
           const isPA = await isPlatformAdminPromise;
           if (isPA) {
-            window.location.replace("platform-admin.html");
+            window.location.replace("/platform-admin/");
           } else {
             alert("You need to be an org admin to manage a team.");
-            window.location.replace("dashboard.html");
+            window.location.replace("/dashboard/");
           }
           return;
         }
@@ -313,7 +313,7 @@
       // Render the org switcher if the user admins more than one org
       // AND the currently-viewed org is one of them. The second clause
       // skips the picker for platform admins drilled into an org they
-      // don't admin (their navigation tool is platform-admin.html).
+      // don't admin (their navigation tool is /platform-admin/).
       // Selecting a different option navigates to ?as_org=<that-id>
       // (full reload — simplest way to re-resolve all org-scoped state
       // without hand-stitching cache invalidation).
@@ -328,7 +328,7 @@
           select.addEventListener("change", () => {
             const next = select.value;
             if (next && next !== org.id) {
-              window.location.href = `team.html?as_org=${encodeURIComponent(next)}`;
+              window.location.href = `/team/?as_org=${encodeURIComponent(next)}`;
             }
           });
           switcher.classList.remove("hidden");
@@ -1053,8 +1053,7 @@
       }
 
       function buildSignupLink(email) {
-        const base = `${location.origin}${location.pathname.replace(/team\.html$/, "")}login.html`;
-        return `${base}?signup=1&email=${encodeURIComponent(email)}`;
+        return `${location.origin}/login/?signup=1&email=${encodeURIComponent(email)}`;
       }
 
       // ---- access modal ------------------------------------------------
@@ -1288,7 +1287,7 @@
   </script>
 
   <footer class="app-footer">
-    <a href="guides.html">Guides</a><span class="sep">·</span><a href="terms.html">Terms</a><span class="sep">·</span><a href="privacy.html">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
+    <a href="/guides/">Guides</a><span class="sep">·</span><a href="/terms/">Terms</a><span class="sep">·</span><a href="/privacy/">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
   </footer>
 </body>
 </html>

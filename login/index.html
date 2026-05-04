@@ -5,11 +5,11 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign in — Uptown Dashboard</title>
-  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="app.css" />
+  <link rel="stylesheet" href="/app.css" />
 </head>
 <body class="login-body">
 
@@ -21,7 +21,7 @@
   -->
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
-      <img src="assets/logo-white.png" alt="Uptown" />
+      <img src="/assets/logo-white.png" alt="Uptown" />
       <div>
         <div class="login-brand-name">Uptown Dashboard</div>
         <div class="login-brand-sub">Operator Console</div>
@@ -60,16 +60,16 @@
     </div>
 
     <!-- Click-wrap consent. Lives inside the card so it's visually
-         tied to the submit button and unmissable. terms.html /
-         privacy.html open in the same window — they're plain pages,
+         tied to the submit button and unmissable. /terms/ /
+         /privacy/ open in the same window — they're plain pages,
          no auth context to preserve. -->
     <div class="login-legal">
-      By signing in, you agree to our <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.
+      By signing in, you agree to our <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.
     </div>
   </form>
 
-  <script src="config.js"></script>
-  <script src="supabase-client.js"></script>
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
   <script>
     // If the operator is already signed in, skip the form entirely.
     // Exception: if they arrived via a signup link (?signup=1 or ?email=),
@@ -81,7 +81,7 @@
 
     if (!wantsSignup) {
       sb.ensureFreshSession().then(session => {
-        if (session) window.location.replace("dashboard.html");
+        if (session) window.location.replace("/dashboard/");
       });
     }
 
@@ -164,12 +164,12 @@
           // Auto-confirm mode: trigger chain has already created the
           // operators row and claimed any pending invites. Dashboard is
           // ready.
-          window.location.replace("dashboard.html");
+          window.location.replace("/dashboard/");
           return;
         }
 
         await sb.signIn(emailEl.value.trim(), pwEl.value);
-        window.location.replace("dashboard.html");
+        window.location.replace("/dashboard/");
       } catch (err) {
         errorEl.textContent   = err.message
           || ((mode === "signup") ? "Sign-up failed" : "Sign-in failed");

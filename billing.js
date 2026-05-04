@@ -1,9 +1,9 @@
 // =============================================================
 // Uptown billing client
 // =============================================================
-// Thin Stripe.js + Edge Function wrapper. Used by team.html (admin
-// billing card), dashboard.html / account.html (when "+ Add Account"
-// hits the seat cap), and platform-admin.html (gift seats).
+// Thin Stripe.js + Edge Function wrapper. Used by /team/ (admin
+// billing card), /dashboard/ / /account/ (when "+ Add Account"
+// hits the seat cap), and /platform-admin/ (gift seats).
 //
 // Public surface (window.Billing):
 //   getSummary()
@@ -24,7 +24,7 @@
 //     Generates a Stripe Customer Portal session URL and redirects
 //     the operator to Stripe. They come back via the return_url.
 //
-// Stripe.js is loaded lazily on first use (the team.html landing
+// Stripe.js is loaded lazily on first use (the /team/ landing
 // path doesn't need it, only the modal flow does).
 
 (function () {

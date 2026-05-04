@@ -58,7 +58,7 @@
     return session;
   }
 
-  // Create a new Supabase auth account from login.html's signup mode.
+  // Create a new Supabase auth account from the login page's signup mode.
   //
   // On success Supabase returns one of two shapes, depending on the
   // project's "Confirm email" setting:

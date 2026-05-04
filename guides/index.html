@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Guides — Uptown Creation</title>
-  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     /* Self-contained styles — guides is a long-lived reference doc that
        should render correctly even if app.css moves or breaks. Mirrors
-       the palette + typographic scale of terms.html / privacy.html so
+       the palette + typographic scale of /terms/ / /privacy/ so
        the three "standalone" pages read as a set. */
     :root {
       --navy:        #0f2138;
@@ -51,7 +51,7 @@
       font-size: 15px;
     }
 
-    /* ---- header (matches terms.html / privacy.html visually) ---- */
+    /* ---- header (matches /terms/ / /privacy/ visually) ---- */
     .header {
       background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
       color: #fff;
@@ -454,13 +454,13 @@
 <body>
 
   <header class="header">
-    <img src="assets/logo-white.png" alt="Uptown" />
+    <img src="/assets/logo-white.png" alt="Uptown" />
     <div>
       <div class="header-wordmark-top">UPTOWN</div>
       <div class="header-wordmark-bot">Guides</div>
     </div>
     <div class="header-spacer"></div>
-    <a href="dashboard.html">← Dashboard</a>
+    <a href="/dashboard/">← Dashboard</a>
   </header>
 
   <div class="shell">
@@ -1444,7 +1444,7 @@
             Portal to manage card and invoices.</li>
         <li><strong>From the extension</strong> — at-cap admins clicking + Add
             account in the popup get sent to
-            <code>dashboard.uptown.com/dashboard.html?action=add-seat</code>,
+            <code>dashboard.uptown.com//dashboard/?action=add-seat</code>,
             which auto-opens the purchase modal on arrival (the popup is too
             narrow to fit Stripe Elements inline).</li>
       </ul>
@@ -1550,15 +1550,6 @@
         account. The tracker shows a brief confirmation and clears.
       </p>
 
-      <div class="callout note">
-        <div class="callout-title">Duplicate-send guard</div>
-        <p>
-          The extension warns if you try to log the same action on the same
-          person twice in a short window — protects against double-logging when
-          you accidentally double-click. Doesn't fire across days, so legitimate
-          follow-ups still work.
-        </p>
-      </div>
 
       <h3 id="ext-sidebar">7.5 — The sidebar &amp; AI suggested replies</h3>
       <p>
@@ -1888,7 +1879,7 @@
   </div>
 
   <footer class="app-footer">
-    <a href="terms.html">Terms</a><span class="sep">·</span><a href="privacy.html">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
+    <a href="/terms/">Terms</a><span class="sep">·</span><a href="/privacy/">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
   </footer>
 
 </body>
