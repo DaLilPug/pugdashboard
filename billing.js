@@ -313,23 +313,25 @@
   }
 
   // ── Stripe Customer Portal redirect ─────────────────────────
+  // The card itself is gated on is_admin in loadBilling(); the button
+  // is gated on has_payment_method in renderBilling(). If we're being
+  // called, both already held at render time — and the edge function
+  // re-validates server-side. So skip the redundant client-side
+  // precheck (which fired a misleading "Only admins can manage
+  // billing" message any time a transient getSummary failed) and
+  // surface whatever specific error the edge function returns.
   async function openPortal() {
-    const summary = await getSummary();
-    if (!summary?.is_admin) {
-      alert("Only admins can manage billing.");
-      return;
-    }
-    if (!summary.has_payment_method) {
-      alert("No active subscription yet — purchase a seat first.");
-      return;
-    }
     try {
       const r = await callFn("stripe-billing-portal", {
         return_url: window.location.href,
       });
       if (r?.url) window.location.assign(r.url);
     } catch (err) {
-      alert("Couldn't open billing portal: " + (err.message || err));
+      const msg = err?.message || String(err);
+      if      (/not_org_admin/.test(msg)) alert("Only org admins can manage billing.");
+      else if (/no_customer/.test(msg))   alert("No Stripe customer on file yet — purchase a seat first.");
+      else if (/unauthorized/.test(msg))  alert("Sign in again — your session expired.");
+      else                                alert("Couldn't open billing portal: " + msg);
     }
   }
 

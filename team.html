@@ -460,7 +460,18 @@
         });
         card.querySelector("[data-action='switch-interval']")?.addEventListener("click", async () => {
           const target = interval === "year" ? "month" : "year";
-          if (!confirm(`Switch to ${target}ly billing? Stripe will prorate the change on your next invoice.`)) return;
+          // Make the discount math explicit. Monthly = $15/seat/mo
+          // ($180/seat/yr); annual = $120/seat/yr; saving = $60/seat/yr
+          // (33% off). Multiply by paid seats so multi-seat orgs see
+          // their actual dollar savings rather than just per-seat.
+          const seatsLabel = purchased === 1 ? "1 seat" : `${purchased} seats`;
+          const annualTotal           = purchased * 120;
+          const monthlyAnnualizedTotal = purchased * 15 * 12;
+          const savings               = monthlyAnnualizedTotal - annualTotal;
+          const msg = target === "year"
+            ? `Switch to annual billing?\n\nYou'll save $${savings}/year on ${seatsLabel} ($${annualTotal}/year vs $${monthlyAnnualizedTotal} if billed monthly — 33% off).\n\nStripe will prorate the change on your next invoice.`
+            : `Switch to monthly billing?\n\nYou'll lose the 33% annual discount — $${monthlyAnnualizedTotal}/year on ${seatsLabel} instead of $${annualTotal}/year.\n\nStripe will prorate the change on your next invoice.`;
+          if (!confirm(msg)) return;
           try {
             await Billing.callFn("stripe-billing-update", { action: "switch_interval", interval: target });
             await loadBilling();
