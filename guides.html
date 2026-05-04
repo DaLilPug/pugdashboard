@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guides — Uptown Creation</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Self-contained styles — guides is a long-lived reference doc that
+       should render correctly even if app.css moves or breaks. Mirrors
+       the palette + typographic scale of terms.html / privacy.html so
+       the three "standalone" pages read as a set. */
+    :root {
+      --navy:        #0f2138;
+      --navy-soft:   #1c3550;
+      --navy-2:      #4b5b6e;
+      --gray-50:     #f7f8fa;
+      --gray-100:    #eef0f3;
+      --gray-200:    #d8dde3;
+      --gray-300:    #b6bdc6;
+      --gray-400:    #6f7989;
+      --gray-500:    #4a5562;
+      --text:        #15212b;
+      --text-soft:   #4a5562;
+      --accent:      #2d7ab8;
+      --accent-soft: #e9f2fa;
+      --good:        #2f7d52;
+      --good-soft:   #e6f4ec;
+      --warn:        #b46a00;
+      --warn-soft:   #fff7e0;
+      --warn-border: #f3d27a;
+      --bad:         #b8323c;
+      --bad-soft:    #fbeaec;
+      --max-w:       1100px;
+      --content-w:   780px;
+      --sidebar-w:   260px;
+      --r-sm:        6px;
+      --r-md:        10px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: #fff;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    /* ---- header (matches terms.html / privacy.html visually) ---- */
+    .header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+      color: #fff;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+    .header img { height: 30px; width: auto; display: block; }
+    .header-wordmark-top {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.05em;
+      line-height: 1;
+    }
+    .header-wordmark-bot {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 500;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.78);
+      margin-top: 2px;
+    }
+    .header-spacer { flex: 1; }
+    .header a {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .header a:hover { color: #fff; text-decoration: underline; }
+
+    /* ---- two-column shell --------------------------------------- */
+    .shell {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 36px 24px 80px;
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      gap: 44px;
+      align-items: start;
+    }
+    @media (max-width: 880px) {
+      .shell {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 24px 20px 60px;
+      }
+    }
+
+    /* ---- sidebar TOC -------------------------------------------- */
+    .toc {
+      position: sticky;
+      top: 88px;
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      padding-right: 8px;
+      font-size: 13.5px;
+      border-right: 1px solid var(--gray-100);
+    }
+    @media (max-width: 880px) {
+      .toc {
+        position: static;
+        max-height: none;
+        border-right: 0;
+        border-bottom: 1px solid var(--gray-100);
+        padding: 8px 0 16px;
+        margin-bottom: 12px;
+      }
+    }
+    .toc-title {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin: 0 0 10px;
+    }
+    .toc ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      counter-reset: toc;
+    }
+    .toc > ol > li { counter-increment: toc; margin-bottom: 4px; }
+    .toc > ol > li > a::before {
+      content: counter(toc) ".";
+      color: var(--gray-300);
+      font-weight: 600;
+      width: 22px;
+      display: inline-block;
+    }
+    .toc a {
+      color: var(--text-soft);
+      text-decoration: none;
+      display: block;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: background .12s, color .12s;
+    }
+    .toc a:hover {
+      background: var(--gray-50);
+      color: var(--accent);
+    }
+    .toc ol ol {
+      margin: 4px 0 6px 26px;
+      padding: 0;
+      list-style: disc;
+      color: var(--gray-400);
+      font-size: 12.5px;
+    }
+    .toc ol ol li { margin-bottom: 2px; }
+    .toc ol ol a { padding: 2px 6px; }
+
+    /* ---- content ------------------------------------------------ */
+    .content {
+      max-width: var(--content-w);
+      min-width: 0;
+    }
+    .lede {
+      font-size: 17px;
+      color: var(--text-soft);
+      margin: 0 0 30px;
+      padding: 0 0 22px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 34px;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.01em;
+      margin: 0 0 8px;
+    }
+    h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy);
+      margin: 56px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--gray-100);
+      letter-spacing: -0.005em;
+    }
+    h2 .num {
+      display: inline-block;
+      width: 36px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    h3 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 30px 0 8px;
+      letter-spacing: 0.005em;
+    }
+    h4 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--navy-2);
+      margin: 18px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    p, ul, ol { margin: 0 0 14px; }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    li > ul, li > ol { margin-top: 6px; margin-bottom: 4px; }
+    a { color: var(--accent); }
+    strong { color: var(--text); font-weight: 600; }
+    code {
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12.5px;
+      color: var(--navy);
+    }
+    kbd {
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      box-shadow: inset 0 -1px 0 var(--gray-100);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--navy);
+    }
+
+    /* ---- callout boxes ----------------------------------------- */
+    .callout {
+      border-radius: var(--r-md);
+      padding: 14px 16px;
+      margin: 16px 0;
+      border-left: 4px solid var(--gray-200);
+      background: var(--gray-50);
+    }
+    .callout-title {
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--gray-500);
+      margin-bottom: 4px;
+      font-family: 'Montserrat', sans-serif;
+    }
+    .callout p:last-child { margin-bottom: 0; }
+    .callout.tip   { background: var(--accent-soft); border-left-color: var(--accent); }
+    .callout.tip   .callout-title { color: var(--accent); }
+    .callout.note  { background: var(--gray-50); border-left-color: var(--gray-300); }
+    .callout.note  .callout-title { color: var(--gray-500); }
+    .callout.warn  { background: var(--warn-soft);  border-left-color: var(--warn); }
+    .callout.warn  .callout-title { color: var(--warn); }
+    .callout.good  { background: var(--good-soft);  border-left-color: var(--good); }
+    .callout.good  .callout-title { color: var(--good); }
+    .callout.why   { background: #faf6ff; border-left-color: #7e57c2; }
+    .callout.why   .callout-title { color: #5e35b1; }
+
+    /* ---- step-by-step lists ------------------------------------ */
+    ol.steps {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+      margin: 14px 0 18px;
+    }
+    ol.steps > li {
+      counter-increment: step;
+      position: relative;
+      padding: 4px 0 12px 44px;
+      margin-bottom: 0;
+      border-bottom: 1px dashed var(--gray-100);
+    }
+    ol.steps > li:last-child { border-bottom: 0; }
+    ol.steps > li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 4px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 50%;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    ol.steps strong { color: var(--navy); }
+
+    /* ---- collapsible details ------------------------------------ */
+    details.collapsible {
+      border: 1px solid var(--gray-100);
+      border-radius: var(--r-md);
+      padding: 0;
+      margin: 14px 0;
+      background: #fff;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    details.collapsible[open] {
+      border-color: var(--gray-200);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    details.collapsible > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 12px 16px;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--navy);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+    }
+    details.collapsible > summary::-webkit-details-marker { display: none; }
+    details.collapsible > summary::before {
+      content: '▸';
+      color: var(--gray-300);
+      transition: transform .15s, color .15s;
+      font-size: 11px;
+      width: 14px;
+      display: inline-block;
+    }
+    details.collapsible[open] > summary::before {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+    details.collapsible > .details-body {
+      padding: 0 16px 16px 30px;
+    }
+    details.collapsible > .details-body > :first-child { margin-top: 0; }
+    details.collapsible > .details-body > :last-child  { margin-bottom: 0; }
+
+    /* ---- benchmark grid --------------------------------------- */
+    .bench-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 18px 0 22px;
+    }
+    .bench-card {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+      border-radius: var(--r-md);
+      padding: 12px 14px;
+    }
+    .bench-card-num {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: var(--navy);
+      letter-spacing: -0.01em;
+    }
+    .bench-card-label {
+      font-size: 12px;
+      color: var(--text-soft);
+      margin-top: 2px;
+    }
+
+    /* ---- list + filter "anchor" pill ---------------------------- */
+    .pill-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 8px 0 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .pill-list li {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+      color: var(--text-soft);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12.5px;
+      margin: 0;
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+    }
+
+    /* ---- anchor offset for sticky header ----------------------- */
+    h2[id], h3[id] { scroll-margin-top: 88px; }
+
+    /* ---- footer ------------------------------------------------- */
+    footer.app-footer {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 22px 24px 40px;
+      border-top: 1px solid var(--gray-100);
+      font-size: 12.5px;
+      color: var(--gray-400);
+      text-align: center;
+    }
+    footer.app-footer a {
+      color: var(--gray-400);
+      text-decoration: none;
+    }
+    footer.app-footer a:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+    footer.app-footer .sep {
+      margin: 0 8px;
+      color: var(--gray-200);
+      user-select: none;
+    }
+
+    /* ---- small UI mocks (lightweight, not pixel-perfect) ------- */
+    .ui-mock {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+      border-radius: var(--r-md);
+      padding: 10px 14px;
+      margin: 10px 0 16px;
+      font-size: 12.5px;
+      color: var(--text-soft);
+      font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+      line-height: 1.7;
+    }
+
+    @media print {
+      .header, .toc, footer .toc-link { display: none; }
+      .shell { grid-template-columns: 1fr; padding: 0; }
+      .content { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <img src="assets/logo-white.png" alt="Uptown" />
+    <div>
+      <div class="header-wordmark-top">UPTOWN</div>
+      <div class="header-wordmark-bot">Guides</div>
+    </div>
+    <div class="header-spacer"></div>
+    <a href="dashboard.html">← Dashboard</a>
+  </header>
+
+  <div class="shell">
+
+    <!-- =================================================== -->
+    <!-- SIDEBAR TABLE OF CONTENTS                           -->
+    <!-- =================================================== -->
+    <nav class="toc" aria-label="Table of contents">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#welcome">Welcome &amp; Quick Start</a>
+          <ol>
+            <li><a href="#how-it-fits">How the pieces fit together</a></li>
+            <li><a href="#first-week">Your first week</a></li>
+          </ol>
+        </li>
+        <li><a href="#sales-nav">Sales Navigator: setup</a>
+          <ol>
+            <li><a href="#why-salesnav">Why Sales Navigator is required</a></li>
+            <li><a href="#subscribe">Subscribing</a></li>
+          </ol>
+        </li>
+        <li><a href="#lead-lists">Building your Lead Lists</a>
+          <ol>
+            <li><a href="#monthly-lists">The 12 + 12 monthly lists</a></li>
+            <li><a href="#anchor-lists">Responded &amp; InMails Sent</a></li>
+            <li><a href="#retargeting-lists">Retargeting (ad-hoc)</a></li>
+          </ol>
+        </li>
+        <li><a href="#saved-searches">Saved Searches as a pipeline</a>
+          <ol>
+            <li><a href="#filters-overview">Filters overview</a></li>
+            <li><a href="#search-conn">Connection Requests</a></li>
+            <li><a href="#search-msg1">Send Message 1</a></li>
+            <li><a href="#search-inmail">InMail</a></li>
+            <li><a href="#search-retarget">Retargeting</a></li>
+          </ol>
+        </li>
+        <li><a href="#daily-workflow">The daily outreach workflow</a>
+          <ol>
+            <li><a href="#daily-conn">Send connection requests</a></li>
+            <li><a href="#daily-msg1">Send the initial message</a></li>
+            <li><a href="#daily-inbox">Inbox management</a></li>
+            <li><a href="#daily-followups">Completing follow-ups</a></li>
+            <li><a href="#daily-retarget">Monthly retargeting</a></li>
+          </ol>
+        </li>
+        <li><a href="#dashboard">The Dashboard, tab by tab</a>
+          <ol>
+            <li><a href="#dash-login">Logging in</a></li>
+            <li><a href="#dash-toplevel">Top-level Account dashboard</a></li>
+            <li><a href="#dash-summary">Summary</a></li>
+            <li><a href="#dash-prospects">Prospects</a></li>
+            <li><a href="#dash-followups">Follow-ups</a></li>
+            <li><a href="#dash-templates">Templates</a></li>
+            <li><a href="#dash-replyinst">Reply Instructions</a></li>
+            <li><a href="#dash-cadence">Cadence</a></li>
+            <li><a href="#dash-meeting">Meeting Links</a></li>
+            <li><a href="#dash-team">Team page</a></li>
+            <li><a href="#dash-billing">Billing</a></li>
+          </ol>
+        </li>
+        <li><a href="#extension">The Chrome Extension</a>
+          <ol>
+            <li><a href="#ext-install">Install &amp; sign in</a></li>
+            <li><a href="#ext-popup">The toolbar popup</a></li>
+            <li><a href="#ext-streak">The streak panel</a></li>
+            <li><a href="#ext-tracker">The tracker bar</a></li>
+            <li><a href="#ext-sidebar">The sidebar &amp; AI replies</a></li>
+            <li><a href="#ext-followups">Follow-ups in the extension</a></li>
+          </ol>
+        </li>
+        <li><a href="#benchmarks">Benchmarks &amp; what good looks like</a></li>
+        <li><a href="#faq">FAQ &amp; troubleshooting</a></li>
+      </ol>
+    </nav>
+
+    <!-- =================================================== -->
+    <!-- MAIN CONTENT                                        -->
+    <!-- =================================================== -->
+    <main class="content">
+
+      <h1>The Uptown Playbook</h1>
+      <p class="lede">
+        How to set up Sales Navigator the right way, run a clean LinkedIn outreach
+        cadence, and read the dashboards Uptown gives you back. If you do these
+        things in this order, you have a working pipeline.
+      </p>
+
+      <!-- ============================================================== -->
+      <h2 id="welcome"><span class="num">1.</span>Welcome &amp; Quick Start</h2>
+
+      <p>
+        Uptown is a system for running LinkedIn outreach as a repeatable pipeline:
+        consistent volume, clean tracking, and dashboards that tell you what to
+        change next. There are <strong>three pieces</strong> you'll touch every day —
+        Sales Navigator, the <strong>Uptown Outreach Tracker</strong> Chrome extension,
+        and the <strong>dashboard</strong> at
+        <a href="https://dashboard.uptown.com">dashboard.uptown.com</a>.
+      </p>
+
+      <h3 id="how-it-fits">How the pieces fit together</h3>
+      <ul>
+        <li><strong>Sales Navigator</strong> is your prospecting engine. Lead lists +
+            saved searches turn it into a pipeline that always has the right person
+            in front of you for the next action.</li>
+        <li><strong>The Chrome extension</strong> watches what you do on Sales Navigator
+            and on LinkedIn DMs, makes one-click logging trivial, and surfaces AI
+            suggested replies when someone responds.</li>
+        <li><strong>The dashboard</strong> shows you the funnel. It tells you whether
+            your acceptance, response, positive, and meetings are healthy, and it's
+            where you manage templates, cadences, your team, and billing.</li>
+      </ul>
+
+      <div class="callout why">
+        <div class="callout-title">Why we keep two records of every action</div>
+        <p>
+          You'll add people to LinkedIn lead lists <em>and</em> log the same action with
+          the tracker. That looks redundant — it isn't. The lead-list copy keeps Sales
+          Navigator's pipeline organized so the <em>next</em> saved search has the
+          right people in it. The tracker copy is what gives you funnel rates,
+          campaign-level insight, and follow-up cadences — things LinkedIn can't
+          show you on its own.
+        </p>
+      </div>
+
+      <h3 id="first-week">Your first week</h3>
+      <ol class="steps">
+        <li><strong>Subscribe to Sales Navigator</strong> (<a href="#sales-nav">Section 2</a>) and
+            give it a couple of days to fully activate.</li>
+        <li><strong>Build your lead lists</strong> (<a href="#lead-lists">Section 3</a>)
+            — 12 monthly Connection Request lists, 12 monthly Messages Sent lists,
+            plus Responded and InMails Sent. About 15 minutes once you know the
+            naming convention.</li>
+        <li><strong>Build your four saved searches</strong> (<a href="#saved-searches">Section 4</a>) —
+            Connection Requests, Send Message 1, InMail, Retargeting. The first
+            one (Connection Requests) is where you'll spend most of your filter time;
+            the others lean on the lead lists you just built.</li>
+        <li><strong>Install the Chrome extension</strong> (<a href="#ext-install">Section 7</a>),
+            sign in, and pick your account.</li>
+        <li><strong>Send your first 25 connection requests</strong>
+            (<a href="#daily-conn">Section 5.1</a>) and log them with the tracker.
+            That's day one.</li>
+      </ol>
+
+      <!-- ============================================================== -->
+      <h2 id="sales-nav"><span class="num">2.</span>Sales Navigator: setup</h2>
+
+      <h3 id="why-salesnav">Why Sales Navigator is required</h3>
+      <p>
+        Uptown is built around Sales Navigator, not regular LinkedIn search. Without
+        it, you can't realistically run this system — the filter precision and lead
+        list capacity simply aren't there on the free tier.
+      </p>
+      <ul>
+        <li><strong>Filter depth.</strong> Industry, function, seniority, geography,
+            company size, recent posters, signals like job changes — none of these
+            are usable through regular LinkedIn search.</li>
+        <li><strong>Lead lists.</strong> You can build the 26+ named lists this
+            playbook depends on. Free LinkedIn caps you at one "My Network" view.</li>
+        <li><strong>Saved searches with alerts.</strong> Saved searches are how you
+            run the same pipeline every day without rebuilding filters.</li>
+        <li><strong>InMail credits.</strong> InMail is how you reach 2nd-degree and
+            out-of-network prospects who haven't accepted a connection request yet.</li>
+        <li><strong>Higher visibility.</strong> Sales Navigator profiles signal
+            seriousness to other professionals. Your acceptance rate ticks up.</li>
+      </ul>
+
+      <h3 id="subscribe">Subscribing</h3>
+      <ol class="steps">
+        <li>Go to <a href="https://business.linkedin.com/sales-solutions/sales-navigator" target="_blank" rel="noopener">linkedin.com/sales-solutions</a> and
+            pick a plan. <strong>Sales Navigator Core</strong> is the right starting
+            point for individual outreach. Advanced and Advanced Plus are for sales
+            teams using CRMs and don't add anything Uptown needs.</li>
+        <li>LinkedIn typically offers a free trial; use it. The first month is
+            also when you'll be doing the most setup.</li>
+        <li>After signing up, go to <code>linkedin.com/sales</code>. That's the
+            Sales Navigator home — bookmark it. Most of your day will live there.</li>
+        <li>If you've never used Sales Navigator before, spend 15 minutes clicking
+            around the lead filters and lead lists views. The <strong>Lead filters</strong>
+            panel on the left of any search is where you'll spend the most time.</li>
+      </ol>
+
+      <div class="callout note">
+        <div class="callout-title">Subscription = required floor</div>
+        <p>
+          The rest of this guide assumes you have an active Sales Navigator
+          subscription. If yours lapses, the saved searches still exist but you
+          lose access to filters — the pipeline freezes until you renew.
+        </p>
+      </div>
+
+      <!-- ============================================================== -->
+      <h2 id="lead-lists"><span class="num">3.</span>Building your Lead Lists</h2>
+
+      <p>
+        Lead lists are how you keep Sales Navigator organized over time. We use
+        a <strong>monthly naming convention</strong> so that searches can grab
+        specific months by typing a date fragment, and so no single list ever
+        bumps into LinkedIn's 1,000-leads-per-list ceiling.
+      </p>
+
+      <p>
+        At the start of each calendar year you'll create the year's set of lists.
+        Below assumes <strong>2027</strong> — adjust the year for whichever year
+        you're in.
+      </p>
+
+      <h3 id="monthly-lists">The 12 + 12 monthly lists</h3>
+      <p>Create these two sets, one entry per month:</p>
+
+      <h4>Connection Request lists (×12)</h4>
+      <ul class="pill-list">
+        <li>1/27 Connection Request Sent</li>
+        <li>2/27 Connection Request Sent</li>
+        <li>3/27 Connection Request Sent</li>
+        <li>4/27 Connection Request Sent</li>
+        <li>5/27 Connection Request Sent</li>
+        <li>6/27 Connection Request Sent</li>
+        <li>7/27 Connection Request Sent</li>
+        <li>8/27 Connection Request Sent</li>
+        <li>9/27 Connection Request Sent</li>
+        <li>10/27 Connection Request Sent</li>
+        <li>11/27 Connection Request Sent</li>
+        <li>12/27 Connection Request Sent</li>
+      </ul>
+
+      <h4>Messages Sent lists (×12)</h4>
+      <ul class="pill-list">
+        <li>January 2027 Messages Sent</li>
+        <li>February 2027 Messages Sent</li>
+        <li>March 2027 Messages Sent</li>
+        <li>April 2027 Messages Sent</li>
+        <li>May 2027 Messages Sent</li>
+        <li>June 2027 Messages Sent</li>
+        <li>July 2027 Messages Sent</li>
+        <li>August 2027 Messages Sent</li>
+        <li>September 2027 Messages Sent</li>
+        <li>October 2027 Messages Sent</li>
+        <li>November 2027 Messages Sent</li>
+        <li>December 2027 Messages Sent</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-title">Why this exact naming</div>
+        <p>
+          The two formats look inconsistent — they are, on purpose. Sales Navigator's
+          list-picker has a search box. Typing <code>/27</code> filters to just the
+          twelve Connection Request lists; typing <code>2027</code> filters to just
+          the twelve Messages Sent lists. Mixing the formats means you can grab the
+          right set in one keystroke instead of scrolling a 26-item dropdown.
+        </p>
+      </div>
+
+      <h3 id="anchor-lists">Responded &amp; InMails Sent</h3>
+
+      <p>Two more lists, named the same way regardless of year:</p>
+
+      <ol class="steps">
+        <li><strong>Responded</strong> — every prospect who replies to anything goes
+            here. We use it as an exclusion filter on Retargeting saved searches so
+            we never re-target someone who's already replied.
+            <div class="callout note" style="margin-top:8px;">
+              <div class="callout-title">When to make a second one</div>
+              <p>
+                LinkedIn caps lists at 1,000 leads. If Responded fills up, create
+                <strong>Responded 2</strong> and add it to your retargeting exclusion
+                set. Most operators don't hit this for 12+ months.
+              </p>
+            </div>
+        </li>
+        <li><strong>InMails Sent</strong> — every InMail recipient. Used to verify
+            you don't double-InMail the same person (LinkedIn doesn't surface this
+            cleanly otherwise).</li>
+      </ol>
+
+      <h3 id="retargeting-lists">Retargeting lists (ad-hoc)</h3>
+      <p>
+        You don't pre-create retargeting lists. Instead, when you decide to run a
+        retargeting batch (we recommend roughly once a month), you build the list
+        right then and name it for the date you started — e.g.
+        <code>Retargeting 4/23/2027</code>. That way each batch is auditable
+        in isolation if a particular pass underperforms.
+      </p>
+
+      <h3 id="how-create">How to create a lead list</h3>
+      <ol class="steps">
+        <li>From <code>linkedin.com/sales</code>, hover the <strong>Lead Lists</strong>
+            menu in the top nav and click <strong>Create new list</strong>.</li>
+        <li>Type the name exactly as written above. Capitalization matters less
+            than the year fragment — <code>/27</code> and <code>2027</code> are
+            what your search-picker keys off.</li>
+        <li>Save. Repeat 25 more times. (It's tedious; do it once a year and forget
+            about it.)</li>
+      </ol>
+
+      <!-- ============================================================== -->
+      <h2 id="saved-searches"><span class="num">4.</span>Saved Searches as a pipeline</h2>
+
+      <p>
+        With lead lists in place, saved searches turn Sales Navigator into a
+        production line: each search is a "queue" you pull from for one specific
+        action. You'll build four of them.
+      </p>
+
+      <h3 id="filters-overview">Filters overview</h3>
+      <p>
+        Sales Navigator gives you dozens of lead filters. The ones that matter most
+        for outreach quality are:
+      </p>
+
+      <ul>
+        <li><strong>Connection</strong> — limit to 2nd and 3rd-degree connections so
+            you're not pinging people you already know.</li>
+        <li><strong>Geography</strong> — region, country, or metro area.</li>
+        <li><strong>Industry</strong> &amp; <strong>Company headcount</strong> — coarse
+            company-level filters; useful when your ICP is "mid-market SaaS" or similar.</li>
+        <li><strong>Function</strong> &amp; <strong>Current job title</strong> — the
+            person's role. Title is more precise; Function is broader and forgives
+            inconsistent titling.</li>
+        <li><strong>Seniority level</strong> — Director, VP, CXO, Owner, etc.</li>
+        <li><strong>Posted on LinkedIn</strong> — the goldmine. Setting this to
+            <em>last 30 days</em> filters down to people who are demonstrably
+            <em>active</em> on the platform. Acceptance and response rates on
+            "active" leads run 30–50% higher than on dormant profiles.</li>
+        <li><strong>Saved leads and accounts</strong> — used as the exclusion to
+            stop re-targeting your existing saved leads (covered below).</li>
+        <li><strong>People you've interacted with</strong> — exclude
+            <em>Messaged</em> so saved searches never hand you a person you've
+            already DM'd.</li>
+        <li><strong>Lead lists</strong> — the include filter that drives every
+            saved search after the first one.</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-title">Active People filter</div>
+        <p>
+          If you do nothing else with filters, set <strong>Posted on LinkedIn → in the
+          past 30 days</strong>. Targeting active LinkedIn users is the single biggest
+          lever on acceptance rate.
+        </p>
+      </div>
+
+      <h3 id="search-conn">Saved Search 1 — <em>Connection Requests</em></h3>
+      <p>This is the entry point of your pipeline. It's the only search you have to
+        tune for ICP fit; the others piggyback off the lists this one populates.</p>
+
+      <h4>Anchor filters (always on)</h4>
+      <ul>
+        <li><strong>Connection:</strong> 2nd degree connections, 3rd+ degree connections (only — exclude 1st).</li>
+        <li><strong>Saved leads and accounts:</strong> All my saved leads <strong>(Exclude)</strong>. This means anyone you've ever saved to any list won't show up.</li>
+        <li><strong>People you've interacted with → Messaged:</strong> <strong>Exclude</strong>. Redundant safety net for anyone who slipped past the saved-leads exclusion (e.g. you unsaved them, or messaged them outside the playbook).</li>
+      </ul>
+
+      <h4>ICP filters (whatever defines your ideal client)</h4>
+      <p>
+        Add the filters that make someone an ideal customer for your offer. There's
+        no universal answer here, but a workable starter pattern is:
+      </p>
+      <ul>
+        <li>Geography: your serviceable region.</li>
+        <li>Industry: 1–3 industries you've sold to before.</li>
+        <li>Seniority: Owner, Founder, CXO, VP, Director (whoever buys what you sell).</li>
+        <li>Job title or Function: the role of the buyer.</li>
+        <li><strong>Posted on LinkedIn → past 30 days</strong> (highly recommended).</li>
+      </ul>
+
+      <p>
+        Save the search. Name it <strong>Connection Requests</strong>. Each day,
+        this saved search is the queue you start from.
+      </p>
+
+      <h3 id="search-msg1">Saved Search 2 — <em>Send Message 1</em></h3>
+      <p>This search auto-populates with people who accepted a connection request — they're your "ready to message" queue.</p>
+
+      <h4>Anchor filters</h4>
+      <ul>
+        <li><strong>Lead Lists → Include</strong> — all twelve <code>X/27 Connection Request Sent</code> lists. (Type <code>/27</code> in the picker to grab them all in one keystroke.)</li>
+        <li><strong>People you've interacted with → Messaged: Exclude</strong>. Once you've sent Message 1 they fall out of this search.</li>
+      </ul>
+
+      <p>
+        That's it. No ICP filters needed — the connection-request list already did
+        the targeting work. Save as <strong>Send Message 1</strong>.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">Why two saved searches instead of one</div>
+        <p>
+          The Connection Requests search shows you 2nd/3rd-degree people. The Send
+          Message 1 search shows you 1st-degree people who just accepted. Different
+          populations, different next actions. Splitting them into two queues keeps
+          the day-to-day clean: one queue per task.
+        </p>
+      </div>
+
+      <h3 id="search-inmail">Saved Search 3 — <em>InMail</em> (as needed)</h3>
+      <p>
+        Build an InMail saved search whenever you want to test a new audience or a
+        new filter combination. It's a great cheap experiment because InMail
+        bypasses the connection-request acceptance step.
+      </p>
+
+      <h4>Anchor filters</h4>
+      <ul>
+        <li>Same as <em>Connection Requests</em>: Connection 2nd/3rd, exclude all my saved leads, exclude Messaged.</li>
+        <li>Add an exclude on the <strong>InMails Sent</strong> lead list so you don't double-InMail the same person.</li>
+      </ul>
+
+      <p>
+        Layer in whatever experimental ICP filters you want to test, save with a
+        descriptive name (e.g. <code>InMail — VP Ops, US, last 30 days</code>),
+        and burn through your monthly InMail credits there.
+      </p>
+
+      <h3 id="search-retarget">Saved Search 4 — <em>Retargeting</em> (build per batch)</h3>
+      <p>
+        Retargeting hits people you messaged a few months back who never replied.
+        We typically run a retargeting batch once a month.
+      </p>
+
+      <h4>Anchor filters</h4>
+      <ul>
+        <li><strong>Lead Lists → Include</strong> — one or more older
+            <code>Month YYYY Messages Sent</code> lists. A good rule of thumb is at
+            least 2–3 months back, sometimes 6+.
+            <em>Example:</em> if it's October 2027, including <code>January 2027 Messages Sent</code>
+            and <code>February 2027 Messages Sent</code> gives you a clean
+            8–9-month-old cohort to retarget.</li>
+        <li><strong>Lead Lists → Exclude:</strong> the <strong>Responded</strong>
+            list. Critical — never retarget someone who already replied to a
+            previous touch.</li>
+      </ul>
+
+      <p>
+        Save with the date suffix: <code>Retargeting 4/23/2027</code>. After the
+        batch, the saved search becomes a record of which cohort you hit on which
+        day, which makes after-the-fact analysis tractable.
+      </p>
+
+      <div class="callout tip">
+        <div class="callout-title">Cadence vs. retargeting</div>
+        <p>
+          You can reduce your need for retargeting by extending your follow-up cadence
+          inside Uptown — for example, adding a 60- or 90-day step. The dashboard's
+          <a href="#dash-cadence">Cadence tab</a> lets you tune this per account.
+        </p>
+      </div>
+
+      <!-- ============================================================== -->
+      <h2 id="daily-workflow"><span class="num">5.</span>The daily outreach workflow</h2>
+
+      <p>
+        Once your lists and saved searches are in place, the day-to-day flow is
+        small and repeatable. Here's the order of operations.
+      </p>
+
+      <h3 id="daily-conn">5.1 — Send connection requests</h3>
+      <p>
+        <strong>Volume target:</strong> 25–50 per day, 100–200 per week.
+        LinkedIn enforces a weekly cap (varies but ~200 is the practical ceiling).
+        The extension's <a href="#ext-streak">streak panel</a> tracks where you
+        are vs. that weekly target in real time.
+      </p>
+
+      <ol class="steps">
+        <li><strong>Open the <em>Connection Requests</em> saved search.</strong>
+            Each page shows 25 results.</li>
+        <li><strong>Send a connection request to everyone on the page.</strong>
+            Click <em>Connect</em> on each lead — Sales Nav lets you click through
+            without leaving the page. Add a note only if your strategy includes
+            note-with-request; most operators send noteless to maximize acceptance.</li>
+        <li><strong>Save them all to this month's Connection Request Sent list.</strong>
+            Click the <em>Save</em> dropdown on each lead and select e.g.
+            <code>4/27 Connection Request Sent</code>. (Sales Nav lets you select
+            multiple at once with the page-wide checkbox + <em>Save to list</em>.)
+            <div class="callout tip" style="margin-top:8px;">
+              <div class="callout-title">Save before you send</div>
+              <p>
+                If you're worried about losing track when LinkedIn lags, save
+                everyone to the list <em>first</em>, then send the requests.
+                Same end state, no chance of "wait, did I save them?".
+              </p>
+            </div>
+        </li>
+        <li><strong>Log the batch in the tracker.</strong> The Uptown extension's
+            tracker bar appears at the top of the search page. With all 25 leads
+            still selected on the page (the tracker mirrors page selection), click
+            <strong>Connection</strong>, then <strong>Log Outreach</strong>.
+            <div class="callout note" style="margin-top:8px;">
+              <div class="callout-title">What gets logged</div>
+              <p>
+                One <code>connection</code> event per selected prospect, attributed
+                to your currently-selected account. The dashboard's Acceptance Rate
+                and Connections-this-week numbers update immediately.
+              </p>
+            </div>
+        </li>
+        <li><strong>Repeat</strong> until you hit your daily target. Most operators
+            do 1–2 pages of 25 per day.</li>
+      </ol>
+
+      <h3 id="daily-msg1">5.2 — Send the initial message ("Message 1")</h3>
+      <p>
+        The <em>Send Message 1</em> saved search auto-populates whenever a
+        connection request is accepted. These are the people who said "yes" to
+        connecting — they're now ready for your real opener.
+      </p>
+
+      <ol class="steps">
+        <li><strong>Open the <em>Send Message 1</em> saved search.</strong></li>
+        <li><strong>For each new person on this saved search, send your initial message.</strong>
+            We recommend renaming your first saved template inside Uptown's <a href="#dash-templates">Templates tab</a>
+            to <code>Message 1</code> and copying it from the extension popup or
+            the per-account dashboard so the wording stays consistent across the team.</li>
+        <li><strong>Save them to the current month's Messages Sent list.</strong>
+            E.g. <code>April 2027 Messages Sent</code>.
+            <div class="callout tip" style="margin-top:8px;">
+              <div class="callout-title">When to save</div>
+              <p>
+                Some operators save before sending the message — that way if you
+                get distracted you don't lose them out of the pipeline. Either
+                order works as long as both happen.
+              </p>
+            </div>
+        </li>
+        <li><strong>Log in the tracker.</strong> Select the people on the page,
+            click <strong>Message</strong>, click <strong>Log Outreach</strong>.
+            (Usually 25 if your saved search has 25+ pending.)</li>
+      </ol>
+
+      <div class="callout why">
+        <div class="callout-title">Why "Messages Sent" = "New Connections"</div>
+        <p>
+          Because we send Message 1 the moment someone becomes a new connection,
+          the count of Messages Sent in your pipeline equals the count of
+          connection requests that were accepted in that period. That's why the
+          dashboard's <strong>Acceptance Rate</strong> is calculated as
+          <em>Messages Sent ÷ Connection Requests Sent</em>. It's the cleanest
+          measurable proxy for "did they accept?" given LinkedIn doesn't expose
+          a true acceptance event.
+        </p>
+      </div>
+
+      <h3 id="daily-inbox">5.3 — Inbox management</h3>
+      <p>
+        Every reply needs to be logged with the tracker. Logging a reply ends any
+        existing follow-up cadence on that prospect, so they don't keep getting
+        automated nudges after they've engaged.
+      </p>
+
+      <ol class="steps">
+        <li><strong>Open the LinkedIn or Sales Navigator inbox.</strong> Either
+            works; the extension recognizes both.</li>
+        <li><strong>Filter to Unread.</strong> Cuts the visible thread list down
+            to messages you actually need to act on. Skim once a day.</li>
+        <li><strong>Open each thread.</strong> Read the response.</li>
+        <li><strong>Log the response with the tracker.</strong> The Uptown tracker
+            bar shows on the inbox page. With the thread open, click
+            <strong>Response</strong>, pick a sentiment, click <strong>Log Outreach</strong>.
+            <ul style="margin-top:8px;">
+              <li><strong>Positive</strong> — they said yes-ish: interested, want to learn more,
+                  asked a buying-related question. Kicks off the
+                  <a href="#dash-cadence">Positive Response Cadence</a> (whose goal
+                  is booking the meeting).</li>
+              <li><strong>Negative</strong> — clear no, "remove me", "not interested",
+                  "wrong person". Use this honestly — it's how the
+                  <a href="#benchmarks">Positive Rate</a> tells you whether your
+                  message is landing.</li>
+              <li><strong>Neutral</strong> — replies that aren't a yes or a no:
+                  "what's this about", "send me more info", auto-replies. The
+                  cadence ends; future steps are up to you.</li>
+            </ul>
+        </li>
+        <li><strong>Reply.</strong> Use the AI suggested-reply pane in the extension
+            sidebar (see <a href="#ext-sidebar">Section 7.5</a>) as a starting
+            draft, or write from scratch — your call.</li>
+        <li><strong>Add them to the Responded list as redundancy.</strong> In the
+            inbox view, click the <em>Saved</em> button under their name and pick
+            <strong>Responded</strong>. The tracker logs the response, but adding
+            them to the lead list is what protects future Retargeting batches
+            from accidentally re-hitting them.</li>
+      </ol>
+
+      <div class="callout warn">
+        <div class="callout-title">Log every response, not just the positive ones</div>
+        <p>
+          The dashboard's Response Rate, Positive Rate, and benchmarking tags
+          all depend on having an honest count of <em>every</em> reply, not just
+          the good ones. Skipping negatives makes your funnel look better than
+          it is and hides whichever <a href="#benchmarks">issue tag</a> would
+          otherwise tell you exactly what to fix.
+        </p>
+      </div>
+
+      <h3 id="daily-followups">5.4 — Completing follow-ups</h3>
+      <p>
+        Each day the dashboard and the extension queue up follow-up tasks that
+        are due. There are two flavors:
+      </p>
+      <ul>
+        <li><strong>Regular follow-ups</strong> — the next step in your standard
+            Follow-up Cadence for prospects who haven't responded yet.</li>
+        <li><strong>Positive follow-ups</strong> — the next step in the Positive
+            Response Cadence, aimed at moving an interested prospect toward a
+            booked meeting.</li>
+        <li><strong>Manual follow-ups</strong> — anything you scheduled by hand
+            via the "Schedule follow-up" flow on a thread.</li>
+      </ul>
+
+      <p>
+        The fastest way to work the follow-up queue is from the inbox, not from
+        the task list:
+      </p>
+
+      <ol class="steps">
+        <li>Open Uptown's <strong>Follow-ups</strong> tab in the extension popup or
+            in the <a href="#dash-followups">per-account dashboard</a>. You'll see
+            today's due tasks grouped by type with per-pill counts.</li>
+        <li><strong>Copy the prospect's name</strong> from the task. The extension
+            shows a small clipboard icon to the left of each name — one click
+            copies just the name.</li>
+        <li>Switch to your Sales Nav messaging inbox and paste the name into the
+            <strong>Search Messages</strong> field. Their thread comes up
+            instantly.</li>
+        <li>Send the next follow-up message. Use the cadence template assigned to
+            this step if you want to stay on-script (the extension's
+            <strong>Open thread</strong> button auto-flips the sidebar to the
+            Follow-ups view so the template is right there).</li>
+        <li><strong>Log in the tracker.</strong> Click <strong>Follow-up</strong>
+            (or <strong>Positive Follow-up</strong> if it's a positive-response
+            cadence step), then <strong>Log Outreach</strong>. The task drops off
+            the queue.</li>
+        <li>Repeat until the day's follow-up queue is empty.</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">Why the inbox-first approach beats Open Task</div>
+        <p>
+          You can click <em>Open Task</em> on each task and the extension will
+          deep-link to the LinkedIn thread, but the round-trip feels slow when
+          you're working through 20+ follow-ups. Copy-paste-into-search is faster
+          once you've got the muscle memory.
+        </p>
+      </div>
+
+      <h3 id="daily-retarget">5.5 — Monthly retargeting</h3>
+      <p>
+        Once a month, kick off a retargeting batch. Build a fresh saved search
+        as described in <a href="#search-retarget">Section 4.4</a>, name it for
+        today's date, and send a retargeting message to everyone in it.
+      </p>
+
+      <ol class="steps">
+        <li>Build the saved search (older Messages Sent list, exclude Responded).</li>
+        <li>For each page: send the retargeting message, save them to a freshly
+            created <code>Retargeting MM/DD/YYYY</code> list, and log
+            <strong>Retargeting</strong> in the tracker.</li>
+        <li>Move on with your week. The retargeting list itself is your record of
+            who got hit; if any reply, the inbox-management flow takes care of
+            them like any other response.</li>
+      </ol>
+
+      <!-- ============================================================== -->
+      <h2 id="dashboard"><span class="num">6.</span>The Dashboard, tab by tab</h2>
+
+      <p>
+        The dashboard is at <a href="https://dashboard.uptown.com">dashboard.uptown.com</a>.
+        It's a fast, sortable view of every account you have access to, with a
+        deep per-account drill-in.
+      </p>
+
+      <h3 id="dash-login">6.1 — Logging in</h3>
+      <p>
+        First-time users land here from an email invite. After that, sign in with
+        the email and password you set up. If you forget your password, click
+        <em>Forgot password</em> on the login screen.
+      </p>
+
+      <h3 id="dash-toplevel">6.2 — Top-level Account dashboard</h3>
+      <p>
+        After logging in you see a sortable table of every account you have
+        access to. Each row is one account; columns show the funnel for the
+        selected timeframe.
+      </p>
+
+      <h4>Filters &amp; timeframe</h4>
+      <ul>
+        <li><strong>Accounts / Companies / Status</strong> — narrow the table to
+            just the accounts you want to look at. Status defaults to <em>All</em>;
+            switch to <em>Active</em> to hide accounts that haven't seen activity.</li>
+        <li><strong>Timeframe pills</strong> — 1W / 2W / 3W / 1M / 2M / 3M / This Year / All Time.
+            <em>This Year</em> is the default — fastest to load and most relevant
+            for ongoing performance reviews.</li>
+        <li><strong>Show archived</strong> checkbox in the table header reveals
+            archived accounts (greyed out, with an Unarchive button).</li>
+      </ul>
+
+      <h4>Reading the columns</h4>
+      <p>
+        Each row's data cells form a single tinted card running across the row.
+        Hover any data cell to see a deeper tint and a small <em>›</em> chevron;
+        click anywhere on the row to drill into that account's per-account
+        dashboard.
+      </p>
+
+      <ul>
+        <li><strong>Connections</strong> — connection requests sent in the timeframe.</li>
+        <li><strong>Messages</strong> — Message 1 sends (= new accepted connections).</li>
+        <li><strong>Acc. rate</strong> — Messages ÷ Connections. Color-coded against
+            the 30% benchmark (good ≥30%, ok ≥15%, bad below).</li>
+        <li><strong>Responses</strong> — replies received.</li>
+        <li><strong>Resp. rate</strong> — Responses ÷ Messages. Benchmark 20%.</li>
+        <li><strong>Positives</strong> — replies you tagged as positive sentiment.</li>
+        <li><strong>Pos. resp. rate</strong> — Positives ÷ Responses. Benchmark 15%.</li>
+        <li><strong>Meetings</strong> — meetings booked in the timeframe.</li>
+        <li><strong>Pos. booking rate</strong> — Meetings ÷ Positives. Benchmark 40%.</li>
+        <li><strong>Trend</strong> — a tiny cumulative chart (orange = positives,
+            green = meetings) over the selected timeframe. Quick visual on whether
+            an account is building momentum or flat-lining.</li>
+      </ul>
+
+      <h4>Additional outreach (collapsed by default)</h4>
+      <p>
+        Click the <strong>→</strong> toggle in the header to reveal four extra
+        columns: <em>Regular FU, Positive FU, InMails, Retargeting</em>. These
+        roll into the funnel but live behind a toggle to keep the default view
+        scannable.
+      </p>
+
+      <h4>Adding a new account</h4>
+      <p>
+        Admins see a <strong>+ Add new account</strong> button on the right of
+        the section header. Clicking it opens a small modal with name + slug
+        fields. If you're at your seat cap, you'll be routed to the Stripe
+        purchase modal first; once a seat frees up the new account is created
+        and seeded with default templates and cadence steps.
+      </p>
+
+      <h3 id="dash-summary">6.3 — Per-account: Summary</h3>
+      <p>
+        Click any row to land on the per-account view. The default tab is
+        <strong>Summary</strong>:
+      </p>
+
+      <ul>
+        <li><strong>Timeframe pills</strong> — same set as the top-level dashboard,
+            independent per-account selection.</li>
+        <li><strong>KPI strip</strong> — the headline funnel numbers (Connections,
+            Messages, Acc. rate, Responses, Resp. rate, Positives, Pos. resp. rate,
+            Meetings, Pos. booking rate) for the selected timeframe.</li>
+        <li><strong>Cumulative chart</strong> — a line per metric over the
+            timeframe. Four series are hidden by default behind the
+            <strong>+</strong> pill in the legend (Regular FU, Positive FU, InMails,
+            Retargeting); click to expand inline.</li>
+        <li><strong>Trends by Period</strong> table — period-over-period comparison
+            (1W → 2W → 3W → 1M → 2M → 3M → YTD → All Time). The bold rate rows
+            (Acceptance, Response, Positive, Pos. Booking) are what you watch
+            week-over-week to see whether a change moved the needle.</li>
+      </ul>
+
+      <div class="callout note">
+        <div class="callout-title">Period-comparison row colors</div>
+        <p>
+          Rate cells are color-coded against the <a href="#benchmarks">benchmark
+          targets</a>. A clean diagonal of green is what a healthy account looks
+          like; clusters of yellow/red are where you focus.
+        </p>
+      </div>
+
+      <h3 id="dash-prospects">6.4 — Per-account: Prospects</h3>
+      <p>
+        The Prospects tab is a spreadsheet view of every distinct person this
+        account has touched, auto-clustered across name / LinkedIn ID / email /
+        profile URL so the same person isn't counted multiple times across
+        events.
+      </p>
+
+      <h4>What's in each row</h4>
+      <ul>
+        <li><strong>Name &amp; basic info</strong> (with an Edit-info pencil for
+            corrections).</li>
+        <li><strong>Status</strong> — derived from the most recent event
+            (Connected, Messaged, Responded, Booked, etc.).</li>
+        <li><strong>Sentiment</strong> — most recent response sentiment (positive
+            / neutral / negative). Inline-editable via the small pill.</li>
+        <li><strong>Last touch</strong> — sortable; three-state click cycle (desc → asc → clear).</li>
+        <li><strong>Event count</strong> &amp; expand chevron — click the row to
+            see the full event timeline.</li>
+      </ul>
+
+      <h4>Editing events</h4>
+      <p>
+        Each event in the expanded timeline has a <strong>pencil</strong> (edit)
+        and an <strong>X</strong> (delete) icon. Edit lets you fix a wrong-typed
+        message body, change a response's sentiment, or correct a mis-categorized
+        event type. Delete removes the event from the funnel; if it was the last
+        event for that prospect, the prospect row auto-disappears.
+      </p>
+
+      <h4>Bulk actions</h4>
+      <p>
+        Tick the checkbox on multiple rows (use <kbd>Shift+click</kbd> for range
+        select) and a floating bulk bar appears at the top: count + Clear +
+        <strong>Delete N</strong>. Useful for cleaning up bad imports or
+        duplicates a manual merge missed.
+      </p>
+
+      <h4>Mark meeting booked</h4>
+      <p>
+        Each prospect row has a <strong>Mark meeting booked</strong> button. Use
+        it when you booked a meeting outside of an integrated calendar (or want
+        to log one manually). The button flips to <em>Meeting logged ✓</em> after;
+        deleting the meeting event flips it back.
+      </p>
+
+      <h3 id="dash-followups">6.5 — Per-account: Follow-ups</h3>
+      <p>
+        The Follow-ups tab is the per-account version of the daily queue. It
+        shows all follow-up tasks across all three sources (regular cadence,
+        positive cadence, manual) due today and overdue, grouped by type with
+        filter pills.
+      </p>
+
+      <p>
+        From here you can:
+      </p>
+      <ul>
+        <li>Click <strong>Open thread</strong> to deep-link to the LinkedIn DM.</li>
+        <li>Click the small clipboard icon next to a name to copy the name to
+            paste into Sales Nav's Search Messages box.</li>
+        <li>Mark a task complete (which logs the corresponding follow-up event).</li>
+        <li>Cancel a task (removes it without logging).</li>
+        <li>Reschedule a task to a different date.</li>
+      </ul>
+
+      <h3 id="dash-templates">6.6 — Per-account: Templates</h3>
+      <p>
+        Templates are your one-off message library — Message 1, retargeting copy,
+        and any other paste-ready text you reuse. Up to 10 per account.
+      </p>
+
+      <ul>
+        <li><strong>Add</strong>, <strong>rename</strong> inline, <strong>edit body</strong>,
+            <strong>copy</strong>, <strong>delete</strong>.</li>
+        <li>Templates support these variables, expanded automatically when the
+            extension copies them into a message: <code>{{first_name}}</code>,
+            <code>{{company}}</code>, <code>{{title}}</code>.</li>
+        <li>Templates are also available from the extension popup so you can copy
+            without leaving Sales Nav.</li>
+      </ul>
+
+      <div class="callout tip">
+        <div class="callout-title">Naming your first template "Message 1"</div>
+        <p>
+          We recommend renaming your first saved template to <code>Message 1</code>
+          and writing your initial-message copy there. The naming consistency
+          makes the daily workflow ("copy Message 1, send, log") clean across
+          your team.
+        </p>
+      </div>
+
+      <h3 id="dash-replyinst">6.7 — Per-account: Reply Instructions</h3>
+      <p>
+        A free-form text box that becomes the system prompt for the AI suggested-reply
+        feature in the extension sidebar. The AI reads this instruction plus the
+        message you sent and the prospect's reply when drafting a suggested
+        response.
+      </p>
+
+      <p>Good Reply Instructions are short, specific, and outcome-oriented. Examples:</p>
+      <ul>
+        <li><em>"Be warm but brief. If they ask about pricing, pivot to booking a call. Never quote numbers."</em></li>
+        <li><em>"Tone: senior consultant, not salesy. Always end with a soft CTA toward a 15-minute call."</em></li>
+        <li><em>"If the response is a clear no, draft a polite acknowledgement and offer to circle back in 6 months."</em></li>
+      </ul>
+
+      <h3 id="dash-cadence">6.8 — Per-account: Cadence</h3>
+      <p>
+        Cadence controls automated follow-up timing. There are <strong>two
+        independent sequences</strong> per account:
+      </p>
+
+      <h4>Follow-up Cadence</h4>
+      <p>
+        Anchored on a Message 1 send. Steps fire on the days you specify
+        (e.g. day 3, day 7, day 14) and stop when the prospect responds, books a
+        meeting, or you cancel. Each step has a template; templates support the
+        same <code>{{first_name}}</code> / <code>{{company}}</code> /
+        <code>{{title}}</code> variables.
+      </p>
+
+      <h4>Positive Response Cadence</h4>
+      <p>
+        Anchored on a positive-sentiment response. Goal is booking a meeting.
+        Steps fire on day-offsets after the positive response. Stops on
+        meeting booked or cancellation.
+      </p>
+
+      <h4>The On/Off toggle</h4>
+      <p>
+        The big switch at the top of each cadence panel disables enrolling
+        <strong>new</strong> prospects without affecting in-flight tasks. So if
+        you flip Follow-up Cadence off mid-month, the people already in the
+        sequence keep getting their scheduled tasks; only newly-messaged prospects
+        won't enroll.
+      </p>
+
+      <h3 id="dash-meeting">6.9 — Per-account: Meeting Links</h3>
+      <p>
+        Per-account meeting links you can copy into LinkedIn DMs. Two flavors:
+      </p>
+
+      <ul>
+        <li><strong>Plain link</strong> — paste-ready URL with a display name. No
+            integration; bookings won't auto-log.</li>
+        <li><strong>Integrated link</strong> — connect Calendly or HubSpot via OAuth.
+            Bookings on the linked event type / matching meeting title auto-log
+            as <code>meeting_booked</code> outreach events, attached to the right
+            prospect by name match.</li>
+      </ul>
+
+      <h4>Connecting Calendly</h4>
+      <ol class="steps">
+        <li>Click <strong>Connect Calendly</strong> on a meeting link row.</li>
+        <li>OAuth into Calendly. Pick which event type this link should listen on.</li>
+        <li>Save. Future bookings on that event type fire a webhook into Uptown
+            and create a <code>meeting_booked</code> event for the matching prospect.</li>
+      </ol>
+
+      <h4>Connecting HubSpot</h4>
+      <ol class="steps">
+        <li>Click <strong>Connect HubSpot</strong>.</li>
+        <li>OAuth in. Type a unique substring that matches the meeting title for
+            this account (e.g. <code>Acme Corp intro call</code>).</li>
+        <li>HubSpot fires a webhook on every meeting created; meetings whose
+            titles contain your match-text get auto-logged on this Uptown account.
+            One HubSpot org can route to multiple Uptown accounts via different
+            match strings.</li>
+      </ol>
+
+      <h3 id="dash-team">6.10 — Team page (admins)</h3>
+      <p>
+        Admins see a <strong>Team</strong> link in the top-right header. The Team
+        page is where you:
+      </p>
+
+      <ul>
+        <li><strong>Invite members and admins</strong> — paste their email, pick
+            a role, get a shareable invite link to drop into Slack or email.
+            Admins see all accounts; members only see what you grant them.</li>
+        <li><strong>Manage access</strong> — for each member, click
+            <em>Manage access</em> to pick which accounts they can see.</li>
+        <li><strong>Manage roles</strong> — promote a member to admin or vice versa.</li>
+        <li><strong>Recent activity</strong> — an audit log of the last 50 events
+            in this org (invites, members joined/removed, accounts archived/unarchived,
+            seat-cap changes, outreach edits and deletions).</li>
+        <li><strong>Billing card</strong> — admin-only, at the bottom: add seat /
+            remove seat / switch monthly↔annual / manage payment &amp; invoices.
+            See <a href="#dash-billing">6.11</a>.</li>
+      </ul>
+
+      <h3 id="dash-billing">6.11 — Billing</h3>
+      <p>
+        Uptown bills <strong>$15 per seat per month</strong> or
+        <strong>$120 per seat per year</strong> (33% off when billed annually).
+        Each seat is one LinkedIn account being run through Uptown. The first
+        seat you buy comes with a <strong>7-day free trial</strong>.
+      </p>
+
+      <h4>Where the controls live</h4>
+      <ul>
+        <li><strong>Adding your first seat / paying for a trial</strong> — clicking
+            <em>+ Add new account</em> when you have no paid seats opens the Stripe
+            purchase modal directly.</li>
+        <li><strong>Adding seats at-cap</strong> — clicking <em>+ Add new account</em>
+            when you're at your seat cap routes admins to the purchase modal;
+            members get an "ask your admin" prompt.</li>
+        <li><strong>Routine seat management</strong> — the Team page billing card.
+            Add seat, remove seat, switch interval, open the Stripe Customer
+            Portal to manage card and invoices.</li>
+        <li><strong>From the extension</strong> — at-cap admins clicking + Add
+            account in the popup get sent to
+            <code>dashboard.uptown.com/dashboard.html?action=add-seat</code>,
+            which auto-opens the purchase modal on arrival (the popup is too
+            narrow to fit Stripe Elements inline).</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">What happens if a payment fails</div>
+        <p>
+          Stripe retries failed payments per its standard schedule. If the retries
+          all fail, the subscription is suspended and Uptown locks out the dashboard
+          and extension until the card is updated via the Customer Portal. Your
+          data is preserved through the suspension.
+        </p>
+      </div>
+
+      <!-- ============================================================== -->
+      <h2 id="extension"><span class="num">7.</span>The Chrome Extension</h2>
+
+      <p>
+        The <strong>Uptown Outreach Tracker</strong> extension is what makes
+        single-click logging possible from inside Sales Navigator and LinkedIn
+        DMs. It also surfaces AI-suggested replies and exposes your follow-up
+        queue right in the page.
+      </p>
+
+      <h3 id="ext-install">7.1 — Install &amp; sign in</h3>
+      <ol class="steps">
+        <li>Install from the <strong>Chrome Web Store</strong> (link is on the top
+            of the dashboard once a user has access; it shows up as
+            <em>Get the Chrome extension ↗</em>).</li>
+        <li>After install, click the Uptown icon in your Chrome toolbar (you may
+            want to pin it). The popup opens with a sign-in form.</li>
+        <li>Sign in with the same email / password you use on the dashboard.</li>
+        <li>Pick your active <strong>account</strong> from the dropdown. Outreach
+            you log will be tagged to this account until you switch.</li>
+      </ol>
+
+      <h3 id="ext-popup">7.2 — The toolbar popup</h3>
+      <p>
+        Clicking the Uptown icon in the Chrome toolbar opens the popup. From the
+        popup you can:
+      </p>
+
+      <ul>
+        <li>Switch between accounts (member: only your assigned ones; admin: all).</li>
+        <li>See the <a href="#ext-streak">streak panel</a> for your current weekly
+            connection-request count + countdown to LinkedIn's Sunday reset.</li>
+        <li>Open the <strong>Templates</strong> drawer to copy a message body.</li>
+        <li>Open the <strong>Meeting Links</strong> drawer to copy a meeting URL.</li>
+        <li>Edit <strong>Reply Instructions</strong> for the current account.</li>
+        <li>Edit <strong>Follow-up Cadence</strong> and <strong>Positive Response
+            Cadence</strong> for the current account.</li>
+        <li>Click <strong>+ Add account</strong> (admins only) to spin up a new
+            account without leaving the page.</li>
+        <li>Click <strong>Guides</strong> in the header (top-right) to open this
+            page.</li>
+      </ul>
+
+      <h3 id="ext-streak">7.3 — The streak panel</h3>
+      <p>
+        Sandwiched between the account picker and the drawer stack, the streak
+        panel shows two cells:
+      </p>
+
+      <ul>
+        <li><strong>Until Sunday Reset</strong> — countdown to LinkedIn's weekly
+            connection-request quota reset (Sunday 7pm Central).</li>
+        <li><strong>Connections this week</strong> — how many connection requests
+            you've logged for this account since the last reset.</li>
+      </ul>
+
+      <p>
+        The counter cell color shifts as you progress:
+      </p>
+      <ul>
+        <li>0–49 — neutral.</li>
+        <li>50+ — warm amber ("getting there").</li>
+        <li>100+ — green ("on target").</li>
+        <li>200+ — calm teal ("weekly cap hit"). <em>Not</em> celebratory: 200 is
+            a hard ceiling LinkedIn enforces, not a stretch goal.</li>
+      </ul>
+
+      <h3 id="ext-tracker">7.4 — The tracker bar (Sales Navigator)</h3>
+      <p>
+        On Sales Navigator search pages and lead lists, the Uptown tracker
+        appears at the top of the results area. With one or more leads selected
+        on the page, you click an action button to log:
+      </p>
+
+      <ul>
+        <li><strong>Connection</strong> — connection requests sent.</li>
+        <li><strong>Message</strong> — Message 1 sends.</li>
+        <li><strong>Follow-up</strong> — regular follow-up step.</li>
+        <li><strong>Positive Follow-up</strong> — positive response cadence step.</li>
+        <li><strong>InMail</strong> — InMail sends.</li>
+        <li><strong>Retargeting</strong> — retargeting message sends.</li>
+        <li><strong>Response</strong> — replies, with sentiment selector
+            (positive / neutral / negative).</li>
+      </ul>
+
+      <p>
+        After picking an action, click <strong>Log Outreach</strong>. One event
+        per selected lead is written to the dashboard, attributed to your active
+        account. The tracker shows a brief confirmation and clears.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">Duplicate-send guard</div>
+        <p>
+          The extension warns if you try to log the same action on the same
+          person twice in a short window — protects against double-logging when
+          you accidentally double-click. Doesn't fire across days, so legitimate
+          follow-ups still work.
+        </p>
+      </div>
+
+      <h3 id="ext-sidebar">7.5 — The sidebar &amp; AI suggested replies</h3>
+      <p>
+        Inside Sales Navigator and LinkedIn message threads, an Uptown sidebar
+        slides in from the right. It has three modes:
+      </p>
+
+      <ul>
+        <li><strong>Follow-ups view</strong> — your due follow-up queue with the
+            same filter pills, copy-name buttons, and Open-thread links as the
+            dashboard's Follow-ups tab.</li>
+        <li><strong>Reply view</strong> (active when you have a message thread
+            open) — shows the recent conversation, your selected account's
+            <a href="#dash-replyinst">Reply Instructions</a>, and a
+            <strong>Suggested reply</strong> drafted by AI. Edit it inline, or
+            click <em>Regenerate</em> for a new draft.</li>
+        <li><strong>Account chip</strong> — the currently-selected account name
+            appears as a read-only pill in the sidebar header so you don't lose
+            track of which account you're logging to. Switching accounts in the
+            popup live-updates this chip.</li>
+      </ul>
+
+      <h3 id="ext-followups">7.6 — Follow-ups in the extension</h3>
+      <p>
+        The Follow-ups view in the sidebar mirrors the dashboard tab, but it's
+        always one click away from inside any LinkedIn page. Clicking
+        <strong>Open thread</strong> on a task opens the LinkedIn DM in a new
+        tab and auto-flips the new tab's sidebar to the Follow-ups view, so the
+        template + recent conversation are already visible when you arrive.
+      </p>
+
+      <!-- ============================================================== -->
+      <h2 id="benchmarks"><span class="num">8.</span>Benchmarks &amp; what good looks like</h2>
+
+      <p>
+        Uptown's benchmark targets are based on hundreds of cohorts across our
+        client base. They're not aspirational; they're what a clean cadence and
+        a fitted ICP actually produce.
+      </p>
+
+      <div class="bench-grid">
+        <div class="bench-card">
+          <div class="bench-card-num">30%</div>
+          <div class="bench-card-label">Acceptance rate<br><span style="color:var(--gray-400);font-size:11px;">connections accepted ÷ requests sent</span></div>
+        </div>
+        <div class="bench-card">
+          <div class="bench-card-num">20%</div>
+          <div class="bench-card-label">Response rate<br><span style="color:var(--gray-400);font-size:11px;">responses ÷ messages sent</span></div>
+        </div>
+        <div class="bench-card">
+          <div class="bench-card-num">15%</div>
+          <div class="bench-card-label">Positive rate<br><span style="color:var(--gray-400);font-size:11px;">positives ÷ responses</span></div>
+        </div>
+        <div class="bench-card">
+          <div class="bench-card-num">4+</div>
+          <div class="bench-card-label">Meetings booked<br><span style="color:var(--gray-400);font-size:11px;">per month</span></div>
+        </div>
+        <div class="bench-card">
+          <div class="bench-card-num">40%</div>
+          <div class="bench-card-label">Booking rate<br><span style="color:var(--gray-400);font-size:11px;">meetings ÷ positives</span></div>
+        </div>
+      </div>
+
+      <h3>The two levers</h3>
+      <p>
+        Every fix lives on one of two levers: <strong>targeting</strong> (who
+        you're going after) or <strong>messaging</strong> (what you're saying).
+        The benchmark numbers tell you which lever to pull.
+      </p>
+
+      <h3>Issue patterns at a glance</h3>
+      <p>
+        These are the patterns we look for during a manual audit. The future
+        AI Analysis feature on the dashboard will surface them automatically;
+        for now, here's the cheat sheet.
+      </p>
+
+      <details class="collapsible">
+        <summary>Tag 1 — Low Acceptance (Acc &lt; 30%)</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> targeting or profile problem.</p>
+          <p><strong>What to try:</strong> check headline + photo on your LinkedIn
+            profile, tighten title matching, toggle <em>Posted on LinkedIn → last
+            30 days</em>, adjust seniority levels in the Connection Requests
+            saved search.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 2 — High Acceptance, Low Response (Acc ≥ 30%, Resp &lt; 20%)</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> targeting active people, but wrong fit;
+            or weak pattern disrupt; or message reads spammy.</p>
+          <p><strong>What to try:</strong> read 20–30 neutral/negative responses,
+            tag the patterns, exclude bad-fit company/title keywords, change your
+            opener / pattern disrupt, simplify jargon.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 3 — High Acc, High Resp, Low Positive (Pos &lt; 15%)</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> problem statement isn't impactful;
+            wrong audience priorities.</p>
+          <p><strong>What to try:</strong> tag common no's from 20–30 negative/neutral
+            replies, try a softer CTA to validate the problem statement.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 4 — High everything except Meetings (Mtg low)</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> not enough urgency, wrong conversion
+            channel, meeting-link problem.</p>
+          <p><strong>What to try:</strong> rewrite problem statement for urgency,
+            switch to a harder CTA, change channel (phone / email), audit your
+            <a href="#dash-meeting">meeting link</a> for broken redirects.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 5 — Low Acc but downstream funnel works</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> selective audience self-filters at
+            the request step; the funnel works for the people who do accept.</p>
+          <p><strong>What to try:</strong> don't over-optimize acceptance — your
+            ICP is just narrow. Test small profile tweaks; consider increasing
+            volume to compensate.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 6 — Low Acc + Low Resp + High Pos% + Low Mtg</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> sample size too small; the high
+            positive rate is statistical noise on a tiny denominator.</p>
+          <p><strong>What to try:</strong> fix acceptance first (Tag 1). Don't
+            change messaging until the volume to evaluate it exists.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 7 — Low Acc + High Resp + Low Pos + Low Mtg</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> few acceptors engage but the offer
+            isn't compelling enough.</p>
+          <p><strong>What to try:</strong> fix acceptance first (Tag 1), then
+            rewrite the problem statement to focus on outcomes.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 8 — High Acc + Low Resp + High Pos + Low Mtg</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> weak opener — message isn't getting
+            read past the first line.</p>
+          <p><strong>What to try:</strong> rewrite the opening line / pattern
+            disrupt; keep the rest of the message intact; A/B test openers.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 9 — High Acc, Low Resp, Low Pos, High Mtg</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> data or tracking issue. Statistically
+            unlikely at volume.</p>
+          <p><strong>What to try:</strong> audit your data — verify response
+            logging is happening (check inbox management discipline),
+            verify meeting attribution in the Meeting Links integration. If the
+            data looks right after the audit, treat as Tag 2.</p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Tag 10 — High Acc, High Resp, Low Pos, High Mtg</summary>
+        <div class="details-body">
+          <p><strong>Likely cause:</strong> the team is converting manually
+            despite a weak positive rate. The closer is doing heroics.</p>
+          <p><strong>What to try:</strong> don't change the conversion approach
+            (it's working). Rewrite the problem statement so the positive rate
+            climbs and meetings come from less heroic effort. Monitor meetings
+            carefully so the rewrite doesn't break what's working.</p>
+        </div>
+      </details>
+
+      <h3>Audit cadence</h3>
+      <ul>
+        <li><strong>Green</strong> (all benchmarks healthy) — audit every 4 weeks.</li>
+        <li><strong>Yellow</strong> (one or two tags showing) — audit every 2 weeks.</li>
+        <li><strong>Red</strong> (multiple tags, or one severe) — audit weekly.</li>
+        <li>If a benchmark has lagged for &gt;3 weeks since your last change,
+            escalate — that's the signal that the change you made wasn't enough.</li>
+      </ul>
+
+      <!-- ============================================================== -->
+      <h2 id="faq"><span class="num">9.</span>FAQ &amp; troubleshooting</h2>
+
+      <details class="collapsible">
+        <summary>I logged something to the wrong account. How do I fix it?</summary>
+        <div class="details-body">
+          <p>
+            Open that account's <a href="#dash-prospects">Prospects tab</a>, find
+            the prospect, expand the row, click the pencil on the wrong event,
+            and edit the type or delete it. If you'd already logged it on the
+            right account too, just delete the wrong one.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>The tracker bar isn't showing on Sales Nav.</summary>
+        <div class="details-body">
+          <ul>
+            <li>Check that you're signed in via the popup.</li>
+            <li>Check that you've selected an account in the popup.</li>
+            <li>Reload the Sales Nav page.</li>
+            <li>If still missing: open the popup, sign out and sign back in,
+                reload the page.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>I hit my seat cap and need to add an account.</summary>
+        <div class="details-body">
+          <p>
+            If you're an admin, click <strong>+ Add new account</strong> (in the
+            dashboard or popup). You'll get a Stripe purchase modal that adds a
+            seat and creates the account. If you're a member, ask your admin to
+            buy a seat from the Team page billing card.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>How do I cancel my subscription?</summary>
+        <div class="details-body">
+          <p>
+            Team page → billing card → <strong>Manage payment &amp; invoices</strong>
+            → Stripe Customer Portal → Cancel subscription. Cancellation takes
+            effect at the end of your current billing period. Your data is
+            preserved.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>How do I switch from monthly to annual billing?</summary>
+        <div class="details-body">
+          <p>
+            Team page → billing card → <strong>Switch to annual</strong>. The
+            confirm dialog spells out the savings (33% off the monthly rate).
+            Switching mid-period prorates against your next bill.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>Calendly bookings aren't auto-logging.</summary>
+        <div class="details-body">
+          <ul>
+            <li>Check that the Meeting Links row has a green <em>Integrated</em> badge.</li>
+            <li>Check that the booking was on the event type you selected during OAuth.</li>
+            <li>Auto-attachment is by name match. If your prospect booked under a
+                different name (e.g. nickname, married name) you may need to log
+                the meeting manually from the <a href="#dash-prospects">Prospects tab</a>.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>HubSpot bookings aren't auto-logging.</summary>
+        <div class="details-body">
+          <ul>
+            <li>Check the meeting title actually contains the substring you
+                set during connect.</li>
+            <li>Verify HubSpot's webhook subscription is active in the Meeting Links
+                row (it'll show a connected indicator).</li>
+            <li>HubSpot's webhook fires on Meeting Created, not on Meeting Updated.
+                Edits to a meeting after creation don't re-fire.</li>
+          </ul>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>I need to delete a prospect entirely.</summary>
+        <div class="details-body">
+          <p>
+            Tick the prospect's checkbox in the
+            <a href="#dash-prospects">Prospects tab</a> and click
+            <strong>Delete N</strong> in the floating bulk bar (works with one or
+            many). Deletion is logged in the audit log on the
+            <a href="#dash-team">Team page</a>.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>I want to invite a teammate but they already use Uptown.</summary>
+        <div class="details-body">
+          <p>
+            Invite their existing email anyway. Instead of creating a new account,
+            Uptown will surface a pending invite at the top of their dashboard —
+            they accept (joining your org) or decline (no change). They keep their
+            existing account and gain access to yours.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>How do I export my data?</summary>
+        <div class="details-body">
+          <p>
+            We don't ship a self-serve export today. Email
+            <a href="mailto:austin@uptown.com">austin@uptown.com</a> and we'll
+            pull a CSV of your outreach + prospects per account.
+          </p>
+        </div>
+      </details>
+
+      <p style="margin-top:48px;color:var(--gray-400);font-size:13px;">
+        Still stuck? Email <a href="mailto:austin@uptown.com">austin@uptown.com</a>.
+        We respond within a business day.
+      </p>
+
+    </main>
+  </div>
+
+  <footer class="app-footer">
+    <a href="terms.html">Terms</a><span class="sep">·</span><a href="privacy.html">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
+  </footer>
+
+</body>
+</html>

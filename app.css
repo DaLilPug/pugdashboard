@@ -3404,6 +3404,33 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 #org-table tbody tr:hover { background: transparent; }
 #org-table tbody tr:hover td.editable-seats .editable-value { background: var(--navy-light); }
 
+/* ---------- Guides nav link ---------- */
+/* Public docs link — leftmost button in the header-right cluster.
+   Same pill shape as Team / Platform admin so the cluster reads as
+   one group; always visible (not gated by role). */
+.btn-guides-link {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
+  color: rgba(255,255,255,.85);
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn-guides-link:hover {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.24);
+  color: #fff;
+}
+
 /* ---------- Team nav link ---------- */
 /* Matches the Platform admin pill so the header-right cluster reads
    as one group of utility nav. Same palette; same reveal pattern
