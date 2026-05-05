@@ -945,11 +945,20 @@
             // longer get silently added to the org — they see an
             // Accept / Decline banner on their own dashboard next time
             // they sign in. UI surfaces the pending state so the admin
-            // knows why nobody showed up in the members list yet.
+            // knows why nobody showed up in the members list yet, AND
+            // we send a branded heads-up email so they don't have to
+            // wait until next sign-in to know.
+            const link = buildSignupLink(outcome.email || email);
             resultEl.innerHTML = `<div class="invite-result-ok">
-              ${esc(email)} already has an Uptown account. We'll show them an Accept / Decline prompt on their dashboard the next time they sign in. They'll appear in Members here once they accept.
+              We've emailed ${esc(email)} an invite. They already have an Uptown account, so they'll also see an Accept / Decline prompt on their dashboard the next time they sign in.
             </div>`;
             emailEl.value = "";
+            sendInviteEmail({
+              email:       outcome.email || email,
+              role,
+              accept_url:  link,
+              is_new_user: false,
+            }, resultEl);
             await Promise.all([loadInvites(), loadActivity()]);
           } else if (outcome.status === "added_existing") {
             // Legacy path — only returned if add_invite_consent.sql
@@ -965,7 +974,7 @@
             const link = buildSignupLink(outcome.email || email);
             resultEl.innerHTML = `
               <div class="invite-result-ok">
-                Invite ready. Share this link with ${esc(outcome.email || email)}:
+                We've emailed ${esc(outcome.email || email)} an invite. If you'd rather share the link directly:
               </div>
               <div class="invite-link-row">
                 <input type="text" class="invite-link" readonly value="${esc(link)}" />
@@ -979,6 +988,12 @@
                 copyText(link, ev.currentTarget);
               });
             emailEl.value = "";
+            sendInviteEmail({
+              email:       outcome.email || email,
+              role,
+              accept_url:  link,
+              is_new_user: true,
+            }, resultEl);
             await Promise.all([loadInvites(), loadActivity()]);
           } else {
             resultEl.innerHTML = `<div class="invite-result-info">Invite submitted.</div>`;
@@ -998,6 +1013,58 @@
         } finally {
           btn.disabled = false;
           btn.textContent = prev;
+        }
+      }
+
+      // Fire-and-forget call to the send-team-invite-email edge
+      // function. We've already shown the optimistic "we've emailed
+      // them" copy by the time this runs; if the send fails we append
+      // a small fallback note so the admin knows to share the manual
+      // signup link instead. Doesn't block the rest of the post-invite
+      // flow.
+      async function sendInviteEmail({ email, role, accept_url, is_new_user }, resultEl) {
+        try {
+          const inviterName =
+            session.user?.user_metadata?.name ||
+            session.user?.user_metadata?.full_name ||
+            "";
+          const res = await fetch(
+            `${window.SUPABASE_CONFIG.url}/functions/v1/send-team-invite-email`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${session.access_token}`,
+                "Content-Type":  "application/json",
+                "apikey":        window.SUPABASE_CONFIG.anonKey,
+              },
+              body: JSON.stringify({
+                org_id:       org.id,
+                email,
+                role,
+                accept_url,
+                is_new_user,
+                inviter_name: inviterName,
+              }),
+            }
+          );
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.warn("invite email send failed:", res.status, data);
+            const note = document.createElement("div");
+            note.className = "invite-result-info";
+            note.style.marginTop = "8px";
+            note.textContent =
+              "Heads-up: we couldn't send the invite email automatically. Share the link directly with them above.";
+            resultEl.appendChild(note);
+          }
+        } catch (err) {
+          console.warn("invite email send threw:", err);
+          const note = document.createElement("div");
+          note.className = "invite-result-info";
+          note.style.marginTop = "8px";
+          note.textContent =
+            "Heads-up: we couldn't send the invite email automatically. Share the link directly with them above.";
+          resultEl.appendChild(note);
         }
       }
 
