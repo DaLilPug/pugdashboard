@@ -164,88 +164,19 @@
             <td class="num">${fmtInt(outreachCt)}</td>
             <td>${fmtDateTime(org.created_at)}</td>
             <td class="col-actions">
-              <button class="btn-row-action btn-gift-seats" data-org-id="${esc(org.id)}" data-org-name="${esc(org.name)}" type="button" title="Grant or revoke free seats for this org">Manage seats</button>
               <a class="btn-row-action btn-drill-in" href="/dashboard/?as_org=${encodeURIComponent(org.id)}" title="Open the dashboard scoped to this organization">View as org</a>
             </td>
           </tr>
         `;
       }
 
-      // Manage-seats modal: platform-admin can grant or revoke free
-      // seats. Shows the seat breakdown (paid via Stripe + gifted by
-      // platform admin = total available). Grant bumps seats_gifted
-      // (and thus seats_paid via the trigger); revoke does the
-      // reverse, capped at the current gifted count.
-      async function openSeatsModal(orgId, orgName) {
-        let billing;
-        try {
-          const rows = await sb.sbFetch("/rest/v1/rpc/platform_admin_org_billing", {
-            method: "POST", body: JSON.stringify({ p_org_id: orgId }),
-          });
-          billing = Array.isArray(rows) ? rows[0] : null;
-        } catch (err) {
-          alert("Couldn't load billing for this org: " + (err.message || err));
-          return;
-        }
-        if (!billing) {
-          alert("Org not found.");
-          return;
-        }
-
-        const purchased = Number(billing.seats_purchased) || 0;
-        const gifted    = Number(billing.seats_gifted)    || 0;
-        const total     = Number(billing.seats_paid)      || 0;
-        const used      = Number(billing.seats_used)      || 0;
-        const status    = billing.subscription_status || "none";
-
-        const qtyRaw = window.prompt(
-          `${orgName}\n\n` +
-          `Currently: ${total} total seats (${purchased} paid + ${gifted} gifted), ${used} in use.\n` +
-          `Subscription: ${status}.\n\n` +
-          `Enter a positive number to GRANT free seats, or a negative number to REVOKE gifted seats.\n` +
-          `Cancel to back out.`,
-          ""
-        );
-        if (qtyRaw == null) return;
-        const qty = parseInt(String(qtyRaw).trim(), 10);
-        if (!Number.isFinite(qty) || qty === 0) {
-          alert("Enter a non-zero integer.");
-          return;
-        }
-
-        try {
-          if (qty > 0) {
-            await sb.sbFetch("/rest/v1/rpc/grant_gifted_seats", {
-              method: "POST",
-              body:   JSON.stringify({ p_org_id: orgId, p_qty: qty }),
-            });
-          } else {
-            const absQty = -qty;
-            if (absQty > gifted) {
-              alert(`Cannot revoke ${absQty} gifted seats — only ${gifted} have been granted.`);
-              return;
-            }
-            await sb.sbFetch("/rest/v1/rpc/revoke_gifted_seats", {
-              method: "POST",
-              body:   JSON.stringify({ p_org_id: orgId, p_qty: absQty }),
-            });
-          }
-          await load();
-        } catch (err) {
-          alert("Couldn't update seats: " + (err.message || err));
-        }
-      }
-
       function wireRowHandlers(orgs) {
         // Map of id → the live row object so the inline edit handler
         // can mutate it in place after saving without re-running load().
+        // (The "Manage seats" prompt-based flow was removed once the
+        //  inline-edit on the Gifted column covered the same surface
+        //  cleanly via grant_gifted_seats / revoke_gifted_seats.)
         const byId = new Map(orgs.map(o => [o.id, o]));
-
-        tbodyEl.querySelectorAll(".btn-gift-seats").forEach(btn => {
-          btn.addEventListener("click", () => {
-            openSeatsModal(btn.dataset.orgId, btn.dataset.orgName);
-          });
-        });
 
         tbodyEl.querySelectorAll("td.editable-seats").forEach(td => {
           td.addEventListener("click", (e) => {
