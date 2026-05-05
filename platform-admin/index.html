@@ -69,6 +69,40 @@
         </table>
       </div>
     </section>
+
+    <!--
+      Users section: every Uptown account, joined to its (single)
+      organization. Search filters by name + email + org. Per-row
+      actions: send password reset (any user), delete user (orphans
+      only — server-side gate enforces this too).
+    -->
+    <section class="table-section">
+      <div class="section-head">
+        <h2>Users</h2>
+        <span id="user-count" class="section-meta"></span>
+        <div class="section-head-spacer"></div>
+        <input id="user-search" type="search" class="filter-select"
+               placeholder="Search name, email, organization…"
+               style="min-width:280px;" autocomplete="off" />
+      </div>
+      <div class="table-wrap">
+        <table class="client-table" id="user-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Organization</th>
+              <th>Role</th>
+              <th>Created</th>
+              <th class="col-actions" aria-label="Row actions"></th>
+            </tr>
+          </thead>
+          <tbody id="user-tbody">
+            <tr><td colspan="6" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
   <script src="/config.js"></script>
@@ -97,8 +131,153 @@
         return;
       }
 
-      await load();
+      await Promise.all([load(), loadUsers()]);
 
+      // ============================================================
+      // Users panel
+      // ============================================================
+      const userTbody    = document.getElementById("user-tbody");
+      const userCountEl  = document.getElementById("user-count");
+      const userSearchEl = document.getElementById("user-search");
+      const USER_COLSPAN = 6;
+      let allUsers = [];
+
+      async function loadUsers() {
+        userTbody.innerHTML =
+          `<tr><td colspan="${USER_COLSPAN}" class="loading">Loading…</td></tr>`;
+        try {
+          const rows = await sb.sbFetch("/rest/v1/rpc/platform_admin_users", {
+            method: "POST",
+            body:   JSON.stringify({}),
+          });
+          allUsers = Array.isArray(rows) ? rows : [];
+        } catch (err) {
+          userTbody.innerHTML =
+            `<tr><td colspan="${USER_COLSPAN}" class="loading">Couldn't load users: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+        renderUsers();
+      }
+
+      function filterUsers() {
+        const q = (userSearchEl.value || "").trim().toLowerCase();
+        if (!q) return allUsers;
+        return allUsers.filter(u =>
+          (u.name     || "").toLowerCase().includes(q) ||
+          (u.email    || "").toLowerCase().includes(q) ||
+          (u.org_name || "").toLowerCase().includes(q) ||
+          (u.is_orphan && "orphan".includes(q))
+        );
+      }
+
+      function renderUsers() {
+        const filtered = filterUsers();
+        userCountEl.textContent =
+          filtered.length === allUsers.length
+            ? `— ${allUsers.length} user${allUsers.length === 1 ? "" : "s"}`
+            : `— ${filtered.length} of ${allUsers.length}`;
+
+        if (filtered.length === 0) {
+          userTbody.innerHTML =
+            `<tr><td colspan="${USER_COLSPAN}" class="loading">No users match the current search.</td></tr>`;
+          return;
+        }
+
+        userTbody.innerHTML = filtered.map(renderUserRow).join("");
+        wireUserRowHandlers();
+      }
+
+      function renderUserRow(u) {
+        const orgCell = u.is_orphan
+          ? `<span class="editable-empty">— orphan —</span>`
+          : esc(u.org_name || "—");
+        const roleCell = u.role
+          ? `<span class="role-badge role-${esc(u.role)}">${esc(u.role)}</span>`
+          : `<span class="editable-empty">—</span>`;
+        const deleteBtn = u.is_orphan
+          ? `<button type="button" class="btn-row-action btn-delete-user"
+                     data-operator-id="${esc(u.operator_id)}"
+                     data-email="${esc(u.email || "")}"
+                     data-name="${esc(u.name || "")}"
+                     title="Delete this orphan user permanently">Delete user</button>`
+          : `<button type="button" class="btn-row-action" disabled
+                     title="User is in an organization. Remove them from the org first.">Delete user</button>`;
+        return `
+          <tr data-operator-id="${esc(u.operator_id)}">
+            <td class="client-cell"><span class="client-name">${esc(u.name || "—")}</span></td>
+            <td>${esc(u.email || "—")}</td>
+            <td>${orgCell}</td>
+            <td>${roleCell}</td>
+            <td>${fmtDateTime(u.created_at)}</td>
+            <td class="col-actions">
+              <button type="button" class="btn-row-action btn-reset-pw"
+                      data-email="${esc(u.email || "")}"
+                      title="Send a password reset email to this user">Send password reset</button>
+              ${deleteBtn}
+            </td>
+          </tr>
+        `;
+      }
+
+      function wireUserRowHandlers() {
+        userTbody.querySelectorAll(".btn-reset-pw").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const email = btn.dataset.email;
+            if (!email) return;
+            const prev = btn.textContent;
+            btn.disabled = true; btn.textContent = "Sending…";
+            try {
+              await sb.resetPasswordForEmail(email, `${location.origin}/reset/`);
+              btn.textContent = "Sent ✓";
+              setTimeout(() => { btn.disabled = false; btn.textContent = prev; }, 1800);
+            } catch (err) {
+              alert(`Couldn't send reset: ${err.message || err}`);
+              btn.disabled = false; btn.textContent = prev;
+            }
+          });
+        });
+
+        userTbody.querySelectorAll(".btn-delete-user").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id    = btn.dataset.operatorId;
+            const email = btn.dataset.email;
+            const name  = btn.dataset.name || email;
+            if (!confirm(`Permanently delete user "${name}" (${email})? This cannot be undone.`)) return;
+            const prev = btn.textContent;
+            btn.disabled = true; btn.textContent = "Deleting…";
+            try {
+              const res = await fetch(
+                `${window.SUPABASE_CONFIG.url}/functions/v1/platform-admin-delete-user`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${session.access_token}`,
+                    "Content-Type":  "application/json",
+                    "apikey":        window.SUPABASE_CONFIG.anonKey,
+                  },
+                  body: JSON.stringify({ operator_id: id }),
+                }
+              );
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                throw new Error(data.message || data.error || `delete failed (${res.status})`);
+              }
+              // Drop the row from local cache + re-render so the UI
+              // updates instantly without a full re-fetch.
+              allUsers = allUsers.filter(u => u.operator_id !== id);
+              renderUsers();
+            } catch (err) {
+              alert(`Couldn't delete user: ${err.message || err}`);
+              btn.disabled = false; btn.textContent = prev;
+            }
+          });
+        });
+      }
+
+      // Search updates re-render in place (debounced lightly via input event).
+      userSearchEl.addEventListener("input", renderUsers);
+
+      // Original org-loading function continues below.
       async function load() {
         tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Loading…</td></tr>`;
 

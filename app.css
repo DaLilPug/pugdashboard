@@ -3478,6 +3478,44 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 /* ---------- Login: signup-mode switcher ---------- */
 /* Small prompt + link at the bottom of the login card that flips
    between "Sign in" and "Create account" modes without a reload. */
+/* Forgot-password link, top-right of the password input. Visible in
+   sign-in mode only; hidden in signup + reset (the password field
+   is hidden in reset mode entirely). */
+.login-forgot {
+  display: block;
+  margin-top: 6px;
+  text-align: right;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--gray-400);
+  text-decoration: none;
+}
+.login-forgot:hover {
+  color: var(--navy);
+  text-decoration: underline;
+}
+
+/* Shown on /reset/ when the URL has no recovery hash — i.e. someone
+   navigated here directly instead of through a password-reset email. */
+.login-no-token {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-soft, #4a5562);
+  background: var(--gray-50, #f7f8fa);
+  border: 1px solid var(--gray-100, #eef0f3);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 8px 0 4px;
+}
+.login-no-token p { margin: 0 0 8px; }
+.login-no-token p:last-child { margin-bottom: 0; }
+.login-no-token-link {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: none;
+}
+.login-no-token-link:hover { text-decoration: underline; }
+
 .login-switch {
   margin-top: 14px;
   text-align: center;

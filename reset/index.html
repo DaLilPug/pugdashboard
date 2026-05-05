@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset password — Uptown Dashboard</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body class="login-body">
+
+  <!--
+    Password recovery landing page. Supabase's recovery email links to
+    /auth/v1/verify which (after token validation) redirects here with
+    a recovery session embedded in the URL hash:
+      #access_token=...&refresh_token=...&type=recovery&expires_in=...
+    We parse those, stash them via setSessionFromTokens, and show a
+    "set new password" form. Submit calls updatePassword() and lands
+    the user on the dashboard.
+
+    Edge cases:
+      - No hash present (someone navigated here directly): show an
+        error + link back to the forgot-password flow.
+      - Hash without recovery type (somehow they landed with a normal
+        magic-link session): still allow the password update, since
+        the access token is valid.
+      - Stale link (token expired): updatePassword() will reject;
+        we surface the error and direct them to request a new link.
+  -->
+
+  <form id="reset-form" class="login-card" autocomplete="off">
+    <div class="login-brand">
+      <img src="/assets/logo-white.png" alt="Uptown" />
+      <div>
+        <div class="login-brand-name">Uptown Dashboard</div>
+        <div class="login-brand-sub">Operator Console</div>
+      </div>
+    </div>
+
+    <div id="reset-title" class="login-title">Reset your password</div>
+
+    <div id="reset-form-fields">
+      <div class="login-field">
+        <label class="login-label" for="new-password">New password</label>
+        <input id="new-password" class="login-input" type="password" required
+               autocomplete="new-password" minlength="6" placeholder="••••••••" />
+      </div>
+
+      <div class="login-field">
+        <label class="login-label" for="new-password-2">Confirm new password</label>
+        <input id="new-password-2" class="login-input" type="password" required
+               autocomplete="new-password" minlength="6" placeholder="••••••••" />
+      </div>
+
+      <button id="reset-submit" class="login-submit" type="submit">Update password</button>
+    </div>
+
+    <!-- Error state when the URL hash is missing / malformed. The form
+         hides; this block shows. -->
+    <div id="reset-no-token" class="login-no-token" hidden>
+      <p>This page only opens from a password-reset email link. The link may have expired or been used already.</p>
+      <p><a href="/login/" class="login-no-token-link">Back to sign in</a> — request a new reset email from the "Forgot password?" link there.</p>
+    </div>
+
+    <div id="error-msg" class="login-error"></div>
+    <div id="info-msg"  class="login-info"></div>
+  </form>
+
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script>
+    const formFields = document.getElementById("reset-form-fields");
+    const noTokenEl  = document.getElementById("reset-no-token");
+    const errorEl    = document.getElementById("error-msg");
+    const infoEl     = document.getElementById("info-msg");
+    const submitBtn  = document.getElementById("reset-submit");
+    const pw1El      = document.getElementById("new-password");
+    const pw2El      = document.getElementById("new-password-2");
+
+    // Supabase puts the recovery session in URL fragment, e.g.:
+    //   #access_token=...&refresh_token=...&expires_in=3600&type=recovery
+    // Parse it, stash it, then strip from the URL bar so a refresh
+    // doesn't replay the tokens.
+    function parseHashTokens() {
+      if (!location.hash || location.hash.length < 2) return null;
+      const params = new URLSearchParams(location.hash.slice(1));
+      const access = params.get("access_token");
+      if (!access) return null;
+      return {
+        access_token:  access,
+        refresh_token: params.get("refresh_token") || "",
+        expires_in:    parseInt(params.get("expires_in") || "3600", 10),
+      };
+    }
+
+    const tokens = parseHashTokens();
+    if (tokens) {
+      sb.setSessionFromTokens(tokens);
+      // Clear the hash from the URL bar so the tokens aren't visible
+      // and a manual refresh doesn't reattempt the recovery flow.
+      history.replaceState(null, "", location.pathname);
+    } else {
+      // No tokens in URL — user landed here directly. Show the
+      // not-from-email message instead of the form.
+      formFields.hidden = true;
+      noTokenEl.hidden  = false;
+    }
+
+    document.getElementById("reset-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.textContent = "";
+      infoEl.textContent  = "";
+
+      const pw1 = pw1El.value;
+      const pw2 = pw2El.value;
+
+      if (pw1.length < 6) {
+        errorEl.textContent = "Password must be at least 6 characters.";
+        return;
+      }
+      if (pw1 !== pw2) {
+        errorEl.textContent = "Passwords don't match.";
+        return;
+      }
+
+      submitBtn.disabled    = true;
+      submitBtn.textContent = "Updating…";
+
+      try {
+        await sb.updatePassword(pw1);
+        infoEl.textContent = "Password updated. Redirecting…";
+        // Quick beat so the user sees the confirmation, then dashboard.
+        setTimeout(() => window.location.replace("/dashboard/"), 800);
+      } catch (err) {
+        errorEl.textContent = err.message || "Couldn't update password.";
+        submitBtn.disabled    = false;
+        submitBtn.textContent = "Update password";
+      }
+    });
+  </script>
+</body>
+</html>

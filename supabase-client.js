@@ -161,6 +161,69 @@
     return s;
   }
 
+  // Trigger Supabase's password-recovery flow. Sends an email containing
+  // a one-time link that, when clicked, redirects the user to the
+  // `redirectTo` URL with a recovery session embedded in the URL hash.
+  // The /reset/ page parses that hash, calls setSessionFromTokens, and
+  // shows a "set new password" form that calls updatePassword().
+  //
+  // Note: Supabase silently no-ops if the email isn't a real user (so an
+  // attacker can't enumerate accounts). The UI says "if your email is on
+  // file, a link is on its way" regardless of outcome.
+  async function resetPasswordForEmail(email, redirectTo) {
+    const res = await fetch(`${URL_BASE}/auth/v1/recover`, {
+      method: "POST",
+      headers: {
+        apikey:         ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, redirect_to: redirectTo }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        data.error_description || data.msg || data.error || "Couldn't send reset email"
+      );
+    }
+  }
+
+  // Update the signed-in user's password. Used by the /reset/ page after
+  // the user lands from a recovery link with a session in URL hash.
+  async function updatePassword(newPassword) {
+    const s = await ensureFreshSession();
+    if (!s?.access_token) throw new Error("Not signed in");
+    const res = await fetch(`${URL_BASE}/auth/v1/user`, {
+      method: "PUT",
+      headers: {
+        apikey:         ANON_KEY,
+        Authorization:  `Bearer ${s.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password: newPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        data.error_description || data.msg || data.error || "Couldn't update password"
+      );
+    }
+    return data;
+  }
+
+  // Stash a session that came from outside the normal sign-in flow (the
+  // recovery URL Supabase redirects to has the access + refresh tokens
+  // in the URL hash; the /reset/ page reads them and calls this).
+  function setSessionFromTokens({ access_token, refresh_token, expires_in, user }) {
+    const session = {
+      access_token,
+      refresh_token,
+      user: user || null,
+      expires_at: Date.now() + ((expires_in || 3600) * 1000),
+    };
+    setSession(session);
+    return session;
+  }
+
   async function signOut() {
     const s = getSession();
     if (s?.access_token) {
@@ -284,6 +347,9 @@
     signIn,
     signUp,
     signOut,
+    resetPasswordForEmail,
+    updatePassword,
+    setSessionFromTokens,
     getSession,
     refreshSession,
     ensureFreshSession,

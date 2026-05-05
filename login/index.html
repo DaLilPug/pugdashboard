@@ -44,10 +44,14 @@
              autocomplete="email" placeholder="you@uptown.com" />
     </div>
 
-    <div class="login-field">
+    <div id="password-field" class="login-field">
       <label class="login-label" for="password">Password</label>
       <input id="password" class="login-input" type="password" required
              autocomplete="current-password" placeholder="••••••••" />
+      <!-- Forgot-password link: visible only in sign-in mode. Click
+           swaps the form into "reset" mode (just email + send reset
+           button); the password field hides. -->
+      <a id="forgot-link" class="login-forgot" href="#" role="button">Forgot password?</a>
     </div>
 
     <button id="submit-btn" class="login-submit" type="submit">Sign in</button>
@@ -90,12 +94,14 @@
     const nameFieldEl  = document.getElementById("name-field");
     const nameEl       = document.getElementById("name");
     const emailEl      = document.getElementById("email");
+    const pwFieldEl    = document.getElementById("password-field");
     const pwEl         = document.getElementById("password");
     const submitBtn    = document.getElementById("submit-btn");
     const errorEl      = document.getElementById("error-msg");
     const infoEl       = document.getElementById("info-msg");
     const switchPromptEl = document.getElementById("switch-prompt");
     const switchLinkEl   = document.getElementById("switch-link");
+    const forgotLinkEl   = document.getElementById("forgot-link");
 
     let mode = wantsSignup ? "signup" : "signin";
 
@@ -113,15 +119,29 @@
         titleEl.textContent      = "Create your account";
         nameFieldEl.hidden       = false;
         nameEl.required          = true;
+        pwFieldEl.hidden         = false;
+        pwEl.required            = true;
         pwEl.setAttribute("autocomplete", "new-password");
         submitBtn.textContent    = "Create account";
         switchPromptEl.textContent = "Already have an account?";
         switchLinkEl.textContent   = "Sign in";
         document.title           = "Create account — Uptown Dashboard";
+      } else if (mode === "reset") {
+        titleEl.textContent      = "Reset your password";
+        nameFieldEl.hidden       = true;
+        nameEl.required          = false;
+        pwFieldEl.hidden         = true;
+        pwEl.required            = false;
+        submitBtn.textContent    = "Send reset link";
+        switchPromptEl.textContent = "Remembered it?";
+        switchLinkEl.textContent   = "Back to sign in";
+        document.title           = "Reset password — Uptown Dashboard";
       } else {
         titleEl.textContent      = "Sign in to continue";
         nameFieldEl.hidden       = true;
         nameEl.required          = false;
+        pwFieldEl.hidden         = false;
+        pwEl.required            = true;
         pwEl.setAttribute("autocomplete", "current-password");
         submitBtn.textContent    = "Sign in";
         switchPromptEl.textContent = "New to Uptown?";
@@ -132,7 +152,17 @@
 
     switchLinkEl.addEventListener("click", (e) => {
       e.preventDefault();
-      mode = (mode === "signup") ? "signin" : "signup";
+      // From reset mode, "Back to sign in" is the only switch.
+      // Otherwise toggle between signin and signup.
+      if (mode === "reset")        mode = "signin";
+      else if (mode === "signup")  mode = "signin";
+      else                          mode = "signup";
+      applyMode();
+    });
+
+    forgotLinkEl.addEventListener("click", (e) => {
+      e.preventDefault();
+      mode = "reset";
       applyMode();
     });
 
@@ -142,9 +172,27 @@
       infoEl.textContent  = "";
       submitBtn.disabled  = true;
       const prevLabel     = submitBtn.textContent;
-      submitBtn.textContent = (mode === "signup") ? "Creating account…" : "Signing in…";
+      submitBtn.textContent =
+        mode === "signup" ? "Creating account…" :
+        mode === "reset"  ? "Sending…" :
+                            "Signing in…";
 
       try {
+        if (mode === "reset") {
+          await sb.resetPasswordForEmail(
+            emailEl.value.trim(),
+            `${location.origin}/reset/`
+          );
+          // Don't reveal whether the email matched a real user — Supabase
+          // silently no-ops for unknown emails to prevent enumeration.
+          // Show the same "if it's on file, check your inbox" either way.
+          infoEl.textContent =
+            "If that email is on file, a reset link is on its way. Check your inbox.";
+          submitBtn.disabled    = false;
+          submitBtn.textContent = prevLabel;
+          return;
+        }
+
         if (mode === "signup") {
           const result = await sb.signUp(
             emailEl.value.trim(),
