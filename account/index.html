@@ -6092,14 +6092,33 @@
           btn.disabled = true; btn.textContent = "Transferring…";
           fb.className = "dz-modal-feedback";
           fb.textContent = "";
+          // Capture pre-RPC state we'll need for the email — once
+          // transfer_archived_client returns, client.org_id is no
+          // longer the source org from our perspective.
+          const sourceOrgId = client.org_id;
           try {
             const result = await sb.sbFetch("/rest/v1/rpc/transfer_archived_client", {
               method: "POST",
               body:   JSON.stringify({ p_client_id: client.id, p_target_email: email }),
             });
-            const orgName = result?.target_org_name || "the recipient organization";
+            const targetOrgName = result?.target_org_name || "the recipient organization";
             fb.className = "dz-modal-feedback ok";
-            fb.textContent = `Transferred to ${orgName}. Returning to dashboard…`;
+            fb.textContent = `Transferred to ${targetOrgName}. Returning to dashboard…`;
+
+            // Fire-and-forget email to the receiving admin.
+            // Doesn't block the dashboard redirect — failure here is
+            // a deliverability glitch, not a transfer failure (the
+            // transfer itself already succeeded server-side).
+            sendTransferEmail({
+              recipient_email:   email,
+              source_org_id:     sourceOrgId,
+              target_org_name:   targetOrgName,
+              account_name:      client.name,
+              source_admin_name: session.user?.user_metadata?.name
+                              || session.user?.user_metadata?.full_name
+                              || "",
+            });
+
             setTimeout(() => window.location.replace("/dashboard/"), 1200);
           } catch (err) {
             fb.className = "dz-modal-feedback error";
@@ -6115,6 +6134,53 @@
             btn.disabled = false; btn.textContent = "Transfer account";
           }
         });
+      }
+
+      // Fire-and-forget call to the send-account-transfer-email edge
+      // function. Looks up the source org's name first (we have its id
+      // from before the RPC ran) so the email body reads naturally.
+      // Failures are logged but don't surface to the user — by the
+      // time this fires the transfer itself has already succeeded.
+      async function sendTransferEmail(opts) {
+        try {
+          // Pull source org name so the recipient sees "Acme Corp
+          // transferred …" rather than a UUID. RLS lets the calling
+          // admin read organizations.name for orgs they admin.
+          let sourceOrgName = "";
+          try {
+            const rows = await sb.sbFetch(
+              `/rest/v1/organizations?select=name&id=eq.${encodeURIComponent(opts.source_org_id)}`
+            );
+            sourceOrgName = rows?.[0]?.name || "";
+          } catch (e) {
+            console.warn("source-org-name lookup failed:", e);
+          }
+
+          const res = await fetch(
+            `${window.SUPABASE_CONFIG.url}/functions/v1/send-account-transfer-email`,
+            {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${session.access_token}`,
+                "Content-Type":  "application/json",
+                "apikey":        window.SUPABASE_CONFIG.anonKey,
+              },
+              body: JSON.stringify({
+                recipient_email:   opts.recipient_email,
+                source_org_name:   sourceOrgName || "Their previous organization",
+                target_org_name:   opts.target_org_name,
+                account_name:      opts.account_name,
+                source_admin_name: opts.source_admin_name || "",
+              }),
+            }
+          );
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            console.warn("transfer email send failed:", res.status, data);
+          }
+        } catch (err) {
+          console.warn("transfer email send threw:", err);
+        }
       }
 
       async function openMergeModal(client) {
