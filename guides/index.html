@@ -117,15 +117,100 @@
       border-right: 1px solid var(--gray-100);
     }
     @media (max-width: 880px) {
+      /* Mobile: TOC becomes a slide-in drawer triggered by the
+         hamburger button in the header. Off-screen by default;
+         CSS .open class slides it in. */
       .toc {
-        position: static;
-        max-height: none;
-        border-right: 0;
-        border-bottom: 1px solid var(--gray-100);
-        padding: 8px 0 16px;
-        margin-bottom: 12px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 86%;
+        max-width: 360px;
+        background: #fff;
+        z-index: 70;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+        transform: translateX(-100%);
+        transition: transform .25s ease-out;
+        padding: 56px 22px 28px;
+        margin: 0;
+        border: 0;
+        max-height: 100vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .toc.open { transform: translateX(0); }
+
+      /* Active section highlight in the drawer */
+      .toc a.active {
+        color: var(--accent);
+        font-weight: 600;
+        background: var(--accent-soft);
       }
     }
+
+    /* ---- hamburger button (mobile only) ---- */
+    .hamburger {
+      display: none;
+      background: none;
+      border: 0;
+      color: rgba(255,255,255,0.85);
+      cursor: pointer;
+      padding: 6px 8px;
+      margin: 0 6px 0 -4px;
+      border-radius: 6px;
+      transition: background .15s, color .15s;
+    }
+    .hamburger:hover {
+      background: rgba(255,255,255,0.10);
+      color: #fff;
+    }
+    .hamburger svg { display: block; }
+    @media (max-width: 880px) {
+      .hamburger { display: inline-flex; align-items: center; }
+    }
+
+    /* ---- drawer close (X) button (mobile only, inside drawer) ---- */
+    .toc-close {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: none;
+      border: 0;
+      font-size: 26px;
+      line-height: 1;
+      color: var(--gray-400);
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 4px;
+    }
+    .toc-close:hover { background: var(--gray-100); color: var(--text); }
+    @media (max-width: 880px) {
+      .toc-close { display: block; }
+    }
+
+    /* ---- drawer backdrop (mobile only, only when open) ---- */
+    .toc-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 33, 56, 0.55);
+      z-index: 60;
+      opacity: 0;
+      transition: opacity .2s;
+      pointer-events: none;
+    }
+    .toc-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    @media (max-width: 880px) {
+      .toc-backdrop { display: block; }
+    }
+
+    /* Lock body scroll while drawer is open. */
+    body.drawer-open { overflow: hidden; }
     .toc-title {
       font-family: 'Montserrat', sans-serif;
       font-weight: 700;
@@ -454,6 +539,15 @@
 <body>
 
   <header class="header">
+    <!-- Mobile-only hamburger; CSS hides on >= 880px width.
+         Opens the slide-in TOC drawer. -->
+    <button id="hamburger" class="hamburger" type="button" aria-label="Open table of contents" aria-controls="toc" aria-expanded="false">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="3" y1="6"  x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
     <img src="/assets/logo-white.png" alt="Uptown" />
     <div>
       <div class="header-wordmark-top">UPTOWN</div>
@@ -463,12 +557,18 @@
     <a href="/dashboard/">← Dashboard</a>
   </header>
 
+  <!-- Mobile-only backdrop behind the open drawer. CSS keeps it
+       hidden (opacity 0, pointer-events none) until JS adds .open. -->
+  <div id="toc-backdrop" class="toc-backdrop" aria-hidden="true"></div>
+
   <div class="shell">
 
     <!-- =================================================== -->
     <!-- SIDEBAR TABLE OF CONTENTS                           -->
     <!-- =================================================== -->
-    <nav class="toc" aria-label="Table of contents">
+    <nav id="toc" class="toc" aria-label="Table of contents">
+      <!-- Mobile-only close X. CSS hides on >= 880px width. -->
+      <button id="toc-close" class="toc-close" type="button" aria-label="Close table of contents">&times;</button>
       <div class="toc-title">Contents</div>
       <ol>
         <li><a href="#welcome">Welcome &amp; Quick Start</a>
@@ -1884,6 +1984,91 @@
   <footer class="app-footer">
     <a href="/terms/">Terms</a><span class="sep">·</span><a href="/privacy/">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
   </footer>
+
+  <script>
+    /* TOC drawer: hamburger toggle + scroll-spy active highlight +
+       auto-center the active link when the drawer opens.
+       No-op on desktop (drawer styles only kick in below 880px),
+       but the scroll-spy runs on every viewport since the active
+       class is harmless when the drawer is hidden. */
+    (function () {
+      const hamburger  = document.getElementById('hamburger');
+      const closeBtn   = document.getElementById('toc-close');
+      const drawer     = document.getElementById('toc');
+      const backdrop   = document.getElementById('toc-backdrop');
+      const tocLinks   = Array.from(drawer.querySelectorAll('a[href^="#"]'));
+
+      // Build the section list once: each TOC link → the heading it points to.
+      const sections = tocLinks
+        .map(a => ({ link: a, el: document.getElementById(a.getAttribute('href').slice(1)) }))
+        .filter(s => s.el);
+
+      function openDrawer() {
+        drawer.classList.add('open');
+        backdrop.classList.add('open');
+        document.body.classList.add('drawer-open');
+        hamburger.setAttribute('aria-expanded', 'true');
+        // Center the active link in the drawer's scroll viewport.
+        // requestAnimationFrame so the layout has settled after .open.
+        requestAnimationFrame(() => {
+          const active = drawer.querySelector('a.active');
+          if (!active) return;
+          const drawerRect = drawer.getBoundingClientRect();
+          const linkRect   = active.getBoundingClientRect();
+          const offset = (linkRect.top - drawerRect.top)
+                       - (drawerRect.height / 2)
+                       + (linkRect.height / 2);
+          drawer.scrollTop = drawer.scrollTop + offset;
+        });
+      }
+
+      function closeDrawer() {
+        drawer.classList.remove('open');
+        backdrop.classList.remove('open');
+        document.body.classList.remove('drawer-open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      }
+
+      hamburger.addEventListener('click', openDrawer);
+      closeBtn .addEventListener('click', closeDrawer);
+      backdrop .addEventListener('click', closeDrawer);
+
+      // Tapping a link inside the drawer navigates AND closes the
+      // drawer so the user lands on the section. Tiny delay so the
+      // smooth-scroll has started before we begin closing.
+      tocLinks.forEach(a => a.addEventListener('click', () => setTimeout(closeDrawer, 50)));
+
+      // ESC closes the drawer.
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
+      });
+
+      // If the user resizes from mobile to desktop with the drawer
+      // open, clean up the body-scroll-lock so desktop scrolls again.
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 880 && drawer.classList.contains('open')) closeDrawer();
+      });
+
+      // Scroll-spy: walk sections in document order, mark as active
+      // the last one whose top is at-or-above an "active line" 100px
+      // below the viewport's top edge. Using getBoundingClientRect
+      // (cheap) instead of IntersectionObserver because we want the
+      // simple "topmost section currently in view" semantics, not
+      // intersection ratios.
+      const ACTIVE_LINE = 100;
+      function updateActive() {
+        let active = sections[0];
+        for (const s of sections) {
+          if (s.el.getBoundingClientRect().top <= ACTIVE_LINE) active = s;
+          else break;
+        }
+        if (!active) return;
+        for (const s of sections) s.link.classList.toggle('active', s === active);
+      }
+      window.addEventListener('scroll', updateActive, { passive: true });
+      updateActive();
+    })();
+  </script>
 
 </body>
 </html>
