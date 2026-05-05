@@ -1954,11 +1954,74 @@
         <summary>I want to invite a teammate but they already use Uptown.</summary>
         <div class="details-body">
           <p>
-            Invite their existing email anyway. Instead of creating a new account,
-            Uptown will surface a pending invite at the top of their dashboard —
-            they accept (joining your org) or decline (no change). They keep their
-            existing account and gain access to yours.
+            Each Uptown account belongs to <strong>one</strong> organization at
+            a time. If your teammate is already in another organization, the
+            invite will be rejected with "they're already in another organization."
+            They'll need to leave their current org first (have an admin remove
+            them from the Members list there) before they can be invited to yours.
           </p>
+          <p>
+            If they have an Uptown account but aren't in any organization (rare —
+            usually means they signed up directly without an invite), inviting
+            their email works as expected: a pending invite shows on their
+            dashboard the next time they sign in, and they Accept/Decline from
+            there.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>How do I delete, transfer, or merge an account's data?</summary>
+        <div class="details-body">
+          <p>
+            All three actions are admin-only and only available on
+            <strong>archived</strong> accounts. Archive the account first
+            (Archive button on the main dashboard row), then open the per-account
+            page — a <em>Danger zone</em> panel appears at the bottom of the
+            Summary tab with three options:
+          </p>
+          <ul>
+            <li>
+              <strong>Delete account.</strong> Permanently removes the account,
+              every outreach event, and every prospect. To confirm you'll be
+              asked to type the account name. The audit log on the
+              <a href="#dash-team">Team page</a> keeps a permanent record
+              (who, when, how many events + prospects) — but the data itself
+              cannot be undone from the dashboard.
+            </li>
+            <li>
+              <strong>Transfer data.</strong> Reassigns the account to a different
+              organization. Type the email of an admin in the receiving
+              organization. The recipient must already have an Uptown account and
+              be an admin of an organization other than yours; the dashboard
+              tells you exactly which check failed if validation rejects the
+              email. The transferred account stays archived in the new org —
+              the receiving admin unarchives it from their dashboard to start
+              using it. Both organizations see the action in their activity log.
+            </li>
+            <li>
+              <strong>Merge into another account.</strong> Pick an active account
+              in your organization from the dropdown. Every outreach event and
+              prospect from this archived account moves into the target account
+              (the prospect-clustering rules re-cluster them under the target's
+              identity space, so duplicates collapse automatically). When the
+              merge completes, this archived account is deleted.
+            </li>
+          </ul>
+          <div class="callout warn" style="margin-top:12px;">
+            <div class="callout-title">Recovering from a mistake</div>
+            <p>
+              <strong>Transfer</strong> is reversible from the dashboard — your
+              platform admin can transfer it back. <strong>Delete</strong> and
+              <strong>Merge</strong> can only be undone via a database backup
+              restore (Supabase Pro keeps 7 days of point-in-time recovery).
+              If you delete or merge by mistake, email
+              <a href="mailto:austin@uptown.com">austin@uptown.com</a> right
+              away — the audit log preserves the action details, and the
+              sooner we restore, the less other-account data we have to
+              re-merge from the backup.
+            </p>
+          </div>
         </div>
       </details>
 
@@ -1966,9 +2029,29 @@
         <summary>How do I export my data?</summary>
         <div class="details-body">
           <p>
-            We don't ship a self-serve export today. Email
+            Open any account's <a href="#dash-prospects">Prospects tab</a>. Two
+            ways to get data out:
+          </p>
+          <ul>
+            <li>
+              <strong>Export CSV</strong> button (top-right of the Prospects
+              toolbar) — exports every prospect currently in view, respecting
+              your timeframe + status + sentiment + search filters. The file
+              includes all the columns shown on screen plus identifiers
+              (LinkedIn ID, profile URL, email).
+            </li>
+            <li>
+              <strong>Select + copy individual rows</strong> — click any
+              prospect to expand its event timeline, then highlight + copy the
+              text you need (e.g., a single message body to paste elsewhere).
+              For bulk copy of a larger selection, the CSV export is faster.
+            </li>
+          </ul>
+          <p>
+            If you need a full account-wide export including audit log entries
+            or older raw data we've archived, email
             <a href="mailto:austin@uptown.com">austin@uptown.com</a> and we'll
-            pull a CSV of your outreach + prospects per account.
+            pull a custom dump.
           </p>
         </div>
       </details>
