@@ -3330,19 +3330,26 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   flex: 0 0 auto;
 }
 
-/* Seats-used/paid cell on /platform-admin/. Clickable to edit the
-   cap; the whole cell acts as an editable zone, matching the .editable
-   cells in /dashboard/. */
+/* Seats Used / Paid / Gifted cell on /platform-admin/. Only the
+   gifted (third) value is clickable to edit; used + paid are read-
+   only. The .editable-value class is now applied only to the
+   gifted span, so hover/click affordance lights up just there. */
 .client-table td.editable-seats {
-  cursor: pointer;
+  cursor: default;
   position: relative;
 }
-.client-table td.editable-seats:hover .editable-value { background: var(--navy-light); }
 .client-table td.editable-seats .editable-value {
+  cursor: pointer;
   display: inline-block;
   padding: 2px 6px;
   border-radius: 4px;
   transition: background .15s;
+}
+.client-table td.editable-seats:hover .editable-value { background: var(--navy-light); }
+.client-table td.editable-seats .seats-sep {
+  color: var(--gray-300);
+  margin: 0 4px;
+  user-select: none;
 }
 .client-table td.editable-seats.editing {
   padding: 6px 8px;

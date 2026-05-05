@@ -56,7 +56,7 @@
             <tr>
               <th>Organization</th>
               <th>Admin contact</th>
-              <th class="num">Seats used / paid</th>
+              <th class="num" title="Active accounts / Stripe-paid seats / Platform-admin-gifted seats. Click the gifted number to edit.">Used / Paid / Gifted</th>
               <th class="num">Total clients</th>
               <th class="num">Outreach</th>
               <th>Created</th>
@@ -132,22 +132,33 @@
       }
 
       function renderRow(org) {
-        const seatsUsed  = Number(org.seats_used)     || 0;
-        const seatsPaid  = Number(org.seats_paid)     || 0;
-        const clientCnt  = Number(org.client_count)   || 0;
-        const outreachCt = Number(org.outreach_count) || 0;
-        const atCap      = seatsUsed >= seatsPaid;
-        const nearCap    = !atCap && seatsUsed >= seatsPaid * 0.9 && seatsPaid > 0;
-        const seatClass  = atCap ? "seats-at-cap" : nearCap ? "seats-near-cap" : "";
+        const seatsUsed      = Number(org.seats_used)      || 0;
+        const seatsPaid      = Number(org.seats_paid)      || 0;
+        const seatsPurchased = Number(org.seats_purchased) || 0;
+        const seatsGifted    = Number(org.seats_gifted)    || 0;
+        const clientCnt      = Number(org.client_count)    || 0;
+        const outreachCt     = Number(org.outreach_count)  || 0;
+        const atCap          = seatsUsed >= seatsPaid;
+        const nearCap        = !atCap && seatsUsed >= seatsPaid * 0.9 && seatsPaid > 0;
+        const seatClass      = atCap ? "seats-at-cap" : nearCap ? "seats-near-cap" : "";
 
+        // Three-value display: Used / Paid / Gifted. Used and Paid
+        // are read-only (paid is Stripe-managed); only Gifted is
+        // inline-editable. The td.editable-seats class still wires
+        // the click handler — but it now targets the gifted number
+        // specifically.
         return `
           <tr data-org-id="${esc(org.id)}">
             <td class="client-cell">
               <span class="client-name">${esc(org.name)}</span>
             </td>
             <td>${org.admin_email ? esc(org.admin_email) : `<span class="editable-empty">— none —</span>`}</td>
-            <td class="num editable-seats ${seatClass}" data-field="seats_paid" title="Click to edit the seat cap">
-              <span class="editable-value"><span class="seats-used">${fmtInt(seatsUsed)}</span> / <span class="seats-paid">${fmtInt(seatsPaid)}</span></span>
+            <td class="num editable-seats ${seatClass}" data-field="seats_gifted" title="Click the gifted number to edit">
+              <span class="seats-used">${fmtInt(seatsUsed)}</span>
+              <span class="seats-sep">/</span>
+              <span class="seats-paid">${fmtInt(seatsPurchased)}</span>
+              <span class="seats-sep">/</span>
+              <span class="editable-value seats-gifted">${fmtInt(seatsGifted)}</span>
             </td>
             <td class="num">${fmtInt(clientCnt)}</td>
             <td class="num">${fmtInt(outreachCt)}</td>
@@ -238,6 +249,9 @@
 
         tbodyEl.querySelectorAll("td.editable-seats").forEach(td => {
           td.addEventListener("click", (e) => {
+            // Only the gifted span is meant to be the click target;
+            // ignore clicks on the used/paid spans or separators.
+            if (!e.target.closest(".seats-gifted, .editable-value")) return;
             e.stopPropagation();
             if (td.classList.contains("editing")) return;
             const tr    = td.closest("tr");
@@ -245,25 +259,26 @@
             const org   = byId.get(orgId);
             if (!org) return;
 
-            const currentCap = Number(org.seats_paid) || 0;
-            const seatsUsed  = Number(org.seats_used) || 0;
+            const currentGifted    = Number(org.seats_gifted)    || 0;
+            const currentPurchased = Number(org.seats_purchased) || 0;
+            const seatsUsed        = Number(org.seats_used)      || 0;
 
             td.classList.add("editing");
 
-            // Small inline editor: the number, nothing else. Keep the
-            // "used /" prefix visible so the admin sees the floor they
-            // can't go below.
+            // Inline editor on just the gifted number. Used + Paid
+            // stay rendered as read-only prefix so the admin sees
+            // the full math while typing.
             const input = document.createElement("input");
             input.type  = "number";
-            input.min   = String(seatsUsed);
+            input.min   = "0";
             input.step  = "1";
-            input.value = String(currentCap);
+            input.value = String(currentGifted);
             input.className = "editable-input editable-input-seats";
 
             td.innerHTML = "";
             const prefix = document.createElement("span");
-            prefix.textContent = `${fmtInt(seatsUsed)} / `;
             prefix.className = "seats-used-prefix";
+            prefix.textContent = `${fmtInt(seatsUsed)} / ${fmtInt(currentPurchased)} / `;
             td.appendChild(prefix);
             td.appendChild(input);
             input.focus();
@@ -272,14 +287,20 @@
             let done = false;
             const restore = () => {
               td.classList.remove("editing");
-              const newCap    = Number(org.seats_paid) || 0;
-              const newUsed   = Number(org.seats_used) || 0;
-              const atCap     = newUsed >= newCap;
-              const nearCap   = !atCap && newUsed >= newCap * 0.9 && newCap > 0;
+              const newPaid     = Number(org.seats_paid)      || 0;
+              const newUsed     = Number(org.seats_used)      || 0;
+              const newPurchased= Number(org.seats_purchased) || 0;
+              const newGifted   = Number(org.seats_gifted)    || 0;
+              const atCap       = newUsed >= newPaid;
+              const nearCap     = !atCap && newUsed >= newPaid * 0.9 && newPaid > 0;
               td.classList.toggle("seats-at-cap",   atCap);
               td.classList.toggle("seats-near-cap", nearCap);
               td.innerHTML =
-                `<span class="editable-value"><span class="seats-used">${fmtInt(newUsed)}</span> / <span class="seats-paid">${fmtInt(newCap)}</span></span>`;
+                `<span class="seats-used">${fmtInt(newUsed)}</span>` +
+                `<span class="seats-sep">/</span>` +
+                `<span class="seats-paid">${fmtInt(newPurchased)}</span>` +
+                `<span class="seats-sep">/</span>` +
+                `<span class="editable-value seats-gifted">${fmtInt(newGifted)}</span>`;
             };
 
             const commit = async () => {
@@ -290,32 +311,44 @@
                 restore();
                 return;
               }
-              const nextCap = Math.floor(Number(raw));
-              if (nextCap === currentCap) { restore(); return; }
+              const nextGifted = Math.floor(Number(raw));
+              if (nextGifted < 0)              { alert("Gifted seats can't be negative."); restore(); return; }
+              if (nextGifted === currentGifted) { restore(); return; }
+
+              const delta = nextGifted - currentGifted;
+              const rpc   = delta > 0 ? "grant_gifted_seats" : "revoke_gifted_seats";
+              const qty   = Math.abs(delta);
 
               try {
-                const res = await sb.sbFetch("/rest/v1/rpc/update_seats_paid", {
+                await sb.sbFetch(`/rest/v1/rpc/${rpc}`, {
                   method: "POST",
-                  body:   JSON.stringify({ target_org_id: orgId, new_cap: nextCap }),
+                  body:   JSON.stringify({ p_org_id: orgId, p_qty: qty }),
                 });
-                // RPC returns the updated organizations row (or an array
-                // wrapping one row, depending on PostgREST version).
-                const updated = Array.isArray(res) ? res[0] : res;
-                if (updated && updated.seats_paid != null) {
-                  org.seats_paid = Number(updated.seats_paid);
-                }
+                // Cache update — the trigger may have auto-archived
+                // some clients (if revoke pushed below active count),
+                // so refresh seats_used too. Cheapest path is to
+                // re-fetch this org's row from the summary RPC.
+                org.seats_gifted    = nextGifted;
+                org.seats_paid      = currentPurchased + nextGifted;
+                try {
+                  const fresh = await sb.sbFetch("/rest/v1/rpc/platform_admin_org_summary", {
+                    method: "POST", body: JSON.stringify({}),
+                  });
+                  const updated = (fresh || []).find(o => o.id === orgId);
+                  if (updated) Object.assign(org, updated);
+                } catch (_) { /* fall through with optimistic cache */ }
                 restore();
               } catch (err) {
                 const m = err.message || "";
                 let msg;
-                if (/insufficient_privilege|Only platform admins/i.test(m)) {
-                  msg = "Only platform admins can change seat caps. (This page shouldn't even be visible to you — something's off; try reloading.)";
-                } else if (/below active seats/i.test(m)) {
-                  msg = m; // Server message is already user-readable.
-                } else if (/non-negative/i.test(m)) {
-                  msg = "Seat cap must be a non-negative whole number.";
+                if (/platform admin only|insufficient_privilege/i.test(m)) {
+                  msg = "Only platform admins can change gifted seats.";
+                } else if (/cannot revoke/i.test(m)) {
+                  msg = m;
+                } else if (/positive integer/i.test(m)) {
+                  msg = "Gifted seats must be a non-negative whole number.";
                 } else {
-                  msg = `Couldn't update seats: ${m}`;
+                  msg = `Couldn't update gifted seats: ${m}`;
                 }
                 alert(msg);
                 restore();
