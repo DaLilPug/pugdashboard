@@ -599,6 +599,25 @@
             return `${actor} archived account <strong>${esc(p.name || "(unnamed)")}</strong>`;
           case "account.unarchived":
             return `${actor} unarchived account <strong>${esc(p.name || "(unnamed)")}</strong>`;
+          // Archived-account terminal actions, logged by:
+          //   delete_archived_client       → account.deleted
+          //   transfer_archived_client     → account.transferred_out / .transferred_in
+          //   merge_archived_client_into   → account.merged_into
+          case "account.deleted": {
+            const counts = [];
+            if (p.outreach_count != null) counts.push(`${p.outreach_count} events`);
+            if (p.prospect_count != null) counts.push(`${p.prospect_count} prospects`);
+            const tail = counts.length ? ` (${counts.join(", ")})` : "";
+            return `${actor} deleted account <strong>${esc(p.name || "(unnamed)")}</strong>${tail}`;
+          }
+          case "account.transferred_out":
+            return `${actor} transferred account <strong>${esc(p.name || "(unnamed)")}</strong> to <strong>${esc(p.target_org_name || p.target_email || "another org")}</strong>`;
+          case "account.transferred_in":
+            return `${actor} received account <strong>${esc(p.name || "(unnamed)")}</strong> from <strong>${esc(p.source_org_name || "another org")}</strong>`;
+          case "account.merged_into": {
+            const moved = p.outreach_moved != null ? ` (${p.outreach_moved} events moved)` : "";
+            return `${actor} merged <strong>${esc(p.archived_name || "(unnamed)")}</strong> into <strong>${esc(p.target_name || "(unnamed)")}</strong>${moved}`;
+          }
           case "seats.cap_changed": {
             const oldCap = p.old_cap ?? "?";
             const newCap = p.new_cap ?? "?";

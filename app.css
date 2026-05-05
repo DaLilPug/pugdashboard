@@ -4915,6 +4915,175 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .period-table .period-label-full  { display: inline; }
 .period-table .period-label-short { display: none; }
 
+
+/* ==============================================================
+   Danger zone (archived-account terminal actions on /account/)
+   --------------------------------------------------------------
+   Reveal-gated by JS (admin + archived_at not null). Three actions:
+   delete, transfer, merge. Each opens a shared modal with per-action
+   form content rendered by the JS in account/index.html.
+   ============================================================== */
+
+.panel-card-danger {
+  border-left: 3px solid #d93025;
+  background: #fff8f8;
+}
+.panel-card-danger .panel-card-head h2 { color: #b3261e; }
+
+.danger-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px 18px;
+}
+.danger-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--gray-100);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+.danger-action-text { flex: 1 1 300px; min-width: 0; }
+.danger-action h3 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+.danger-action p {
+  font-size: 12.5px;
+  color: var(--gray-500);
+  margin: 0;
+  max-width: 540px;
+  line-height: 1.5;
+}
+
+.btn-danger {
+  background: #d93025;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.btn-danger:hover:not(:disabled) { background: #b3261e; }
+.btn-danger:disabled { background: #e7a8a4; cursor: not-allowed; }
+
+.btn-danger-soft {
+  background: #fff;
+  color: #b3261e;
+  border: 1.5px solid #b3261e;
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .15s, color .15s, opacity .15s;
+}
+.btn-danger-soft:hover:not(:disabled) { background: #b3261e; color: #fff; }
+.btn-danger-soft:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Danger-zone modal: shared shell, JS swaps body content per action. */
+.dz-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 33, 56, 0.55);
+  z-index: 1200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.dz-modal-backdrop.open { display: flex; }
+.dz-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.dz-modal h3 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+.dz-modal p {
+  font-size: 13px;
+  color: var(--gray-500);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.dz-modal-warn {
+  background: #fff8f8;
+  border-left: 3px solid #d93025;
+  padding: 10px 12px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: #6d201d;
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.dz-modal-warn strong { color: #b3261e; }
+.dz-modal label {
+  display: block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-500);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.dz-modal input[type="text"],
+.dz-modal input[type="email"],
+.dz-modal select {
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 8px 10px;
+  outline: none;
+  margin-bottom: 14px;
+  background: #fff;
+  color: var(--navy);
+}
+.dz-modal input:focus, .dz-modal select:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(1,58,82,.08);
+}
+.dz-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.dz-modal-feedback {
+  font-size: 12.5px;
+  margin-top: 12px;
+  min-height: 16px;
+}
+.dz-modal-feedback.error { color: #b3261e; }
+.dz-modal-feedback.ok    { color: #2f7d52; }
+
 /* ---- 1. Header hamburger button + drawer ---- */
 .header-hamburger {
   display: none;

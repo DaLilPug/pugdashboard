@@ -121,6 +121,40 @@
           <div class="loading">Loading…</div>
         </div>
       </section>
+
+      <!-- Danger zone: only rendered for archived accounts AND only
+           when the signed-in operator is admin of this account's
+           org (or platform admin). Reveal logic + click handlers
+           live in the main IIFE near startRenameAccount. -->
+      <section id="danger-zone" class="panel-card panel-card-danger hidden">
+        <div class="panel-card-head">
+          <h2>Danger zone</h2>
+          <span class="panel-card-sub">This account is archived. These actions are permanent.</span>
+        </div>
+        <div class="danger-actions">
+          <div class="danger-action">
+            <div class="danger-action-text">
+              <h3>Delete account</h3>
+              <p>Permanently deletes this account and all of its prospect and outreach data. The audit log keeps a record of who did it.</p>
+            </div>
+            <button id="dz-delete-btn" class="btn-danger" type="button">Delete account</button>
+          </div>
+          <div class="danger-action">
+            <div class="danger-action-text">
+              <h3>Transfer data</h3>
+              <p>Move this account to a different organization. The recipient must already have an Uptown account and be an admin of another organization.</p>
+            </div>
+            <button id="dz-transfer-btn" class="btn-danger-soft" type="button">Transfer data</button>
+          </div>
+          <div class="danger-action">
+            <div class="danger-action-text">
+              <h3>Merge into another account</h3>
+              <p>Move all prospects and outreach into a different active account in this organization. This account is deleted when the merge completes.</p>
+            </div>
+            <button id="dz-merge-btn" class="btn-danger-soft" type="button">Merge into…</button>
+          </div>
+        </div>
+      </section>
     </section>
 
     <!-- =================== PROSPECTS ===================== -->
@@ -378,7 +412,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -409,6 +443,10 @@
       const editBtn = document.getElementById("account-name-edit-btn");
       editBtn.classList.remove("hidden");
       editBtn.addEventListener("click", () => startRenameAccount(client));
+
+      // Reveal the danger-zone panel if archived AND admin. Async,
+      // doesn't block page render.
+      initDangerZone(client);
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
@@ -5932,8 +5970,242 @@
           if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
         });
       }
+
+      // ---- Danger zone: delete / transfer / merge archived account ----
+      // Reveal the panel only when (a) the account is archived AND
+      // (b) the operator is org admin or platform admin. All three
+      // RPCs are SECURITY DEFINER and re-check admin status server-side
+      // — the client-side gate is just to avoid showing buttons that
+      // would 403 on click.
+      async function initDangerZone(client) {
+        if (!client.archived_at) return;
+
+        let isAdmin = false;
+        try {
+          const isPA = await Auth.isPlatformAdmin();
+          if (isPA) {
+            isAdmin = true;
+          } else {
+            const result = await sb.sbFetch("/rest/v1/rpc/is_org_admin", {
+              method: "POST",
+              body:   JSON.stringify({ op_id: session.user.id, target_org_id: client.org_id }),
+            });
+            isAdmin = result === true;
+          }
+        } catch (err) {
+          console.warn("danger-zone admin probe failed:", err);
+          return;
+        }
+        if (!isAdmin) return;
+
+        const panel = document.getElementById("danger-zone");
+        panel.classList.remove("hidden");
+
+        document.getElementById("dz-delete-btn"  ).addEventListener("click", () => openDeleteModal(client));
+        document.getElementById("dz-transfer-btn").addEventListener("click", () => openTransferModal(client));
+        document.getElementById("dz-merge-btn"   ).addEventListener("click", () => openMergeModal(client));
+
+        // Backdrop click + ESC close any open modal.
+        document.getElementById("dz-modal-backdrop")
+          .addEventListener("click", (e) => { if (e.target.id === "dz-modal-backdrop") closeDzModal(); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") closeDzModal();
+        });
+      }
+
+      function closeDzModal() {
+        document.getElementById("dz-modal-backdrop").classList.remove("open");
+      }
+
+      function openDeleteModal(client) {
+        const backdrop = document.getElementById("dz-modal-backdrop");
+        const body     = document.getElementById("dz-modal-body");
+        body.innerHTML = `
+          <h3>Delete "${esc(client.name)}"?</h3>
+          <div class="dz-modal-warn">
+            <strong>This is permanent.</strong> All outreach events and prospects on this account will be deleted. The audit log will keep a record of this action — but the data itself can't be undone from the dashboard.
+          </div>
+          <label for="dz-confirm-name">Type the account name to confirm</label>
+          <input id="dz-confirm-name" type="text" autocomplete="off" placeholder="${esc(client.name)}" />
+          <div class="dz-modal-actions">
+            <button class="btn-secondary" data-action="cancel" type="button">Cancel</button>
+            <button class="btn-danger" id="dz-confirm-delete" type="button" disabled>Delete account</button>
+          </div>
+          <div class="dz-modal-feedback" id="dz-feedback"></div>
+        `;
+        backdrop.classList.add("open");
+
+        const input  = document.getElementById("dz-confirm-name");
+        const btn    = document.getElementById("dz-confirm-delete");
+        const fb     = document.getElementById("dz-feedback");
+        input.focus();
+        input.addEventListener("input", () => {
+          btn.disabled = input.value.trim() !== client.name.trim();
+        });
+        body.querySelector('[data-action="cancel"]').addEventListener("click", closeDzModal);
+        btn.addEventListener("click", async () => {
+          btn.disabled = true; btn.textContent = "Deleting…";
+          fb.className = "dz-modal-feedback";
+          fb.textContent = "";
+          try {
+            await sb.sbFetch("/rest/v1/rpc/delete_archived_client", {
+              method: "POST",
+              body:   JSON.stringify({ p_client_id: client.id }),
+            });
+            window.location.replace("/dashboard/");
+          } catch (err) {
+            fb.className = "dz-modal-feedback error";
+            const m = err.message || String(err);
+            fb.textContent = /insufficient_privilege|Only org admins/i.test(m)
+              ? "Only org admins can delete accounts."
+              : `Couldn't delete: ${m}`;
+            btn.disabled = false; btn.textContent = "Delete account";
+          }
+        });
+      }
+
+      function openTransferModal(client) {
+        const backdrop = document.getElementById("dz-modal-backdrop");
+        const body     = document.getElementById("dz-modal-body");
+        body.innerHTML = `
+          <h3>Transfer "${esc(client.name)}"</h3>
+          <p>Type the email of an admin in the receiving organization. The recipient must already have an Uptown account and be an admin of an organization other than yours.</p>
+          <label for="dz-target-email">Recipient email</label>
+          <input id="dz-target-email" type="email" autocomplete="off" placeholder="admin@otherorg.com" />
+          <div class="dz-modal-actions">
+            <button class="btn-secondary" data-action="cancel" type="button">Cancel</button>
+            <button class="btn-danger-soft" id="dz-confirm-transfer" type="button">Transfer account</button>
+          </div>
+          <div class="dz-modal-feedback" id="dz-feedback"></div>
+        `;
+        backdrop.classList.add("open");
+
+        const input = document.getElementById("dz-target-email");
+        const btn   = document.getElementById("dz-confirm-transfer");
+        const fb    = document.getElementById("dz-feedback");
+        input.focus();
+        body.querySelector('[data-action="cancel"]').addEventListener("click", closeDzModal);
+
+        btn.addEventListener("click", async () => {
+          const email = (input.value || "").trim();
+          if (!email) { input.focus(); return; }
+          btn.disabled = true; btn.textContent = "Transferring…";
+          fb.className = "dz-modal-feedback";
+          fb.textContent = "";
+          try {
+            const result = await sb.sbFetch("/rest/v1/rpc/transfer_archived_client", {
+              method: "POST",
+              body:   JSON.stringify({ p_client_id: client.id, p_target_email: email }),
+            });
+            const orgName = result?.target_org_name || "the recipient organization";
+            fb.className = "dz-modal-feedback ok";
+            fb.textContent = `Transferred to ${orgName}. Returning to dashboard…`;
+            setTimeout(() => window.location.replace("/dashboard/"), 1200);
+          } catch (err) {
+            fb.className = "dz-modal-feedback error";
+            const m = err.message || String(err);
+            let msg;
+            if (/no_operator/i.test(m))      msg = "No Uptown account with that email.";
+            else if (/no_org/i.test(m))      msg = "That user isn't a member of any organization.";
+            else if (/same_org/i.test(m))    msg = "That user is in the same organization as this account.";
+            else if (/not_admin/i.test(m))   msg = "That user must be an admin of their organization to receive a transfer.";
+            else if (/insufficient_privilege|Only org admins/i.test(m)) msg = "Only org admins can transfer accounts.";
+            else msg = `Couldn't transfer: ${m}`;
+            fb.textContent = msg;
+            btn.disabled = false; btn.textContent = "Transfer account";
+          }
+        });
+      }
+
+      async function openMergeModal(client) {
+        const backdrop = document.getElementById("dz-modal-backdrop");
+        const body     = document.getElementById("dz-modal-body");
+        body.innerHTML = `
+          <h3>Merge "${esc(client.name)}" into another account</h3>
+          <p>All outreach events and prospects from this account will move into the target account, then this account will be deleted.</p>
+          <label for="dz-target-client">Merge into</label>
+          <select id="dz-target-client"><option value="">Loading…</option></select>
+          <div class="dz-modal-actions">
+            <button class="btn-secondary" data-action="cancel" type="button">Cancel</button>
+            <button class="btn-danger-soft" id="dz-confirm-merge" type="button" disabled>Merge accounts</button>
+          </div>
+          <div class="dz-modal-feedback" id="dz-feedback"></div>
+        `;
+        backdrop.classList.add("open");
+
+        const select = document.getElementById("dz-target-client");
+        const btn    = document.getElementById("dz-confirm-merge");
+        const fb     = document.getElementById("dz-feedback");
+        body.querySelector('[data-action="cancel"]').addEventListener("click", closeDzModal);
+
+        // Fetch active (non-archived) clients in this org, excluding the
+        // archived client itself. RLS scopes us to clients we can see;
+        // for an org admin that's the whole org's roster.
+        try {
+          const rows = await sb.sbFetch(
+            "/rest/v1/clients" +
+            `?select=id,name&org_id=eq.${encodeURIComponent(client.org_id)}` +
+            `&id=neq.${encodeURIComponent(client.id)}` +
+            "&archived_at=is.null&order=name.asc"
+          );
+          if (!rows || !rows.length) {
+            select.innerHTML = `<option value="">No other active accounts in this org</option>`;
+            select.disabled = true;
+            btn.disabled = true;
+            fb.className = "dz-modal-feedback error";
+            fb.textContent = "Create or unarchive an active account before merging.";
+            return;
+          }
+          select.innerHTML =
+            `<option value="">— Pick an account —</option>` +
+            rows.map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join("");
+          select.addEventListener("change", () => { btn.disabled = !select.value; });
+        } catch (err) {
+          fb.className = "dz-modal-feedback error";
+          fb.textContent = `Couldn't load accounts: ${err.message || err}`;
+          return;
+        }
+
+        btn.addEventListener("click", async () => {
+          const targetId = select.value;
+          if (!targetId) return;
+          btn.disabled = true; btn.textContent = "Merging…";
+          fb.className = "dz-modal-feedback";
+          fb.textContent = "";
+          try {
+            const result = await sb.sbFetch("/rest/v1/rpc/merge_archived_client_into", {
+              method: "POST",
+              body:   JSON.stringify({
+                p_archived_client_id: client.id,
+                p_target_client_id:   targetId,
+              }),
+            });
+            const targetName = result?.target_name || "the target account";
+            fb.className = "dz-modal-feedback ok";
+            fb.textContent = `Merged into ${targetName}. Returning to dashboard…`;
+            setTimeout(() => window.location.replace("/dashboard/"), 1200);
+          } catch (err) {
+            fb.className = "dz-modal-feedback error";
+            const m = err.message || String(err);
+            let msg;
+            if (/insufficient_privilege|Only org admins/i.test(m)) msg = "Only org admins can merge accounts.";
+            else if (/same organization/i.test(m))                 msg = "The target account must be in this organization.";
+            else if (/Target account is archived/i.test(m))        msg = "Pick an active (non-archived) account to merge into.";
+            else msg = `Couldn't merge: ${m}`;
+            fb.textContent = msg;
+            btn.disabled = false; btn.textContent = "Merge accounts";
+          }
+        });
+      }
     })();
   </script>
+
+  <!-- Shared danger-zone modal. Empty until JS populates per-action
+       content (delete / transfer / merge). Sits in the body so it can
+       overlay the whole page; .open class on the backdrop reveals it. -->
+  <div id="dz-modal-backdrop" class="dz-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dz-modal" id="dz-modal-body"></div>
+  </div>
 
   <script src="/mobile-nav.js" defer></script>
 
