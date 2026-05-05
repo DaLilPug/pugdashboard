@@ -5138,19 +5138,23 @@ body.header-drawer-open { overflow: hidden; }
 
   /* Period-comparison table (account.html "Trends by Period"):
      freeze the first column so metric labels stay visible while
-     the period columns scroll horizontally. */
+     the period columns scroll horizontally. !important on the
+     background is required because rate-rows (selector
+     `.period-table tr.period-rate-row > th`, specificity 0,2,2)
+     and section-rows set their own row-level background that would
+     otherwise show through the sticky cell — letting the rate-cell
+     chips bleed visibly behind the metric label. */
   .period-table th:first-child,
   .period-table td:first-child,
   .period-table tbody th {
     position: sticky;
     left: 0;
-    z-index: 2;
-    background: #fff;
+    z-index: 3;
+    background: #fff !important;
     box-shadow: 1px 0 0 rgba(1, 58, 82, 0.06);
   }
   .period-table thead th:first-child {
-    z-index: 3;
-    background: #fff;
+    z-index: 4;
   }
 
   /* Follow-ups toolbar: let pills wrap to a second row instead of
