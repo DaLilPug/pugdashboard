@@ -4948,6 +4948,12 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
    needing !important everywhere upstream.
    ============================================================== */
 
+/* Period-comparison table labels: full label visible on desktop,
+   shortened "%" / "FU's" version visible on mobile. Defaults here;
+   the @media block below flips them at <= 800px. */
+.period-table .period-label-full  { display: inline; }
+.period-table .period-label-short { display: none; }
+
 /* ---- 1. Header hamburger button + drawer ---- */
 .header-hamburger {
   display: none;
@@ -5152,10 +5158,24 @@ body.header-drawer-open { overflow: hidden; }
     z-index: 3;
     background: #fff !important;
     box-shadow: 1px 0 0 rgba(1, 58, 82, 0.06);
+    /* Tighten the sticky first column on mobile so the data columns
+       have more room. Combined with the .period-label-short toggle
+       below, brings the column from ~half the chart down to ~110px. */
+    padding-left: 8px;
+    padding-right: 8px;
+    max-width: 130px;
   }
   .period-table thead th:first-child {
     z-index: 4;
   }
+
+  /* Mobile-only short labels in the first column.
+     Rendered alongside the full label as a sibling span; CSS hides
+     the full and shows the short below 800px. Desktop keeps the
+     full labels (the short span is display: none).
+     Replacements: "Rate" → "%", "Follow Ups" → "FU's". */
+  .period-table .period-label-full  { display: none; }
+  .period-table .period-label-short { display: inline; }
 
   /* Follow-ups toolbar: let pills wrap to a second row instead of
      overflowing. Count chip drops to its own line below the pills. */

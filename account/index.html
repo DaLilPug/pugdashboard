@@ -3897,7 +3897,14 @@
           // period-rate-row gets a bold label + subtle row shadow so the
           // funnel rates pop out from the count rows around them.
           const trCls = isRate ? "period-rate-row" : "";
-          return `<tr class="${trCls}"><th>${esc(label)}</th>${cells}</tr>`;
+          // Mobile gets a tighter label so the (sticky) first column
+          // doesn't eat half the chart. CSS in app.css toggles which
+          // span is visible based on viewport width. Rule: "Rate" → "%",
+          // "Follow Ups" → "FU's", everything else unchanged.
+          const shortLabel = label
+            .replace(/\bRate\b/g, "%")
+            .replace(/Follow Ups/g, "FU's");
+          return `<tr class="${trCls}"><th><span class="period-label-full">${esc(label)}</span><span class="period-label-short">${esc(shortLabel)}</span></th>${cells}</tr>`;
         };
 
         root.innerHTML = `
