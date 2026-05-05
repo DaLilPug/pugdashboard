@@ -3899,11 +3899,16 @@
           const trCls = isRate ? "period-rate-row" : "";
           // Mobile gets a tighter label so the (sticky) first column
           // doesn't eat half the chart. CSS in app.css toggles which
-          // span is visible based on viewport width. Rule: "Rate" → "%",
-          // "Follow Ups" → "FU's", everything else unchanged.
+          // span is visible based on viewport width. Rules:
+          //   "Rate"        → "%"
+          //   "Follow Ups"  → "FU's"
+          //   " Sent"       → "" (Connections Sent → Connections)
+          //   " Booked"     → "" (Meetings Booked → Meetings)
           const shortLabel = label
             .replace(/\bRate\b/g, "%")
-            .replace(/Follow Ups/g, "FU's");
+            .replace(/Follow Ups/g, "FU's")
+            .replace(/ Sent\b/g, "")
+            .replace(/ Booked\b/g, "");
           return `<tr class="${trCls}"><th><span class="period-label-full">${esc(label)}</span><span class="period-label-short">${esc(shortLabel)}</span></th>${cells}</tr>`;
         };
 

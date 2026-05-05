@@ -5160,9 +5160,11 @@ body.header-drawer-open { overflow: hidden; }
     box-shadow: 1px 0 0 rgba(1, 58, 82, 0.06);
     /* Tighten the sticky first column on mobile so the data columns
        have more room. Combined with the .period-label-short toggle
-       below, brings the column from ~half the chart down to ~110px. */
+       below, brings the column from ~half the chart down to ~110px.
+       padding-right gets a smidge extra so the label doesn't bump up
+       against the first data column. */
     padding-left: 8px;
-    padding-right: 8px;
+    padding-right: 16px;
     max-width: 130px;
   }
   .period-table thead th:first-child {
