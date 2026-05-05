@@ -131,16 +131,18 @@
         return;
       }
 
-      await Promise.all([load(), loadUsers()]);
-
       // ============================================================
-      // Users panel
+      // Users panel — declared BEFORE the Promise.all so the const
+      // bindings are out of TDZ when loadUsers() runs synchronously
+      // (its first synchronous statement reads userTbody).
       // ============================================================
       const userTbody    = document.getElementById("user-tbody");
       const userCountEl  = document.getElementById("user-count");
       const userSearchEl = document.getElementById("user-search");
       const USER_COLSPAN = 6;
       let allUsers = [];
+
+      await Promise.all([load(), loadUsers()]);
 
       async function loadUsers() {
         userTbody.innerHTML =
