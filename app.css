@@ -5084,6 +5084,70 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .dz-modal-feedback.error { color: #b3261e; }
 .dz-modal-feedback.ok    { color: #2f7d52; }
 
+
+/* ==============================================================
+   Orphan empty-state on /dashboard/
+   --------------------------------------------------------------
+   Shown when the signed-in user has no organization_members row
+   (left their org, was removed, signed up before auto-create-on-
+   signup landed). Replaces the filter-bar + accounts table while
+   visible. Pending-invite banner above stays as an alternative.
+   ============================================================== */
+.orphan-empty-state {
+  max-width: 720px;
+  margin: 60px auto;
+  padding: 0 24px;
+}
+.orphan-empty-state.hidden { display: none; }
+.orphan-empty-card {
+  background: #fff;
+  border: 1px solid var(--gray-100);
+  border-radius: 12px;
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(15,33,56,0.04);
+}
+.orphan-empty-card h2 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+.orphan-empty-card p {
+  font-size: 14px;
+  color: var(--gray-500);
+  line-height: 1.55;
+  max-width: 480px;
+  margin: 0 auto 20px;
+}
+.orphan-empty-card .btn-primary {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 10px 22px;
+  border-radius: 6px;
+  border: 0;
+  background: var(--navy);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.orphan-empty-card .btn-primary:hover:not(:disabled) { background: var(--navy-soft, #1c3550); }
+.orphan-empty-card .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+
+/* ---- Leave-organization row on /team/ ---- */
+.leave-org-row {
+  margin: 28px 32px 12px;
+  padding-top: 22px;
+  border-top: 1px solid var(--gray-100);
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* ---- 1. Header hamburger button + drawer ---- */
 .header-hamburger {
   display: none;

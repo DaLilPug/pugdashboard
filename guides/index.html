@@ -1305,7 +1305,9 @@
 
       <h3 id="dash-summary">6.3 — Per-account: Summary</h3>
       <p>
-        Click any row to land on the per-account view. The default tab is
+        Click any row to land on the per-account view. The account name shows
+        as the page heading with a small ✎ pencil to its right; admins click
+        the pencil to rename the account inline. The default tab is
         <strong>Summary</strong>:
       </p>
 
@@ -1505,25 +1507,37 @@
             match strings.</li>
       </ol>
 
-      <h3 id="dash-team">6.10 — Team page (admins)</h3>
+      <h3 id="dash-team">6.10 — Team page (admins + members)</h3>
       <p>
-        Admins see a <strong>Team</strong> link in the top-right header. The Team
-        page is where you:
+        Admins see a <strong>Team</strong> link in the top-right header.
+        The page heading shows the organization name with a ✎ pencil next to
+        it (admins click to rename); below that you'll find:
       </p>
 
       <ul>
-        <li><strong>Invite members and admins</strong> — paste their email, pick
-            a role, get a shareable invite link to drop into Slack or email.
+        <li><strong>Invite members and admins</strong> (admin-only) — paste their
+            email, pick a role, get a shareable invite link to drop into Slack
+            or email. Each Uptown account belongs to one organization at a time;
+            invites to someone already in another org are rejected with a
+            "they need to leave their current org first" message.
             Admins see all accounts; members only see what you grant them.</li>
-        <li><strong>Manage access</strong> — for each member, click
+        <li><strong>Manage access</strong> (admin-only) — for each member, click
             <em>Manage access</em> to pick which accounts they can see.</li>
-        <li><strong>Manage roles</strong> — promote a member to admin or vice versa.</li>
+        <li><strong>Manage roles</strong> (admin-only) — promote a member to admin
+            or vice versa.</li>
         <li><strong>Recent activity</strong> — an audit log of the last 50 events
-            in this org (invites, members joined/removed, accounts archived/unarchived,
-            seat-cap changes, outreach edits and deletions).</li>
-        <li><strong>Billing card</strong> — admin-only, at the bottom: add seat /
-            remove seat / switch monthly↔annual / manage payment &amp; invoices.
-            See <a href="#dash-billing">6.11</a>.</li>
+            in this org (invites, members joined/left/removed, role changes,
+            organization renames, accounts created/archived/unarchived/deleted/
+            transferred/merged, seat-cap changes, outreach edits and deletions).</li>
+        <li><strong>Billing card</strong> (admin-only, near the bottom) —
+            add seat / remove seat / switch monthly↔annual / manage payment
+            &amp; invoices. See <a href="#dash-billing">6.11</a>.</li>
+        <li><strong>Leave organization</strong> (anyone) — at the very bottom.
+            Members can always leave; admins can leave only if at least one
+            other admin remains, or — if they're the last person — only after
+            transferring/deleting all accounts and cancelling any active Stripe
+            subscription. See the FAQ entry on
+            <a href="#faq">leaving an org to join another</a>.</li>
       </ul>
 
       <h3 id="dash-billing">6.11 — Billing</h3>
@@ -1956,16 +1970,100 @@
           <p>
             Each Uptown account belongs to <strong>one</strong> organization at
             a time. If your teammate is already in another organization, the
-            invite will be rejected with "they're already in another organization."
-            They'll need to leave their current org first (have an admin remove
-            them from the Members list there) before they can be invited to yours.
+            invite will be rejected with "they're already in another
+            organization." They'll need to leave their current org first
+            (see the next FAQ entry) before they can be invited to yours.
           </p>
           <p>
-            If they have an Uptown account but aren't in any organization (rare —
-            usually means they signed up directly without an invite), inviting
-            their email works as expected: a pending invite shows on their
-            dashboard the next time they sign in, and they Accept/Decline from
-            there.
+            If they have an Uptown account but aren't in any organization at
+            the moment — for example, they recently left their previous org or
+            an admin removed them — the invite works normally. A pending invite
+            shows on their dashboard the next time they sign in; they Accept
+            or Decline from there.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>I want to leave my organization to join a different one (or just on my own).</summary>
+        <div class="details-body">
+          <p>
+            Each Uptown account belongs to one organization at a time, so
+            joining a new org means leaving your current one first. The full
+            sequence depends on whether you're an admin and what state your
+            org is in:
+          </p>
+          <h4>If you're a member (not an admin)</h4>
+          <p>
+            Open the <a href="#dash-team">Team page</a> and click
+            <strong>Leave organization</strong> at the bottom. You're out
+            immediately. The org continues with its remaining admins. Once
+            you're out, you can accept any pending invite waiting for you,
+            or click <strong>Create organization</strong> on your dashboard
+            empty-state to start your own.
+          </p>
+          <h4>If you're an admin and there's at least one other admin</h4>
+          <p>
+            Same as above — clicking <strong>Leave organization</strong> just
+            drops your membership. The org keeps going with the remaining
+            admin(s).
+          </p>
+          <h4>If you're the only admin</h4>
+          <p>
+            The system protects against orphaning data and stranding members,
+            so leaving is conditional. Step through these in order:
+          </p>
+          <ol>
+            <li>
+              <strong>Hand off your accounts.</strong> For each account in your
+              org: archive it (Archive button on the dashboard row), open the
+              archived per-account page, and either
+              <a href="#faq">delete it, transfer it, or merge it</a> into
+              another account. Transfer is what most "company hires me" flows
+              use — pick a recipient admin email at the new org and the
+              account moves there fully.
+            </li>
+            <li>
+              <strong>Promote or remove other members.</strong> If anyone else
+              is in your org as a member, they need to either be promoted to
+              admin (so an admin remains) or be removed.
+            </li>
+            <li>
+              <strong>Cancel any active Stripe subscription.</strong> Team
+              page → billing card → <em>Manage payment &amp; invoices</em> →
+              cancel. Lets the period close out cleanly.
+            </li>
+            <li>
+              <strong>Click Leave organization.</strong> Once your org has no
+              other members, no accounts, and no active subscription, leaving
+              cleanly deletes the (now-empty) org. You become an unattached
+              Uptown account.
+            </li>
+            <li>
+              <strong>Accept the new org's invite</strong> (if applicable) from
+              the banner on your dashboard, or click
+              <strong>Create organization</strong> in the empty-state to start
+              fresh on your own.
+            </li>
+          </ol>
+          <p>
+            If any of those checks fail, the Leave button surfaces a specific
+            message — "you're the only admin, promote a member first" or
+            "this org has 3 accounts that need to be transferred or deleted
+            first" or "cancel your subscription first" — pointing you at the
+            exact next step.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
+        <summary>How do I rename my organization?</summary>
+        <div class="details-body">
+          <p>
+            Open the <a href="#dash-team">Team page</a>. Admins see a small
+            ✎ pencil next to the organization name at the top of the page —
+            click it, type the new name, press Enter (or click outside) to
+            save. The change shows up immediately in the Recent Activity log.
           </p>
         </div>
       </details>

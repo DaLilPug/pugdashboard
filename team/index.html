@@ -45,7 +45,16 @@
   </div>
 
   <div class="account-titlebar">
-    <h1>Team</h1>
+    <div class="account-titlebar-row">
+      <h1 id="org-name-display">Team</h1>
+      <!-- Org rename pencil. Visible to admins (revealed by JS once
+           the org loads). Click → inline-edit input → rename_organization RPC. -->
+      <button id="org-name-edit-btn"
+              class="account-name-edit hidden"
+              type="button"
+              aria-label="Rename organization"
+              title="Rename organization">&#9998;</button>
+    </div>
     <div class="account-meta">
       <span id="team-subtitle">Invite admins and members, revoke access, and assign account visibility.</span>
     </div>
@@ -155,6 +164,15 @@
          only for admins with a configured plan or a Stripe customer
          on file. Members see nothing here. -->
     <div id="team-billing-card" class="team-billing-card" hidden></div>
+
+    <!-- Leave organization. Visible to anyone in the org; the
+         leave_organization RPC enforces the rule-table server-side
+         (sole-admin-with-clients gets blocked, sole-admin-of-empty
+         deletes the org, etc.). Sits at the bottom under billing so
+         it reads as the terminal action it is. -->
+    <div class="leave-org-row">
+      <button id="leave-org-btn" class="btn-danger-soft" type="button">Leave organization</button>
+    </div>
   </main>
 
   <!-- Client access modal: opens from a member row's "Manage access"
@@ -304,8 +322,20 @@
         document.title = `Team — ${org.name}`;
       }
 
+      // Show the org name as the page H1 (replacing the placeholder
+       // "Team" text), with the rename pencil revealed for admins.
+      const orgNameEl  = document.getElementById("org-name-display");
+      const orgEditBtn = document.getElementById("org-name-edit-btn");
+      orgNameEl.textContent = org.name;
+
+      const isAdminOfThisOrg = myAdminOrgIds.has(org.id);
+      if (isAdminOfThisOrg) {
+        orgEditBtn.classList.remove("hidden");
+        orgEditBtn.addEventListener("click", () => startRenameOrg());
+      }
+
       document.getElementById("team-subtitle").textContent =
-        `Managing team for ${org.name}. Invite admins and members, revoke access, and assign account visibility.`;
+        `Invite admins and members, revoke access, and assign account visibility.`;
 
       // ---- state -------------------------------------------------------
       //
@@ -599,6 +629,15 @@
             return `${actor} archived account <strong>${esc(p.name || "(unnamed)")}</strong>`;
           case "account.unarchived":
             return `${actor} unarchived account <strong>${esc(p.name || "(unnamed)")}</strong>`;
+          // Org lifecycle.
+          case "org.created":
+            return p.auto
+              ? `${actor} signed up — organization <strong>${esc(p.name || "(unnamed)")}</strong> created automatically`
+              : `${actor} created organization <strong>${esc(p.name || "(unnamed)")}</strong>`;
+          case "org.renamed":
+            return `${actor} renamed organization from <strong>${esc(p.old_name || "(unnamed)")}</strong> to <strong>${esc(p.new_name || "(unnamed)")}</strong>`;
+          case "member.left":
+            return `${actor} left the organization`;
           // Archived-account terminal actions, logged by:
           //   delete_archived_client       → account.deleted
           //   transfer_archived_client     → account.transferred_out / .transferred_in
@@ -1279,8 +1318,150 @@
           ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
         );
       }
+
+      // ---- Inline rename: pencil → input → rename_organization RPC ----
+      // Mirrors the per-account rename pattern. Server enforces admin.
+      function startRenameOrg() {
+        const h1     = document.getElementById("org-name-display");
+        const editBt = document.getElementById("org-name-edit-btn");
+        const row    = h1.parentElement;
+        if (row.classList.contains("editing")) return;
+        row.classList.add("editing");
+
+        const currentName = org.name || "";
+        const input = document.createElement("input");
+        input.type        = "text";
+        input.value       = currentName;
+        input.placeholder = "Organization name";
+        input.className   = "account-name-input";
+
+        h1.style.display     = "none";
+        editBt.style.display = "none";
+        row.insertBefore(input, h1);
+        input.focus();
+        input.select();
+
+        let done = false;
+        const restore = (name) => {
+          if (!input.parentNode) return;
+          row.removeChild(input);
+          h1.textContent       = name;
+          h1.style.display     = "";
+          editBt.style.display = "";
+          row.classList.remove("editing");
+        };
+
+        const commit = async () => {
+          if (done) return;
+          done = true;
+          const next = input.value.trim();
+          if (!next) { alert("Organization name can't be empty."); restore(currentName); return; }
+          if (next === currentName) { restore(currentName); return; }
+          try {
+            await sb.sbFetch("/rest/v1/rpc/rename_organization", {
+              method: "POST",
+              body:   JSON.stringify({ p_org_id: org.id, p_new_name: next }),
+            });
+            org.name = next;
+            document.title = `Team — ${next}`;
+            restore(next);
+            await loadActivity();
+          } catch (err) {
+            const m = err.message || "";
+            const msg = /insufficient_privilege|Only org admins/i.test(m)
+              ? "Only org admins can rename the organization."
+              : `Couldn't rename: ${m}`;
+            alert(msg);
+            restore(currentName);
+          }
+        };
+        const cancel = () => { if (done) return; done = true; restore(currentName); };
+
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
+          if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
+        });
+      }
+
+      // ---- Leave organization ----
+      // Visible to every member (not just admins). Server-side
+      // leave_organization RPC enforces the rule-table; surface the
+      // structured block-codes as actionable error messages.
+      const leaveBtn = document.getElementById("leave-org-btn");
+      if (leaveBtn) {
+        leaveBtn.addEventListener("click", openLeaveOrgModal);
+      }
+
+      function openLeaveOrgModal() {
+        const backdrop = document.getElementById("leave-org-backdrop");
+        const body     = document.getElementById("leave-org-body");
+        body.innerHTML = `
+          <h3>Leave "${esc(org.name)}"?</h3>
+          <p>You'll lose access to this organization's accounts. If you're the only person and there are no accounts, the organization itself will be deleted.</p>
+          <div class="dz-modal-actions">
+            <button class="btn-secondary" data-action="cancel" type="button">Cancel</button>
+            <button class="btn-danger-soft" id="leave-org-confirm" type="button">Leave organization</button>
+          </div>
+          <div class="dz-modal-feedback" id="leave-org-feedback"></div>
+        `;
+        backdrop.classList.add("open");
+        body.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.classList.remove("open"));
+        document.getElementById("leave-org-confirm").addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          const fb  = document.getElementById("leave-org-feedback");
+          btn.disabled = true; btn.textContent = "Leaving…";
+          fb.className = "dz-modal-feedback"; fb.textContent = "";
+          try {
+            const result = await sb.sbFetch("/rest/v1/rpc/leave_organization", {
+              method: "POST",
+              body:   JSON.stringify({}),
+            });
+            const status = result?.status;
+            if (status === "left" || status === "left_and_deleted_org") {
+              window.location.replace("/dashboard/");
+              return;
+            }
+            // Block paths — show the actionable next step.
+            fb.className = "dz-modal-feedback error";
+            if (status === "must_promote_admin") {
+              fb.textContent = `You're the only admin. Promote a member to admin first (use the role dropdown in the Members list above).`;
+            } else if (status === "transfer_or_delete_accounts") {
+              const n = result?.client_count;
+              fb.textContent = `This organization has ${n} account${n === 1 ? "" : "s"}. Archive each one and then delete or transfer it from the per-account dashboard before leaving.`;
+            } else if (status === "cancel_subscription") {
+              fb.textContent = `Cancel your active Stripe subscription first (Manage payment & invoices in the billing card below), then try again.`;
+            } else {
+              fb.textContent = `Couldn't leave: unexpected response.`;
+            }
+            btn.disabled = false; btn.textContent = "Leave organization";
+          } catch (err) {
+            fb.className = "dz-modal-feedback error";
+            fb.textContent = `Couldn't leave: ${err.message || err}`;
+            btn.disabled = false; btn.textContent = "Leave organization";
+          }
+        });
+
+        // Backdrop / ESC close
+        backdrop.addEventListener("click", (e) => {
+          if (e.target.id === "leave-org-backdrop") backdrop.classList.remove("open");
+        }, { once: true });
+        const escHandler = (ev) => {
+          if (ev.key === "Escape") {
+            backdrop.classList.remove("open");
+            document.removeEventListener("keydown", escHandler);
+          }
+        };
+        document.addEventListener("keydown", escHandler);
+      }
     })();
   </script>
+
+  <!-- Leave-organization modal. Same shell as the per-account
+       danger-zone modal; populated by JS on click. -->
+  <div id="leave-org-backdrop" class="dz-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dz-modal" id="leave-org-body"></div>
+  </div>
 
   <footer class="app-footer">
     <a href="/guides/">Guides</a><span class="sep">·</span><a href="/terms/">Terms</a><span class="sep">·</span><a href="/privacy/">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
