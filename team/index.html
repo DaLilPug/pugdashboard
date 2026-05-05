@@ -49,13 +49,6 @@
     <div class="account-meta">
       <span id="team-subtitle">Invite admins and members, revoke access, and assign account visibility.</span>
     </div>
-    <!-- Org switcher: rendered only when the signed-in user admins more
-         than one org. Lets a multi-org admin flip between teams without
-         going through the platform-admin tool. -->
-    <div id="org-switcher" class="org-switcher hidden">
-      <label class="org-switcher-label" for="org-switcher-select">Switch organization</label>
-      <select id="org-switcher-select" class="org-switcher-select" aria-label="Switch organization"></select>
-    </div>
   </div>
 
   <main class="main main-wide">
@@ -309,31 +302,6 @@
         const o = myAdminOrgs[0];
         org = { id: o.id, name: o.name, seats_paid: o.seats_paid };
         document.title = `Team — ${org.name}`;
-      }
-
-      // Render the org switcher if the user admins more than one org
-      // AND the currently-viewed org is one of them. The second clause
-      // skips the picker for platform admins drilled into an org they
-      // don't admin (their navigation tool is /platform-admin/).
-      // Selecting a different option navigates to ?as_org=<that-id>
-      // (full reload — simplest way to re-resolve all org-scoped state
-      // without hand-stitching cache invalidation).
-      if (myAdminOrgs.length > 1 && myAdminOrgIds.has(org.id)) {
-        const switcher = document.getElementById("org-switcher");
-        const select   = document.getElementById("org-switcher-select");
-        if (switcher && select) {
-          select.innerHTML = myAdminOrgs.map(o => {
-            const sel = o.id === org.id ? "selected" : "";
-            return `<option value="${esc(o.id)}" ${sel}>${esc(o.name)}</option>`;
-          }).join("");
-          select.addEventListener("change", () => {
-            const next = select.value;
-            if (next && next !== org.id) {
-              window.location.href = `/team/?as_org=${encodeURIComponent(next)}`;
-            }
-          });
-          switcher.classList.remove("hidden");
-        }
       }
 
       document.getElementById("team-subtitle").textContent =
@@ -905,6 +873,14 @@
           if (outcome.status === "already_member") {
             resultEl.innerHTML = `<div class="invite-result-info">
               ${esc(email)} is already a ${esc(outcome.current_role || "member")} of this org. You can change their role in the members list.
+            </div>`;
+          } else if (outcome.status === "already_in_an_org") {
+            // Post-simplify_to_one_org_per_email.sql: an Uptown
+            // account can only belong to one org. The target email
+            // is already in some other org and must leave it before
+            // joining this one.
+            resultEl.innerHTML = `<div class="invite-result-info">
+              ${esc(email)} is already a member of another Uptown organization. Each Uptown account can only belong to one organization at a time — they'll need to leave their current org before they can be invited here.
             </div>`;
           } else if (outcome.status === "invited_existing") {
             // Existing Uptown user. Post-add_invite_consent.sql they no
