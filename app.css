@@ -3213,23 +3213,6 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
    failure — archival is a deliberate admin action, not an error. */
 .status-archived { background: #c89b3c; box-shadow: 0 0 0 3px rgba(200, 155, 60, 0.15); }
 
-/* ---------- inline rename on Account cell ---------- */
-/* Mirror the .editable cell affordance (hover highlight, click swaps
-   to input). Separate from .editable because rename goes through the
-   rename_seat RPC, not a direct PATCH. */
-.client-table td.editable-name {
-  cursor: text;
-  position: relative;
-}
-.client-table td.editable-name:hover .editable-value { background: var(--navy-light); }
-.client-table td.editable-name .editable-value {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: background .15s;
-}
-.client-table td.editable-name.editing { padding: 6px 8px; }
-
 /* ==============================================================
    Platform admin: nav link + drill-in banner + listing table
    ============================================================== */
@@ -4953,4 +4936,279 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .team-billing-status-past_due,
 .team-billing-status-unpaid { color: #c0392b; font-weight: 600; }
 .team-billing-status-canceled { color: #8899a6; }
+
+
+/* ==============================================================
+   Mobile UX: hamburger drawer, mobile selects, sticky columns,
+   follow-ups pill wrap, etc.
+   --------------------------------------------------------------
+   All wired by /mobile-nav.js. This block is a single
+   self-contained mobile-responsiveness layer added 2026-05-05;
+   keep it at the bottom of app.css so its overrides win without
+   needing !important everywhere upstream.
+   ============================================================== */
+
+/* ---- 1. Header hamburger button + drawer ---- */
+.header-hamburger {
+  display: none;
+  background: none;
+  border: 0;
+  color: rgba(255,255,255,0.92);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  align-items: center;
+  transition: background .15s, color .15s;
+}
+.header-hamburger:hover {
+  background: rgba(255,255,255,0.10);
+  color: #fff;
+}
+.header-hamburger svg { display: block; }
+
+.header-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 78%;
+  max-width: 320px;
+  background: #fff;
+  z-index: 1100;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+  transform: translateX(100%);
+  transition: transform .25s ease-out;
+  padding: 56px 18px 24px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.header-drawer.open { transform: translateX(0); }
+
+.header-drawer-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: 0;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.header-drawer-close:hover { background: var(--gray-100); color: var(--text); }
+
+.header-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 33, 56, 0.55);
+  z-index: 1090;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.header-drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+body.header-drawer-open { overflow: hidden; }
+
+.header-drawer-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.header-drawer-items > * {
+  display: block !important;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--navy);
+  background: var(--gray-50);
+  border: 1px solid var(--gray-100);
+  text-decoration: none;
+  cursor: pointer;
+}
+.header-drawer-items > a:hover,
+.header-drawer-items > button:hover {
+  background: var(--accent-soft, #e9f2fa);
+  color: var(--accent, #2d7ab8);
+}
+.header-drawer-items .header-drawer-email {
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--gray-500) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 12px !important;
+  text-transform: none !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+  padding: 4px 14px 12px !important;
+  cursor: default;
+}
+
+/* ---- 2. Mobile pill→select dropdowns ---- */
+.mobile-pill-select {
+  display: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 7px 28px 7px 10px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--r-pill);
+  background: #fff;
+  color: var(--navy);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23013A52' d='M0 0l5 6 5-6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  max-width: 100%;
+}
+
+/* ---- 3. Mobile-only layout adjustments (<= 800px) ---- */
+@media (max-width: 800px) {
+  /* Hide the original header right-cluster; show only the hamburger
+     (the drawer takes over). The original cluster items remain in
+     the DOM so handlers wired via id (e.g. signout) keep working. */
+  .header-right > * { display: none !important; }
+  .header-right > .header-hamburger { display: inline-flex !important; }
+
+  /* Pill groups → hide pills, show the JS-injected select. */
+  .timeframe-pills { display: none !important; }
+  .timeframe-pills + .mobile-pill-select { display: inline-block; }
+
+  .sub-tabs { display: none !important; }
+  .sub-tabs + .mobile-pill-select {
+    display: block;
+    margin: 10px 16px 0;
+    width: calc(100% - 32px);
+    max-width: 480px;
+    padding: 9px 32px 9px 12px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    font-size: 12px;
+  }
+
+  /* Section head: let "+ Add new account" wrap below the title
+     instead of overflowing. */
+  .section-head {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .section-head h2 { flex: 1 1 auto; min-width: 0; }
+  .btn-add-account {
+    flex: 0 0 auto;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  /* Account column sticky on horizontal scroll. The table wrap
+     already does overflow-x; we just pin the first column so the
+     account name stays visible while metrics columns scroll past. */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .client-table th:first-child,
+  .client-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+    box-shadow: 1px 0 0 var(--gray-100);
+  }
+  .client-table thead th:first-child {
+    z-index: 3;
+    background: var(--surface-1, #fff);
+  }
+  .client-table tbody tr:hover td:first-child {
+    background: var(--gray-50);
+  }
+  .client-table tbody tr.is-archived td:first-child {
+    background: #fafbfc;
+  }
+
+  /* Period-comparison table (account.html "Trends by Period"):
+     freeze the first column so metric labels stay visible while
+     the period columns scroll horizontally. */
+  .period-table th:first-child,
+  .period-table td:first-child,
+  .period-table tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #fff;
+    box-shadow: 1px 0 0 rgba(1, 58, 82, 0.06);
+  }
+  .period-table thead th:first-child {
+    z-index: 3;
+    background: #fff;
+  }
+
+  /* Follow-ups toolbar: let pills wrap to a second row instead of
+     overflowing. Count chip drops to its own line below the pills. */
+  .fu-toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .fu-source-pills {
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1 1 100%;
+    order: 2;
+  }
+  .fu-view-toggle  { order: 1; }
+  .fu-toolbar-count {
+    order: 3;
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
+}
+
+/* ---- 4. Account-name pencil edit (account/index.html) ---- */
+.account-titlebar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.account-name-edit {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--gray-400);
+  transition: background .15s, color .15s;
+  line-height: 1;
+}
+.account-name-edit:hover {
+  background: var(--gray-50);
+  color: var(--navy);
+}
+.account-name-input {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+  border: 1.5px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 4px 10px;
+  outline: none;
+  width: 100%;
+  max-width: 420px;
+}
+.account-name-input:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(1,58,82,.08);
+}
 

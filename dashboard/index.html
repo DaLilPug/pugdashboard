@@ -210,6 +210,7 @@
   <script src="/supabase-client.js"></script>
   <script src="/auth.js"></script>
   <script src="/billing.js"></script>
+  <script src="/mobile-nav.js" defer></script>
   <script>
     (async function main() {
       const session = await Auth.requireAuth();
@@ -1284,8 +1285,8 @@
 
         return `
           <tr data-client-id="${esc(c.id)}"${isArchived ? ' class="is-archived"' : ''}>
-            <td class="client-cell editable-name" data-field="name">
-              <span class="editable-value client-name">${esc(c.name)}</span>
+            <td class="client-cell" data-field="name">
+              <span class="client-name">${esc(c.name)}</span>
             </td>
             <td class="editable" data-field="company">
               <span class="editable-value">${c.company ? esc(c.company) : `<span class="editable-empty">— set —</span>`}</span>
@@ -1322,106 +1323,20 @@
 
       function wireRowHandlers() {
         // Row click → account page. The interactive cells (inline-edit
-        // columns, inline-rename on the name, and the row-action button
-        // column) all stopPropagation in their own listeners — the
-        // closest() check here is defence-in-depth so a future cell
-        // with a missing stopPropagation doesn't silently navigate.
+        // columns and the row-action button column) all stopPropagation
+        // in their own listeners — the closest() check here is
+        // defence-in-depth so a future cell with a missing
+        // stopPropagation doesn't silently navigate. Renaming the
+        // account no longer happens here; it's done from the per-account
+        // page now (pencil button next to the H1).
         tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
           tr.addEventListener("click", (e) => {
-            if (e.target.closest(".editable, .editable-name, .col-actions")) return;
+            if (e.target.closest(".editable, .col-actions")) return;
             window.location.href = `/account/?id=${encodeURIComponent(tr.dataset.clientId)}`;
           });
         });
         tbodyEl.querySelectorAll(".editable").forEach(wireEditable);
-        tbodyEl.querySelectorAll(".editable-name").forEach(wireRenameSeat);
         tbodyEl.querySelectorAll(".btn-row-action").forEach(wireRowAction);
-      }
-
-      // Inline rename on the Account cell. Unlike the other editable
-      // cells (which PATCH /rest/v1/clients directly with column-level
-      // GRANTs), rename goes through the rename_seat SECURITY DEFINER
-      // RPC. That's deliberate: only admins can rename, and routing
-      // through a SECURITY DEFINER function means there's no writable
-      // column grant on clients.name that a buggy/malicious client
-      // could exploit to rename rows they shouldn't touch.
-      function wireRenameSeat(td) {
-        td.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (td.classList.contains("editing")) return;
-          const tr       = td.closest("tr");
-          const clientId = tr.dataset.clientId;
-          const client   = clientsCache.find(c => c.id === clientId);
-          if (!client) return;
-
-          const currentName = client.name || "";
-          td.classList.add("editing");
-
-          const input = document.createElement("input");
-          input.type        = "text";
-          input.value       = currentName;
-          input.placeholder = "Account name";
-          input.className   = "editable-input";
-          td.innerHTML = "";
-          td.appendChild(input);
-          input.focus();
-          input.select();
-
-          let done = false;
-          const commit = async () => {
-            if (done) return;
-            done = true;
-            const nextName = input.value.trim();
-            if (!nextName) {
-              alert("Account name can't be empty.");
-              restoreName(td, currentName);
-              return;
-            }
-            if (nextName === currentName) {
-              restoreName(td, currentName);
-              return;
-            }
-            try {
-              await sb.sbFetch("/rest/v1/rpc/rename_seat", {
-                method: "POST",
-                body:   JSON.stringify({ seat_id: clientId, new_name: nextName }),
-              });
-              // Mirror into cache so downstream renders see the new name
-              // without a fresh fetch. Multiselect labels and KPI strip
-              // pick up the change on the follow-up rerender.
-              client.name = nextName;
-              restoreName(td, nextName);
-              renderMultiselects();
-            } catch (err) {
-              const m = err.message || "";
-              let msg;
-              if (/insufficient_privilege|Only admins/i.test(m)) {
-                msg = "Only organization admins can rename accounts.";
-              } else if (/cannot be empty/i.test(m)) {
-                msg = "Account name can't be empty.";
-              } else {
-                msg = `Couldn't rename: ${m}`;
-              }
-              alert(msg);
-              restoreName(td, currentName);
-            }
-          };
-          const cancel = () => {
-            if (done) return;
-            done = true;
-            restoreName(td, currentName);
-          };
-
-          input.addEventListener("blur", commit);
-          input.addEventListener("keydown", (ev) => {
-            if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
-            if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
-          });
-        });
-      }
-
-      function restoreName(td, name) {
-        td.classList.remove("editing");
-        td.innerHTML = `<span class="editable-value client-name">${esc(name)}</span>`;
       }
 
       // Archive / unarchive button handler. Both go through SECURITY

@@ -46,7 +46,17 @@
   </header>
 
   <div class="account-titlebar">
-    <h1 id="account-name">Loading…</h1>
+    <div class="account-titlebar-row">
+      <h1 id="account-name">Loading…</h1>
+      <!-- Rename pencil. Visible after the account loads. Server-side
+           rename_seat RPC enforces admin-only; non-admins clicking get
+           a friendly "Only organization admins" toast. -->
+      <button id="account-name-edit-btn"
+              class="account-name-edit hidden"
+              type="button"
+              aria-label="Rename account"
+              title="Rename account">&#9998;</button>
+    </div>
     <div id="account-meta" class="account-meta"></div>
   </div>
 
@@ -392,6 +402,13 @@
           ? `<a href="${esc(client.linkedin_account_url)}" target="_blank" rel="noopener">LinkedIn profile ↗</a>`
           : "",
       ].filter(Boolean).join(" · ");
+
+      // Reveal the rename pencil now that the account loaded. Always
+      // shown; server-side rename_seat RPC is the source of truth on
+      // permissions (non-admins clicking get a friendly error).
+      const editBtn = document.getElementById("account-name-edit-btn");
+      editBtn.classList.remove("hidden");
+      editBtn.addEventListener("click", () => startRenameAccount(client));
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
@@ -5823,8 +5840,90 @@
         if (!root) return;
         root.querySelectorAll(selector).forEach(autoGrow);
       }
+
+      // ---- Inline rename: pencil → input → rename_seat RPC ----
+      // Mirrors dashboard/index.html's wireRenameSeat flow but
+      // anchored on the H1 instead of a table cell. Server-side
+      // rename_seat (SECURITY DEFINER) enforces admin-only; we
+      // translate the privilege error into a friendly toast.
+      function startRenameAccount(client) {
+        const h1     = document.getElementById("account-name");
+        const editBt = document.getElementById("account-name-edit-btn");
+        const row    = h1.parentElement;
+        if (row.classList.contains("editing")) return;
+        row.classList.add("editing");
+
+        const currentName = client.name || "";
+        const input = document.createElement("input");
+        input.type        = "text";
+        input.value       = currentName;
+        input.placeholder = "Account name";
+        input.className   = "account-name-input";
+
+        h1.style.display     = "none";
+        editBt.style.display = "none";
+        row.insertBefore(input, h1);
+        input.focus();
+        input.select();
+
+        let done = false;
+        const restore = (name) => {
+          if (!input.parentNode) return;
+          row.removeChild(input);
+          h1.textContent       = name;
+          h1.style.display     = "";
+          editBt.style.display = "";
+          row.classList.remove("editing");
+        };
+
+        const commit = async () => {
+          if (done) return;
+          done = true;
+          const nextName = input.value.trim();
+          if (!nextName) {
+            alert("Account name can't be empty.");
+            restore(currentName);
+            return;
+          }
+          if (nextName === currentName) { restore(currentName); return; }
+          try {
+            await sb.sbFetch("/rest/v1/rpc/rename_seat", {
+              method: "POST",
+              body:   JSON.stringify({ seat_id: client.id, new_name: nextName }),
+            });
+            client.name = nextName;
+            document.title = `${nextName} — Uptown`;
+            restore(nextName);
+          } catch (err) {
+            const m = err.message || "";
+            let msg;
+            if (/insufficient_privilege|Only admins/i.test(m)) {
+              msg = "Only organization admins can rename accounts.";
+            } else if (/cannot be empty/i.test(m)) {
+              msg = "Account name can't be empty.";
+            } else {
+              msg = `Couldn't rename: ${m}`;
+            }
+            alert(msg);
+            restore(currentName);
+          }
+        };
+        const cancel = () => {
+          if (done) return;
+          done = true;
+          restore(currentName);
+        };
+
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
+          if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
+        });
+      }
     })();
   </script>
+
+  <script src="/mobile-nav.js" defer></script>
 
   <footer class="app-footer">
     <a href="/guides/">Guides</a><span class="sep">·</span><a href="/terms/">Terms</a><span class="sep">·</span><a href="/privacy/">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
