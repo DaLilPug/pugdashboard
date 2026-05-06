@@ -82,7 +82,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--green); outline
 .header-right { display: flex; align-items: center; gap: 14px; }
 
 .header-logo { display: flex; align-items: center; }
-.header-logo img { height: 34px; width: auto; display: block; object-fit: contain; }
+.header-logo img { height: 52px; width: auto; display: block; object-fit: contain; }
 
 .header-pipe { width: 1px; height: 28px; background: rgba(255,255,255,.12); }
 .header-sub {
