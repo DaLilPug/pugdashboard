@@ -81,24 +81,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--green); outline
 .header-left  { display: flex; align-items: center; gap: 20px; }
 .header-right { display: flex; align-items: center; gap: 14px; }
 
-.header-logo { display: flex; align-items: center; gap: 11px; }
-.header-logo img { width: 26px; height: 26px; display: block; object-fit: contain; }
-
-.header-wordmark { display: flex; flex-direction: column; line-height: 1; gap: 2px; }
-.header-wordmark-top {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 17px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: .06em;
-}
-.header-wordmark-bot {
-  font-size: 8px;
-  font-weight: 600;
-  color: rgba(168,180,196,.7);
-  letter-spacing: .22em;
-  text-transform: uppercase;
-}
+.header-logo { display: flex; align-items: center; }
+.header-logo img { height: 34px; width: auto; display: block; object-fit: contain; }
 
 .header-pipe { width: 1px; height: 28px; background: rgba(255,255,255,.12); }
 .header-sub {
@@ -396,11 +380,8 @@ body.login-body {
   margin-bottom: 20px;
 }
 .login-brand img {
-  width: 36px;
-  height: 36px;
-  padding: 6px;
-  background: var(--navy);
-  border-radius: 10px;
+  height: 44px;
+  width: auto;
   object-fit: contain;
   flex-shrink: 0;
 }
