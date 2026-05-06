@@ -232,6 +232,24 @@
       Auth.wireSignOut();
       Auth.wireUserEmail(session);
 
+      // Fire the welcome email (idempotent server-side via the
+      // operators.welcome_email_sent_at flag — only the very first
+      // /dashboard/ load per operator actually sends an email).
+      // Fully fire-and-forget; doesn't block any rendering.
+      (() => {
+        try {
+          fetch(`${window.SUPABASE_CONFIG.url}/functions/v1/send-welcome-email`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${session.access_token}`,
+              "Content-Type":  "application/json",
+              "apikey":        window.SUPABASE_CONFIG.anonKey,
+            },
+            body: "{}",
+          }).catch(err => console.warn("welcome email send threw:", err));
+        } catch (e) { /* swallow — email send must never break dashboard */ }
+      })();
+
       // ---- platform admin plumbing -------------------------------------
       //
       // Two related features, both gated on is_platform_admin:
