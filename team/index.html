@@ -735,12 +735,10 @@
         }
         const succeeded = u.succeeded_calls || 0;
         const emails    = u.emails_returned || 0;
-        const phones    = u.phones_returned || 0;
         const credits   = Number(u.total_credits || 0);
         const recent    = u.most_recent_call_at ? fmtRelativeTime(u.most_recent_call_at) : "unknown";
         const successPct = total > 0 ? Math.round((succeeded / total) * 100) : 0;
         const emailPct   = total > 0 ? Math.round((emails    / total) * 100) : 0;
-        const phonePct   = total > 0 ? Math.round((phones    / total) * 100) : 0;
         root.innerHTML = `
           <div class="enrichment-stat-grid">
             <div class="enrichment-stat">
@@ -750,10 +748,6 @@
             <div class="enrichment-stat">
               <div class="enrichment-stat-value">${emails} <span class="enrichment-stat-pct">(${emailPct}%)</span></div>
               <div class="enrichment-stat-label">emails matched</div>
-            </div>
-            <div class="enrichment-stat">
-              <div class="enrichment-stat-value">${phones} <span class="enrichment-stat-pct">(${phonePct}%)</span></div>
-              <div class="enrichment-stat-label">phones matched</div>
             </div>
             <div class="enrichment-stat">
               <div class="enrichment-stat-value">${credits.toFixed(0)}</div>

@@ -2067,8 +2067,13 @@
           const sourceBadge = (src) => src && src !== "outreach"
             ? `<span class="pr-enrich-source" title="Sourced from ${esc(src)}">${esc(src)}</span>`
             : "";
+          // Email is rendered as click-to-copy plain text instead of a
+          // mailto: link — clicking mailto: opens the OS mail handler
+          // which is universally annoying when you really just want to
+          // grab the address. data-action handler writes to clipboard
+          // and flashes a transient "Copied" state.
           const emailCellHtml = p.email
-            ? `<a class="pr-contact-link" href="mailto:${esc(p.email)}" title="${esc(p.email)}">${esc(p.email)}</a>${sourceBadge(p.email_source)}`
+            ? `<span class="pr-contact-text" data-action="copy-email" data-email="${esc(p.email)}" title="Click to copy: ${esc(p.email)}">${esc(p.email)}</span>${sourceBadge(p.email_source)}`
             : (p.email_enrich_attempted_at ? naBtn : enrichBtn);
 
           const isChecked = state.selected.has(p.key);
@@ -2756,6 +2761,12 @@
             handleRetryEnrich(actionEl);
             return;
           }
+          if (action === "copy-email") {
+            clickEvt.preventDefault();
+            clickEvt.stopPropagation();
+            handleCopyEmail(actionEl);
+            return;
+          }
 
           // ---- Prospect-row actions (rating + inline notes) ----------
           // These fire from elements in the visible .pr-row (not inside a
@@ -3235,7 +3246,6 @@
               body:   JSON.stringify({
                 p_prospect_id: prospect.id,
                 p_email:       true,
-                p_phone:       false,
               }),
             });
             await enrichOne(prospect.id, "manual");
@@ -3286,6 +3296,44 @@
           };
           await Promise.all(Array.from({ length: PARALLEL }, worker));
           alert(`Bulk enrich complete: ${succeeded} matched, ${targets.length - succeeded - failed} no match, ${failed} failed.`);
+        }
+
+        function handleCopyEmail(el) {
+          const email = el.dataset.email;
+          if (!email) return;
+          const flash = (msg, ok) => {
+            const orig = el.textContent;
+            el.classList.add(ok ? "pr-contact-copied" : "pr-contact-copy-fail");
+            el.textContent = msg;
+            setTimeout(() => {
+              el.classList.remove("pr-contact-copied", "pr-contact-copy-fail");
+              el.textContent = orig;
+            }, 900);
+          };
+          // Modern path: navigator.clipboard. Falls back to a hidden
+          // textarea + execCommand for non-HTTPS / older browsers
+          // (rare but cheap to handle).
+          const writeViaClipboardAPI = () =>
+            navigator.clipboard?.writeText
+              ? navigator.clipboard.writeText(email)
+              : Promise.reject(new Error("no clipboard API"));
+          writeViaClipboardAPI()
+            .then(() => flash("Copied!", true))
+            .catch(() => {
+              try {
+                const ta = document.createElement("textarea");
+                ta.value = email;
+                ta.style.position = "fixed";
+                ta.style.opacity  = "0";
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand("copy");
+                document.body.removeChild(ta);
+                flash(ok ? "Copied!" : "Copy failed", ok);
+              } catch {
+                flash("Copy failed", false);
+              }
+            });
         }
 
         async function enrichOne(prospectId, triggeredBy) {

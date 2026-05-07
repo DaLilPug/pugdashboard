@@ -2833,6 +2833,28 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .pr-contact-link:hover {
   border-bottom-color: var(--navy);
 }
+
+/* Click-to-copy email cell. Plain text by default, dotted underline
+   on hover hints at clickability. Briefly turns green + says
+   "Copied!" after a successful clipboard write. */
+.pr-contact-text {
+  color: var(--navy);
+  cursor: pointer;
+  border-bottom: 1px dotted var(--gray-300);
+  user-select: none;
+}
+.pr-contact-text:hover {
+  border-bottom-color: var(--navy);
+}
+.pr-contact-copied {
+  color: var(--good, #228b22);
+  border-bottom-color: transparent;
+  font-weight: 600;
+}
+.pr-contact-copy-fail {
+  color: var(--danger, #b41e1e);
+  border-bottom-color: transparent;
+}
 .pr-enrich-source {
   display: inline-block;
   margin-left: 6px;
