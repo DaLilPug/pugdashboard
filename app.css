@@ -2818,10 +2818,9 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   box-shadow: 0 0 0 2px rgba(15, 33, 56, 0.10);
 }
 
-/* ---- Email + Phone columns + Enrich button ------------------- */
-.pr-col-email { width: 1%; max-width: 260px; }
-.pr-col-phone { width: 1%; white-space: nowrap; }
-.pr-email-cell, .pr-phone-cell {
+/* ---- Email column + Enrich button --------------------------- */
+.pr-col-email  { width: 1%; max-width: 260px; }
+.pr-email-cell {
   font-size: 12px;
   color: var(--navy);
   white-space: nowrap;
@@ -2902,19 +2901,6 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   cursor: not-allowed;
 }
 
-/* "Pending Apollo…" — phone reveal was requested but the async
-   webhook hasn't fired yet. Read-only, not clickable. */
-.pr-enrich-pending {
-  display: inline-block;
-  padding: 3px 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--accent);
-  background: var(--accent-soft);
-  border-radius: var(--r);
-  font-style: italic;
-}
 .pr-bulk-action-disabled,
 .pr-bulk-action-disabled:hover {
   color: var(--gray-400);
@@ -2960,23 +2946,6 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   color: var(--gray-500);
   margin-top: 8px;
   min-height: 14px;
-}
-
-/* Sub-toggle inside the popover: indented + dim when its parent
-   (auto-enrich) is off. */
-.pr-enrich-sublabel {
-  margin-top: 10px;
-  padding-left: 22px;
-  border-left: 2px solid var(--border);
-}
-.pr-enrich-sublabel-disabled,
-.pr-enrich-sublabel-disabled span {
-  color: var(--gray-400);
-  cursor: not-allowed;
-}
-.pr-enrich-subhelp {
-  padding-left: 22px;
-  margin-top: 4px;
 }
 
 /* Truncate long titles / companies so rows stay single-height. */

@@ -1436,56 +1436,59 @@
         deleting the meeting event flips it back.
       </p>
 
-      <h4 id="dash-enrichment">Email + Phone enrichment (Apollo)</h4>
+      <h4 id="dash-enrichment">Email enrichment (Apollo)</h4>
       <p>
-        The <strong>Email</strong> and <strong>Phone</strong> columns show known
-        contact info — either captured from outreach events (when a prospect
-        responded with their email visible) or fetched from <strong>Apollo</strong>
-        via the enrichment integration. Each enrichment-sourced value carries a
-        small <em>apollo</em> badge so you can tell at a glance where it came from.
+        The <strong>Email</strong> column shows known contact info — either
+        captured from outreach events (when a prospect responded with their
+        email visible) or fetched from <strong>Apollo</strong> via the
+        enrichment integration. Apollo-sourced values carry a small
+        <em>apollo</em> badge so you can tell where they came from.
       </p>
       <p>To use enrichment, an org admin first connects an Apollo API key on the
         <a href="/team/">Team page</a>. Once connected:</p>
       <ul>
-        <li><strong>Per-row enrichment</strong>: any empty Email or Phone cell
-            shows an <em>Enrich ↗</em> button. One click fetches both email and
-            phone in a single Apollo call. Admin only.</li>
+        <li><strong>Per-row enrichment</strong>: any empty Email cell shows an
+            <em>Enrich ↗</em> button. One click fetches the email in a single
+            Apollo call. Admin only.</li>
         <li><strong>Bulk enrichment</strong>: select multiple prospects via the
-            checkboxes, then click <em>Enrich N</em> (full — email + phone) or
-            <em>Enrich N (Email)</em> (cheaper — email only) in the bulk action
-            bar. Only prospects missing email AND with name + company set get
-            enriched. Admin only.</li>
+            checkboxes, then click <em>Enrich N</em> in the bulk action bar.
+            Only prospects missing email AND with name + company set get
+            enriched (the N is the actionable count, not the selected count).
+            Admin only.</li>
         <li><strong>Auto-enrich on acceptance</strong> (off by default per
             account): when a prospect's status moves into Messaged, Responded,
-            or Meeting, Apollo fires automatically if email is unknown. The
-            <em>Auto-enrich: off ▾</em> pill above the prospect filters opens a
-            popover with two checkboxes — the parent toggle, plus an
-            <em>Also include phone reveal</em> sub-toggle that costs extra
-            credits. Admin only.</li>
+            or Meeting, Apollo fires automatically if email is unknown. Toggle
+            via the <em>Auto-enrich: off ▾</em> pill above the prospect
+            filters. Admin only.</li>
       </ul>
-      <h5>Email vs. phone</h5>
       <p>
-        Email is fetched synchronously — it appears in the Email column within
-        a second of the call returning. <strong>Phone reveal is asynchronous</strong>:
-        Apollo queues a background job and POSTs the phone to Uptown's webhook
-        when the reveal completes (usually within minutes). Until then the
-        Phone column shows <em>Pending Apollo…</em>; once delivered, the phone
-        appears on the next page refresh.
+        As a bonus, when Apollo returns a clean canonical LinkedIn URL
+        (the <code>/in/&lt;slug&gt;</code> vanity form rather than the
+        URN-encoded one), the prospect's profile_url is upgraded automatically.
+        That's free side-effect data quality — improves match rates for future
+        enrichments and makes the LinkedIn link in the row click through
+        cleaner.
       </p>
       <p>
         Match rates depend on the prospect's public web presence — Apollo
-        typically returns email for ~70-85% of well-known professionals and
-        phone for ~30-50%. The Phone column shows <em>N/A</em> when Apollo
-        confirmed no match (clickable to retry); empty cells with no
-        <em>N/A</em> badge mean enrichment hasn't been attempted yet.
+        typically returns email for ~70-85% of well-known professionals. The
+        Email column shows <em>N/A</em> when Apollo confirmed no match
+        (clickable to retry); empty cells with no <em>N/A</em> badge mean
+        enrichment hasn't been attempted yet.
       </p>
       <p>
-        Calls are billed by Apollo against the org's own Apollo account.
-        <strong>Phone reveals cost extra credits</strong> per Apollo's pricing
-        — typically 1-2 credits per phone reveal regardless of whether one is
-        found, on top of the 1 credit for email. The <a href="/team/">Team
+        Calls are billed by Apollo against the org's own Apollo account
+        (typically 1 credit per email reveal). The <a href="/team/">Team
         page</a> shows your org's last-30-days usage; for exact charges, check
         Apollo's own usage dashboard.
+      </p>
+      <p>
+        <em>Phone enrichment is intentionally not part of this integration.</em>
+        Apollo's sync response only returns the company main line (not personal
+        phones), and the paid async path was unreliable in testing. If a
+        prospect has a phone captured from outreach (e.g. they shared one in a
+        reply), it shows up in the prospect's <strong>Edit info</strong> form
+        in the timeline expansion — no enrichment-driven Phone column.
       </p>
       <div class="callout note">
         <div class="callout-title">Enrichment doesn't move funnel data</div>
