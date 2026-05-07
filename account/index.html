@@ -1111,6 +1111,13 @@
         //      mailto, etc.), don't toggle.
         //   3. Otherwise, a click inside a .pr-row toggles its timeline.
         wrapEl.addEventListener("click", (e) => {
+          // An inline-edit-in-progress cell (e.g. the Notes textarea)
+          // marks itself with data-editing="1". Clicks inside such a
+          // cell — including on the textarea or its padding — must not
+          // bubble to the row toggle, or starting an edit would also
+          // expand the timeline.
+          if (e.target.closest('[data-editing="1"]')) return;
+
           const actionEl = e.target.closest("[data-action]");
           if (actionEl) {
             handleAction(actionEl, e);
@@ -1943,14 +1950,16 @@
               `title="${p.thumb === false ? 'Clear thumbs down' : 'Mark thumbs down'}" ` +
               `aria-pressed="${p.thumb === false}">👎</button>`;
 
-          // Notes cell: shows a small pill that's filled when notes exist,
-          // muted "+ Notes" prompt when empty. Clicking expands the row
-          // (same toggleTimeline path as clicking anywhere else on the row)
-          // and the notes editor is rendered at the top of the timeline.
+          // Notes cell: spreadsheet-style inline editor. Static state
+          // shows the saved notes wrapped + clamped to ~6 lines; click
+          // anywhere in the cell to swap the static text for a textarea
+          // that auto-grows. Save on blur (RPC), Esc reverts. Empty
+          // state shows a faded "+ Notes" placeholder so the cell still
+          // signals it's editable.
           const hasNotes = !!(p.notes && p.notes.trim());
           const notesCellHtml = hasNotes
-            ? `<button type="button" class="pr-notes-btn pr-notes-has" data-action="open-notes" title="View / edit notes">Notes ✎</button>`
-            : `<button type="button" class="pr-notes-btn pr-notes-empty" data-action="open-notes" title="Add notes">+ Notes</button>`;
+            ? `<div class="pr-notes-display pr-notes-has" data-action="edit-notes-inline" title="Click to edit notes">${esc(p.notes)}</div>`
+            : `<div class="pr-notes-display pr-notes-empty" data-action="edit-notes-inline" title="Click to add notes">+ Notes</div>`;
 
           const isChecked = state.selected.has(p.key);
 
@@ -2084,23 +2093,6 @@
               </div>
             </div>
 
-            <!-- Notes editor — always visible inside an expanded row. The
-                 textarea seeds from p.notes and writes via the
-                 set_prospect_notes RPC on Save. Saving doesn't touch
-                 last_touch / status / sentiment / event counts. -->
-            <div class="pr-notes-editor">
-              <label class="pr-notes-editor-label" for="pr-notes-${esc(p.key)}">Notes</label>
-              <textarea id="pr-notes-${esc(p.key)}"
-                        class="pr-notes-editor-text"
-                        rows="3"
-                        placeholder="Notes about this prospect — call notes, deal status, why you marked the rating, etc."
-                        maxlength="8000">${esc(p.notes || "")}</textarea>
-              <div class="pr-notes-editor-actions">
-                <span class="pr-notes-editor-feedback"></span>
-                <button type="button" class="btn-secondary pr-action" data-action="cancel-notes-edit">Reset</button>
-                <button type="button" class="btn-primary   pr-action" data-action="save-notes">Save notes</button>
-              </div>
-            </div>
 
             <!-- Split-mode bar — hidden by default. Revealed when the
                  .pr-timeline-cell gets the .pr-split-mode class (set by
@@ -2635,21 +2627,22 @@
             return;
           }
 
-          // ---- Prospect-row actions (rating + notes-open) ------------
-          // These fire from buttons in the visible .pr-row (not inside a
+          // ---- Prospect-row actions (rating + inline notes) ----------
+          // These fire from elements in the visible .pr-row (not inside a
           // timeline row), so they look up prospect from .pr-row instead
           // of .pr-timeline-row. They short-circuit before the
-          // timelineRow guard below — clicking a thumb shouldn't expand.
+          // timelineRow guard below — clicking a thumb or notes cell
+          // shouldn't expand the row.
           if (action === "toggle-thumb") {
             clickEvt.preventDefault();
             clickEvt.stopPropagation();
             handleToggleThumb(actionEl);
             return;
           }
-          if (action === "open-notes") {
+          if (action === "edit-notes-inline") {
             clickEvt.preventDefault();
             clickEvt.stopPropagation();
-            handleOpenNotes(actionEl);
+            enterNotesEditMode(actionEl);
             return;
           }
 
@@ -2785,17 +2778,6 @@
             return;
           }
 
-          if (action === "save-notes") {
-            clickEvt.preventDefault();
-            handleSaveNotes(actionEl, prospect, timelineRow);
-            return;
-          }
-          if (action === "cancel-notes-edit") {
-            clickEvt.preventDefault();
-            const ta = timelineRow.querySelector(".pr-notes-editor textarea");
-            if (ta) ta.value = prospect.notes || "";
-            return;
-          }
 
           if (action === "show-add-followup-form") {
             clickEvt.preventDefault();
@@ -2893,103 +2875,100 @@
           }
         }
 
-        function handleOpenNotes(btnEl) {
-          const row = btnEl.closest(".pr-row");
+        // Spreadsheet-style inline notes editor. Click on the static
+        // .pr-notes-display swaps the cell contents for an auto-growing
+        // textarea pre-filled with the saved notes. On blur we save via
+        // RPC; Esc reverts without saving. Cell row height grows with
+        // content (capped via CSS max-height + scroll inside textarea).
+        function enterNotesEditMode(displayEl) {
+          // If already in edit mode (double-click on textarea), no-op.
+          const cell = displayEl.closest(".pr-notes-cell");
+          if (!cell || cell.dataset.editing === "1") return;
+          const row = cell.closest(".pr-row");
           if (!row) return;
-          // Expand the row if not already expanded; the notes editor
-          // lives at the top of the rendered timeline. After
-          // toggleTimeline finishes, focus the textarea.
-          (async () => {
-            const idx = row.dataset.idx;
-            const tbody = row.parentElement;
-            const timeline = tbody.querySelector(`.pr-timeline-row[data-idx="${idx}"]`);
-            const wasOpen = timeline && !timeline.classList.contains("hidden");
-            if (!wasOpen) {
-              await toggleTimeline(row);
+          const idx = Number(row.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          const original = prospect.notes || "";
+          cell.dataset.editing = "1";
+          cell.innerHTML = "";
+
+          const ta = document.createElement("textarea");
+          ta.className = "pr-notes-edit";
+          ta.value = original;
+          ta.maxLength = 8000;
+          ta.placeholder = "Notes about this prospect…";
+          ta.rows = 1;
+          cell.appendChild(ta);
+
+          const autosize = () => {
+            ta.style.height = "auto";
+            ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+          };
+          autosize();
+          ta.focus();
+          // Cursor at end so a stray select-all doesn't immediately
+          // wipe the saved value if the user starts typing.
+          const end = ta.value.length;
+          ta.setSelectionRange(end, end);
+
+          let cancelled = false;
+
+          ta.addEventListener("input", autosize);
+          ta.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+              cancelled = true;
+              ta.value = original;
+              ta.blur();
+            } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              // Cmd/Ctrl+Enter = explicit save shortcut.
+              e.preventDefault();
+              ta.blur();
             }
-            const tl2 = tbody.querySelector(`.pr-timeline-row[data-idx="${idx}"]`);
-            if (!tl2 || tl2.classList.contains("hidden")) return;
-            const ta = tl2.querySelector(".pr-notes-editor textarea");
-            if (ta) {
-              ta.focus();
-              const end = ta.value.length;
-              ta.setSelectionRange(end, end);
+          });
+
+          ta.addEventListener("blur", async () => {
+            const newRaw     = ta.value;
+            const newTrimmed = newRaw.trim();
+            const stored     = newTrimmed === "" ? "" : newRaw;
+
+            if (cancelled || stored === original) {
+              exitNotesEditMode(cell, prospect);
+              return;
             }
-          })();
+
+            try {
+              await sb.sbFetch("/rest/v1/rpc/set_prospect_notes", {
+                method: "POST",
+                body:   JSON.stringify({
+                  p_prospect_id: prospect.id,
+                  p_notes:       newTrimmed === "" ? null : newRaw,
+                }),
+              });
+              prospect.notes = stored;
+              const canonical = state.allProspects.find(x => x.id === prospect.id);
+              if (canonical && canonical !== prospect) canonical.notes = stored;
+              exitNotesEditMode(cell, prospect);
+
+              // Notes filter may need a rerender if active — the
+              // prospect may have just moved into / out of view.
+              if (state.notesFilter !== "all") rerender();
+            } catch (err) {
+              alert("Couldn't save notes: " + (err.message || err));
+              // Revert to the static display showing the previous
+              // saved value rather than leaving a half-saved state.
+              exitNotesEditMode(cell, prospect);
+            }
+          });
         }
 
-        async function handleSaveNotes(btnEl, prospect, timelineRow) {
-          const editor = timelineRow.querySelector(".pr-notes-editor");
-          if (!editor) return;
-          const ta = editor.querySelector("textarea");
-          const feedback = editor.querySelector(".pr-notes-editor-feedback");
-          if (!ta) return;
-
-          const raw = ta.value;
-          const trimmed = raw.trim();
-          // Server normalizes whitespace-only to NULL; mirror here so
-          // the canonical state matches what comes back.
-          const stored  = trimmed === "" ? "" : raw;
-          const prev    = prospect.notes || "";
-
-          if (stored === prev) {
-            if (feedback) {
-              feedback.textContent = "No changes.";
-              setTimeout(() => { feedback.textContent = ""; }, 1200);
-            }
-            return;
-          }
-
-          const prevLabel = btnEl.textContent;
-          btnEl.disabled = true;
-          btnEl.textContent = "Saving…";
-          if (feedback) feedback.textContent = "";
-
-          try {
-            await sb.sbFetch("/rest/v1/rpc/set_prospect_notes", {
-              method: "POST",
-              body:   JSON.stringify({ p_prospect_id: prospect.id, p_notes: trimmed === "" ? null : raw }),
-            });
-            prospect.notes = stored;
-            const canonical = state.allProspects.find(x => x.id === prospect.id);
-            if (canonical && canonical !== prospect) canonical.notes = stored;
-
-            // Surgically flip the Notes pill on the visible row above
-            // this timeline row — keeps the editor open so the
-            // operator can keep typing or see the saved confirmation.
-            const idx = timelineRow.dataset.idx;
-            const tbody = timelineRow.parentElement;
-            const visibleRow = tbody.querySelector(`.pr-row[data-idx="${idx}"]`);
-            const pill = visibleRow?.querySelector(".pr-notes-btn");
-            if (pill) {
-              const has = !!stored.trim();
-              pill.classList.toggle("pr-notes-has",   has);
-              pill.classList.toggle("pr-notes-empty", !has);
-              pill.textContent = has ? "Notes ✎" : "+ Notes";
-              pill.title       = has ? "View / edit notes" : "Add notes";
-            }
-
-            if (feedback) {
-              feedback.textContent = "Saved.";
-              feedback.classList.add("pr-notes-saved");
-              setTimeout(() => {
-                feedback.textContent = "";
-                feedback.classList.remove("pr-notes-saved");
-              }, 1500);
-            }
-
-            // If the Notes filter is active, the prospect may have
-            // moved into / out of view. Defer rerender so the
-            // "Saved." flash is visible first.
-            if (state.notesFilter !== "all") {
-              setTimeout(() => rerender(), 1700);
-            }
-          } catch (err) {
-            alert("Couldn't save notes: " + (err.message || err));
-          } finally {
-            btnEl.disabled = false;
-            btnEl.textContent = prevLabel;
-          }
+        function exitNotesEditMode(cell, prospect) {
+          cell.dataset.editing = "";
+          const has = !!(prospect.notes && prospect.notes.trim());
+          cell.innerHTML = has
+            ? `<div class="pr-notes-display pr-notes-has" data-action="edit-notes-inline" title="Click to edit notes">${esc(prospect.notes)}</div>`
+            : `<div class="pr-notes-display pr-notes-empty" data-action="edit-notes-inline" title="Click to add notes">+ Notes</div>`;
         }
 
         async function handleLogMeeting(btn, prospect) {
