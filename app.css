@@ -2818,6 +2818,106 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   box-shadow: 0 0 0 2px rgba(15, 33, 56, 0.10);
 }
 
+/* ---- Email + Phone columns + Enrich button ------------------- */
+.pr-col-email { width: 1%; max-width: 260px; }
+.pr-col-phone { width: 1%; white-space: nowrap; }
+.pr-email-cell, .pr-phone-cell {
+  font-size: 12px;
+  color: var(--navy);
+  white-space: nowrap;
+}
+.pr-contact-link {
+  color: var(--navy);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--gray-300);
+}
+.pr-contact-link:hover {
+  border-bottom-color: var(--navy);
+}
+.pr-enrich-source {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.pr-enrich-btn {
+  display: inline-block;
+  padding: 3px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: #fff;
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.pr-enrich-btn:hover {
+  background: var(--accent-soft);
+}
+.pr-enrich-btn-disabled,
+.pr-enrich-btn-disabled:hover {
+  color: var(--gray-400);
+  border-color: var(--border);
+  background: #fff;
+  cursor: not-allowed;
+}
+.pr-bulk-action-disabled,
+.pr-bulk-action-disabled:hover {
+  color: var(--gray-400);
+  cursor: not-allowed;
+}
+
+/* ---- Auto-enrich settings pill + popover --------------------- */
+.pr-enrich-wrap { position: relative; }
+.pr-enrich-pill {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.pr-enrich-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  width: 320px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: 0 6px 18px rgba(15, 33, 56, 0.12);
+  padding: 14px 16px;
+}
+.pr-enrich-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--navy);
+  cursor: pointer;
+}
+.pr-enrich-label input { cursor: pointer; }
+.pr-enrich-help {
+  font-size: 12px;
+  color: var(--gray-500);
+  line-height: 1.4;
+  margin: 8px 0 0;
+}
+.pr-enrich-status {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 8px;
+  min-height: 14px;
+}
+
 /* Truncate long titles / companies so rows stay single-height. */
 .pr-table td.pr-company, .pr-table td.pr-title {
   max-width: 260px;
@@ -3628,6 +3728,160 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   margin-top: 28px;
 }
 .team-section:first-of-type { margin-top: 12px; }
+
+/* Enrichment integration section. Admin-only, hidden by default
+   until the loadEnrichment loader reveals it. */
+.section-description {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin: 6px 0 14px;
+  line-height: 1.5;
+}
+.section-description a { color: var(--accent); }
+
+.enrichment-config {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+}
+.enrichment-connected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.enrichment-connected-meta { font-size: 13px; color: var(--navy); }
+.enrichment-connected-actions { display: flex; gap: 8px; }
+
+.enrichment-form { display: flex; flex-direction: column; gap: 8px; }
+.enrichment-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.enrichment-help-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+}
+.enrichment-input {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+}
+.enrichment-input:focus { outline: 0; border-color: var(--navy); }
+.enrichment-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.enrichment-form-error {
+  font-size: 12px;
+  color: var(--danger, #b41e1e);
+  min-height: 16px;
+}
+
+.enrichment-usage { margin-top: 16px; }
+.enrichment-usage-title {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  margin: 0 0 8px;
+}
+.enrichment-usage-empty {
+  font-size: 13px;
+  color: var(--gray-500);
+  padding: 14px;
+  background: var(--surface-1);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.enrichment-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.enrichment-stat {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 14px;
+}
+.enrichment-stat-value {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--navy);
+  line-height: 1.1;
+}
+.enrichment-stat-pct {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-500);
+}
+.enrichment-stat-label {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-top: 4px;
+  letter-spacing: .04em;
+}
+.enrichment-stat-foot {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 8px;
+}
+.enrichment-usage-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Enrichment log modal — wider than the access modal so the
+   table doesn't squeeze. */
+.enrichment-log-modal-card {
+  max-width: 900px;
+  width: 92vw;
+}
+.enrichment-log-table {
+  width: 100%;
+  font-size: 12px;
+}
+.enrichment-log-table th { font-size: 10px; }
+.enrichment-log-pill {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-right: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.enrichment-log-pill-none {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.enrichment-log-fail {
+  color: var(--danger, #b41e1e);
+  font-weight: 600;
+}
 
 /* Invite form — email + role + submit on one row, wrapping on narrow
    viewports. Kept inline (not modal) because invite is the highest-

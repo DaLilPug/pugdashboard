@@ -1436,6 +1436,49 @@
         deleting the meeting event flips it back.
       </p>
 
+      <h4 id="dash-enrichment">Email + Phone enrichment (Apollo)</h4>
+      <p>
+        The <strong>Email</strong> and <strong>Phone</strong> columns show known
+        contact info — either captured from outreach events (when a prospect
+        responded with their email visible) or fetched from <strong>Apollo</strong>
+        via the enrichment integration. Each enrichment-sourced value carries a
+        small <em>apollo</em> badge so you can tell at a glance where it came from.
+      </p>
+      <p>To use enrichment, an org admin first connects an Apollo API key on the
+        <a href="/team/">Team page</a>. Once connected:</p>
+      <ul>
+        <li><strong>Per-row enrichment</strong>: any empty Email or Phone cell
+            shows an <em>Enrich ↗</em> button. Click it to fetch that prospect's
+            contact info — uses 1 Apollo credit. Admin only.</li>
+        <li><strong>Bulk enrichment</strong>: select multiple prospects via the
+            checkboxes, then click <em>Enrich N</em> in the bulk action bar.
+            Only prospects missing email AND with name + company set get
+            enriched (the <em>N</em> in the button is the actionable count, not
+            the selected count). Admin only.</li>
+        <li><strong>Auto-enrich on acceptance</strong> (off by default per
+            account): when a prospect's status moves into Messaged, Responded,
+            or Meeting (i.e. they accepted your connection request), Apollo
+            fires automatically if email is unknown. Toggle this in the
+            <em>Auto-enrich: off ▾</em> pill at the top of the Prospects tab.
+            Admin only to change the toggle.</li>
+      </ul>
+      <p>
+        Match rates depend on the prospect's public web presence — Apollo
+        typically returns email for ~70-85% of well-known professionals and
+        phone for ~30-50%. Calls are billed by Apollo against the org's own
+        Apollo account; the <a href="/team/">Team page</a> shows your org's
+        last-30-days usage.
+      </p>
+      <div class="callout note">
+        <div class="callout-title">Enrichment doesn't move funnel data</div>
+        <p>
+          Enrichment writes only to the Email / Phone columns (and the
+          canonical LinkedIn URL when Apollo returns a cleaner one). It never
+          touches Last touch, Status, Sentiment, Event count, or any rollup —
+          those are activity-driven only.
+        </p>
+      </div>
+
       <h3 id="dash-followups">6.5 — Per-account: Follow-ups</h3>
       <p>
         The Follow-ups tab is the per-account version of the daily queue. It

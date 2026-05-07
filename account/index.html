@@ -169,6 +169,27 @@
             </div>
             <input id="pr-search" class="pr-search" type="search"
                    placeholder="Search name, company, title…" autocomplete="off" />
+            <!-- Auto-enrich settings — admin-only. Hidden until the
+                 user is confirmed an org admin in initEnrichmentSettings. -->
+            <div id="pr-enrich-settings-wrap" class="pr-enrich-wrap hidden">
+              <button id="pr-enrich-settings" class="btn-secondary pr-enrich-pill" type="button"
+                      aria-haspopup="true" aria-expanded="false">
+                Auto-enrich: <span id="pr-enrich-state">off</span> ▾
+              </button>
+              <div id="pr-enrich-popover" class="pr-enrich-popover hidden" role="dialog"
+                   aria-label="Auto-enrich settings">
+                <label class="pr-enrich-label">
+                  <input type="checkbox" id="pr-enrich-toggle" />
+                  <span>Auto-enrich on connection acceptance</span>
+                </label>
+                <p class="pr-enrich-help">
+                  When a prospect's status moves into Messaged, Responded, or Meeting
+                  (i.e. they accepted your request), automatically fetch their email
+                  via Apollo if we don't already have one. Uses your org's Apollo key.
+                </p>
+                <div id="pr-enrich-popover-status" class="pr-enrich-status"></div>
+              </div>
+            </div>
             <button id="pr-export" class="btn-secondary pr-export" type="button">Export CSV</button>
           </div>
         </div>
@@ -424,7 +445,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -1009,6 +1030,13 @@
           // lastCheckedKey enables shift+click range select.
           selected:        new Set(),
           lastCheckedKey:  null,
+          // Enrichment context — populated by initEnrichmentContext()
+          // before the first table render. enrichmentAdmin gates the
+          // Enrich button + auto-enrich popover; enrichmentConnected
+          // is whether the org has an Apollo key configured.
+          enrichmentAdmin:     false,
+          enrichmentConnected: false,
+          enrichmentInflight:  new Set(),  // prospect_ids currently being enriched
           // Split mode is active for at most one expanded prospect at a
           // time (only one timeline can be open). When active:
           //   { prospectKey, selectedEventIds: Set<string> }
@@ -1326,7 +1354,15 @@
 
         // ---- load ----------------------------------------------------
 
-        loadAll();
+        // Resolve enrichment context (admin status + provider connected)
+        // BEFORE the first table render so the Enrich buttons paint
+        // correctly. Then loadAll, then process any auto-enrich queue
+        // items that piled up since the last visit.
+        (async () => {
+          await initEnrichmentContext();
+          await loadAll();
+          processEnrichmentQueue();
+        })();
 
         async function loadAll() {
           // Server-side aggregation via prospect_summary_for_client RPC:
@@ -1429,6 +1465,14 @@
             // sentiment, etc. are unaffected).
             thumb:        (r.thumb === true || r.thumb === false) ? r.thumb : null,
             notes:        r.notes || "",
+            // Enrichment metadata. email_source / phone_source: NULL
+            // (or 'outreach') = came from outreach event identity
+            // propagation; provider name (e.g. 'apollo') = came from
+            // an enrichment call. enriched_at = last successful
+            // enrichment timestamp.
+            email_source: r.email_source || null,
+            phone_source: r.phone_source || null,
+            enriched_at:  r.enriched_at  || null,
             counts: {
               connection:     r.connection_count   || 0,
               message:        r.message_count      || 0,
@@ -1870,6 +1914,8 @@
                     <th class="pr-col-events num">Events</th>
                     <th class="pr-col-last sortable ${lastSortClass}" data-action="sort-column" data-sort="lastTouch" title="Click to sort">Last touch<span class="sort-caret">${lastSortCaret}</span></th>
                     <th class="pr-col-notes">Notes</th>
+                    <th class="pr-col-email">Email</th>
+                    <th class="pr-col-phone">Phone</th>
                     <th class="pr-col-sn">Sales Nav</th>
                     <th class="pr-col-link">LinkedIn</th>
                   </tr>
@@ -1897,11 +1943,35 @@
           const mergeBtn = count >= 2
             ? `<button class="btn-secondary pr-bulk-action" data-action="bulk-merge-prospects" type="button" title="Combine the selected prospects into one">Merge ${fmtInt(count)}</button>`
             : "";
+          // Bulk Enrich: count of currently-selected prospects that
+          // are missing email AND have name + company. Anything else
+          // would no-op (already enriched or insufficient inputs),
+          // so we surface the actionable count.
+          const enrichable = prospects.filter(p =>
+            state.selected.has(p.key)
+            && (!p.email || !p.email.trim())
+            && p.name && p.name.trim()
+            && p.company && p.company.trim()
+          ).length;
+          const enrichLocked   = !state.enrichmentAdmin;
+          const enrichDisabled = !state.enrichmentConnected || enrichable === 0;
+          const enrichTitle = enrichLocked
+            ? "Only org admins can enrich"
+            : !state.enrichmentConnected
+              ? "Connect Apollo on the Team page first"
+              : enrichable === 0
+                ? "No selected prospects are missing email + have name and company"
+                : `Enrich ${enrichable} prospect${enrichable === 1 ? "" : "s"} via Apollo`;
+          const enrichBtn = `<button class="btn-secondary pr-bulk-action ${enrichLocked || enrichDisabled ? 'pr-bulk-action-disabled' : ''}"
+            data-action="bulk-enrich-prospects" type="button"
+            title="${esc(enrichTitle)}"
+            ${enrichLocked || enrichDisabled ? 'disabled' : ''}>Enrich ${fmtInt(enrichable)}</button>`;
           return `
             <div class="pr-bulk-bar" role="region" aria-label="Bulk actions">
               <span class="pr-bulk-count">${fmtInt(count)} prospect${count === 1 ? "" : "s"} selected</span>
               <button class="btn-secondary pr-bulk-action" data-action="bulk-clear-selection" type="button">Clear</button>
               <button class="btn-secondary pr-bulk-action" data-action="bulk-copy-selection" type="button" title="Copy the selected prospects as TSV (paste into Sheets / Excel)">Copy ${fmtInt(count)}</button>
+              ${enrichBtn}
               ${mergeBtn}
               <button class="btn-danger pr-bulk-action" data-action="bulk-delete-prospects" type="button">Delete ${fmtInt(count)}</button>
             </div>
@@ -1961,6 +2031,36 @@
             ? `<div class="pr-notes-display pr-notes-has" data-action="edit-notes-inline" title="Click to edit notes">${esc(p.notes)}</div>`
             : `<div class="pr-notes-display pr-notes-empty" data-action="edit-notes-inline" title="Click to add notes">+ Notes</div>`;
 
+          // Email + phone cells: show the value as a clickable link
+          // when known (mailto: / tel:), or an "Enrich ↗" button when
+          // empty. The Enrich button is admin-gated client-side via
+          // the .pr-enrich-btn-disabled class added on render when
+          // state.enrichmentAdmin is false; the RPC also gates server-
+          // side. The data-action handler below routes both per-cell
+          // and bulk enrichment through the same path.
+          const enrichLocked   = !state.enrichmentAdmin;
+          const enrichDisabled = !state.enrichmentConnected;
+          const enrichBtnTitle = enrichLocked
+            ? "Only org admins can enrich"
+            : enrichDisabled
+              ? "Connect Apollo on the Team page first"
+              : "Enrich via Apollo";
+          const enrichBtn = (field) => `<button type="button"
+              class="pr-enrich-btn ${enrichLocked || enrichDisabled ? 'pr-enrich-btn-disabled' : ''}"
+              data-action="enrich-prospect"
+              data-field="${field}"
+              title="${esc(enrichBtnTitle)}"
+              ${enrichLocked || enrichDisabled ? 'disabled' : ''}>Enrich ↗</button>`;
+          const sourceBadge = (src) => src && src !== "outreach"
+            ? `<span class="pr-enrich-source" title="Sourced from ${esc(src)}">${esc(src)}</span>`
+            : "";
+          const emailCellHtml = p.email
+            ? `<a class="pr-contact-link" href="mailto:${esc(p.email)}" title="${esc(p.email)}">${esc(p.email)}</a>${sourceBadge(p.email_source)}`
+            : enrichBtn("email");
+          const phoneCellHtml = p.phone
+            ? `<a class="pr-contact-link" href="tel:${esc(p.phone)}" title="${esc(p.phone)}">${esc(p.phone)}</a>${sourceBadge(p.phone_source)}`
+            : enrichBtn("phone");
+
           const isChecked = state.selected.has(p.key);
 
           return `
@@ -1983,11 +2083,13 @@
               <td class="num">${fmtInt(p.eventCount)}</td>
               <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
               <td class="pr-notes-cell">${notesCellHtml}</td>
+              <td class="pr-email-cell">${emailCellHtml}</td>
+              <td class="pr-phone-cell">${phoneCellHtml}</td>
               <td class="pr-sn">${snCell}</td>
               <td class="pr-link">${liCell}</td>
             </tr>
             <tr class="pr-timeline-row hidden" data-idx="${idx}">
-              <td colspan="12" class="pr-timeline-cell"></td>
+              <td colspan="14" class="pr-timeline-cell"></td>
             </tr>
           `;
         }
@@ -2393,11 +2495,12 @@
 
         function buildExportRows(prospects) {
           const header = [
-            "Name", "Email", "Phone", "Company", "Title", "Status", "Sentiment",
+            "Name", "Email", "Email Source", "Phone", "Phone Source",
+            "Company", "Title", "Status", "Sentiment",
             "Rating", "Notes",
             "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
             "Responses", "Positive Responses", "Meetings",
-            "Events", "Last Touch",
+            "Events", "Last Touch", "Enriched At",
             "LinkedIn URL", "Sales Nav URL",
             "Latest Message Sent", "Latest Response",
           ];
@@ -2425,7 +2528,9 @@
             return [
               p.name || "",
               p.email || "",
+              p.email_source || "",
               p.phone || "",
+              p.phone_source || "",
               p.company || "",
               p.title || "",
               p.status,
@@ -2442,6 +2547,7 @@
               p.counts.meeting_booked,
               p.events.length,
               p.last_touch ? usDate(p.last_touch.slice(0, 10)) : "",
+              p.enriched_at ? usDate(p.enriched_at.slice(0, 10)) : "",
               p.profile_url   || "",
               p.sales_nav_url || "",
               latestMessage,
@@ -2624,6 +2730,17 @@
           if (action === "bulk-copy-selection") {
             clickEvt.preventDefault();
             handleBulkCopySelection(actionEl);
+            return;
+          }
+          if (action === "bulk-enrich-prospects") {
+            clickEvt.preventDefault();
+            handleBulkEnrich();
+            return;
+          }
+          if (action === "enrich-prospect") {
+            clickEvt.preventDefault();
+            clickEvt.stopPropagation();
+            handleEnrichProspect(actionEl);
             return;
           }
 
@@ -2969,6 +3086,218 @@
           cell.innerHTML = has
             ? `<div class="pr-notes-display pr-notes-has" data-action="edit-notes-inline" title="Click to edit notes">${esc(prospect.notes)}</div>`
             : `<div class="pr-notes-display pr-notes-empty" data-action="edit-notes-inline" title="Click to add notes">+ Notes</div>`;
+        }
+
+        // ---- Enrichment ---------------------------------------------
+        //
+        // The dashboard is just a thin caller. Real work lives in the
+        // enrich-prospect edge function: it validates access via
+        // claim_enrichment_request RPC, looks up the org's API key
+        // (or the platform admin's home-org key in God Mode), calls
+        // Apollo, then writes back via apply_enrichment_result.
+        //
+        // We optimistically refresh the affected prospect row from the
+        // server after each call lands, so email_source / phone_source /
+        // enriched_at all flip in-place without a full table reload.
+
+        async function initEnrichmentContext() {
+          // Resolve admin status + provider connectivity once on load.
+          // Both gate the visible Enrich affordances; the RPCs also
+          // gate server-side, so this is cosmetic only.
+          try {
+            const orgId = client.org_id;
+            if (!orgId) return;
+            // is_org_admin via RPC. If the user can call
+            // get_enrichment_provider_status without a 42501, they're
+            // an admin (or platform admin) of this org.
+            const rows = await sb.sbFetch("/rest/v1/rpc/get_enrichment_provider_status", {
+              method: "POST",
+              body:   JSON.stringify({ p_org_id: orgId }),
+            });
+            state.enrichmentAdmin     = true;
+            state.enrichmentConnected = !!(rows && rows[0] && rows[0].is_connected);
+            initEnrichmentSettingsUi();
+          } catch {
+            // 42501 / 403 — not an admin. Leave both flags false; the
+            // Enrich buttons render disabled with the "admin only"
+            // tooltip and the auto-enrich pill stays hidden.
+            state.enrichmentAdmin     = false;
+            state.enrichmentConnected = false;
+          }
+        }
+
+        function initEnrichmentSettingsUi() {
+          const wrap     = document.getElementById("pr-enrich-settings-wrap");
+          const btn      = document.getElementById("pr-enrich-settings");
+          const popover  = document.getElementById("pr-enrich-popover");
+          const stateEl  = document.getElementById("pr-enrich-state");
+          const toggle   = document.getElementById("pr-enrich-toggle");
+          const statusEl = document.getElementById("pr-enrich-popover-status");
+          if (!wrap || !btn) return;
+          wrap.classList.remove("hidden");
+
+          // Seed checkbox + label from current client config.
+          const currentlyOn = !!client.auto_enrich_on_acceptance;
+          toggle.checked = currentlyOn;
+          stateEl.textContent = currentlyOn ? "on" : "off";
+
+          btn.addEventListener("click", () => {
+            const isOpen = !popover.classList.contains("hidden");
+            popover.classList.toggle("hidden", isOpen);
+            btn.setAttribute("aria-expanded", String(!isOpen));
+          });
+          // Click-outside dismiss.
+          document.addEventListener("click", (e) => {
+            if (popover.classList.contains("hidden")) return;
+            if (e.target.closest("#pr-enrich-popover")) return;
+            if (e.target.closest("#pr-enrich-settings")) return;
+            popover.classList.add("hidden");
+            btn.setAttribute("aria-expanded", "false");
+          });
+
+          toggle.addEventListener("change", async () => {
+            const want = toggle.checked;
+            statusEl.textContent = "Saving…";
+            try {
+              await sb.sbFetch("/rest/v1/rpc/set_auto_enrich_on_acceptance", {
+                method: "POST",
+                body:   JSON.stringify({ p_client_id: clientId, p_enabled: want }),
+              });
+              client.auto_enrich_on_acceptance = want;
+              stateEl.textContent = want ? "on" : "off";
+              statusEl.textContent = "Saved.";
+              setTimeout(() => { statusEl.textContent = ""; }, 1500);
+            } catch (err) {
+              toggle.checked = !want;
+              statusEl.textContent = "Couldn't save: " + (err.message || err);
+            }
+          });
+        }
+
+        async function handleEnrichProspect(btnEl) {
+          if (!state.enrichmentAdmin || !state.enrichmentConnected) return;
+          const row = btnEl.closest(".pr-row");
+          if (!row) return;
+          const idx = Number(row.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+          if (state.enrichmentInflight.has(prospect.id)) return;
+
+          // Optimistic UI: swap the button label to "Enriching…"
+          // before the RPC fires. Any "Enrich" button on this row
+          // (email or phone column) shows the same status.
+          state.enrichmentInflight.add(prospect.id);
+          row.querySelectorAll(".pr-enrich-btn").forEach(b => {
+            b.disabled = true;
+            b.textContent = "Enriching…";
+          });
+
+          try {
+            await enrichOne(prospect.id, "manual");
+            // Refresh just this prospect's row from the server.
+            await refreshProspect(prospect.id);
+            rerender();
+          } catch (err) {
+            row.querySelectorAll(".pr-enrich-btn").forEach(b => {
+              b.disabled = false;
+              b.textContent = "Enrich ↗";
+            });
+            alert("Couldn't enrich: " + (err.message || err));
+          } finally {
+            state.enrichmentInflight.delete(prospect.id);
+          }
+        }
+
+        async function handleBulkEnrich() {
+          if (!state.enrichmentAdmin || !state.enrichmentConnected) return;
+          const targets = state.filtered.filter(p =>
+            state.selected.has(p.key)
+            && (!p.email || !p.email.trim())
+            && p.name && p.name.trim()
+            && p.company && p.company.trim()
+          );
+          if (!targets.length) return;
+          if (!confirm(`Enrich ${targets.length} prospect${targets.length === 1 ? "" : "s"} via Apollo? Each call uses 1 Apollo credit. You'll see the results land row-by-row.`)) {
+            return;
+          }
+
+          // Mark them all in-flight + repaint row buttons.
+          targets.forEach(p => state.enrichmentInflight.add(p.id));
+          rerender();
+
+          // Throttled parallelism: 3 in-flight at a time. Apollo
+          // tolerates higher rates but this keeps progress visible
+          // and avoids transient rate-limit errors.
+          const PARALLEL = 3;
+          let cursor = 0;
+          let succeeded = 0;
+          let failed    = 0;
+          const worker = async () => {
+            while (cursor < targets.length) {
+              const p = targets[cursor++];
+              try {
+                const res = await enrichOne(p.id, "bulk");
+                if (res && res.fields_returned && res.fields_returned.length) succeeded++;
+                else failed++;
+                await refreshProspect(p.id);
+              } catch {
+                failed++;
+              } finally {
+                state.enrichmentInflight.delete(p.id);
+              }
+            }
+          };
+          await Promise.all(Array.from({ length: PARALLEL }, worker));
+          rerender();
+          alert(`Bulk enrich complete: ${succeeded} matched, ${targets.length - succeeded - failed} no match, ${failed} failed.`);
+        }
+
+        async function enrichOne(prospectId, triggeredBy) {
+          // Calls the enrich-prospect edge function. Returns the
+          // parsed { ok, fields_returned } body on success.
+          const url = `${window.SUPABASE_CONFIG.url}/functions/v1/enrich-prospect`;
+          const session = sb.getSession();
+          const token = session?.access_token || window.SUPABASE_CONFIG.anonKey;
+          const resp = await fetch(url, {
+            method:  "POST",
+            headers: {
+              "Content-Type":  "application/json",
+              "Authorization": `Bearer ${token}`,
+              "apikey":        window.SUPABASE_CONFIG.anonKey,
+            },
+            body: JSON.stringify({
+              prospect_id:  prospectId,
+              triggered_by: triggeredBy,
+            }),
+          });
+          const body = await resp.json().catch(() => ({}));
+          if (!resp.ok) {
+            throw new Error(body.error || `HTTP ${resp.status}`);
+          }
+          return body;
+        }
+
+        // ---- Auto-enrich queue processor ----------------------------
+        // Called after loadAll. Pulls up to N queued prospect_ids
+        // (RPC marks them in-flight server-side), then fires
+        // enrich-prospect for each. Fire-and-forget — the dashboard
+        // will see the results next time loadAll runs (or via the
+        // per-row refresh inside handleEnrichProspect for manual calls).
+        async function processEnrichmentQueue() {
+          if (!state.enrichmentAdmin || !state.enrichmentConnected) return;
+          let claimed;
+          try {
+            claimed = await sb.sbFetch("/rest/v1/rpc/claim_queued_enrichments", {
+              method: "POST",
+              body:   JSON.stringify({ p_client_id: clientId, p_limit: 5 }),
+            });
+          } catch {
+            return;  // silent — queue processing is best-effort
+          }
+          if (!Array.isArray(claimed) || !claimed.length) return;
+          claimed.forEach(row => {
+            enrichOne(row.prospect_id, "auto_acceptance").catch(() => {});
+          });
         }
 
         async function handleLogMeeting(btn, prospect) {

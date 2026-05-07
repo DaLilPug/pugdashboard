@@ -143,6 +143,33 @@
       </div>
     </section>
 
+    <!-- Apollo enrichment integration: org-level API key for
+         contact enrichment. Visible to admins only; non-admin
+         JS hides this section. The key, once saved, is never
+         shown back — only "Connected (set X by Y)" metadata. -->
+    <section class="team-section hidden" id="enrichment-section">
+      <div class="section-head">
+        <h2>Apollo enrichment</h2>
+        <span id="enrichment-status" class="section-meta">Checking…</span>
+      </div>
+      <p class="section-description">
+        Connect your org's Apollo API key to enable email + phone enrichment on prospects.
+        Calls are billed by Apollo against your account; Uptown stores the key encrypted at rest
+        and never charges enrichment costs to you.
+        <a href="https://docs.apollo.io/reference/people-enrichment" target="_blank" rel="noopener">Apollo docs ↗</a>
+      </p>
+      <div id="enrichment-config" class="enrichment-config">
+        <div class="loading">Loading…</div>
+      </div>
+      <div id="enrichment-usage" class="enrichment-usage hidden">
+        <h3 class="enrichment-usage-title">Last 30 days</h3>
+        <div id="enrichment-usage-stats" class="enrichment-usage-stats"></div>
+        <div class="enrichment-usage-actions">
+          <button id="enrichment-log-btn" class="btn-secondary" type="button">View detailed log ↗</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Recent activity: append-only audit log of team mutations.
          Org admins see their org's events; the panel auto-refreshes
          after every action the admin takes on this page. -->
@@ -170,6 +197,24 @@
       <button id="leave-org-btn" class="btn-danger-soft" type="button">Leave organization</button>
     </div>
   </main>
+
+  <!-- Enrichment log modal: full per-call audit trail. Opens
+       from "View detailed log" in the Apollo enrichment section. -->
+  <div id="enrichment-log-modal" class="access-modal hidden" role="dialog" aria-modal="true" aria-labelledby="enrichment-log-modal-title">
+    <div class="access-modal-backdrop" data-close="1"></div>
+    <div class="access-modal-card enrichment-log-modal-card">
+      <div class="access-modal-head">
+        <div>
+          <h3 id="enrichment-log-modal-title">Enrichment log</h3>
+          <div class="access-modal-sub">Most recent 100 calls</div>
+        </div>
+        <button type="button" class="access-modal-close" data-close="1" aria-label="Close">×</button>
+      </div>
+      <div id="enrichment-log-body" class="access-modal-body">
+        <div class="loading">Loading…</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Client access modal: opens from a member row's "Manage access"
        button. Shows one checkbox per client in this org; toggling
@@ -357,6 +402,13 @@
         if (e.key === "Escape") closeAccessModal();
       });
 
+      // Wire enrichment-section interactions before loadAll so the
+      // section is responsive as soon as it reveals.
+      document.getElementById("enrichment-log-modal")
+        .addEventListener("click", (e) => {
+          if (e.target.dataset.close === "1") closeEnrichmentLogModal();
+        });
+
       await loadAll();
 
       // ---- loaders -----------------------------------------------------
@@ -368,6 +420,9 @@
           loadClientsAndAccess(),
           loadActivity(),
           loadBilling(),
+          // Enrichment section is admin-gated client-side AND server-side;
+          // non-admins get a 403 and we silently leave the section hidden.
+          isAdminOfThisOrg ? loadEnrichment() : Promise.resolve(),
         ]);
         // loadMembers renders as soon as membership rows arrive, but the
         // Access column depends on clients + accessMap which come from
@@ -519,6 +574,258 @@
         } catch (err) {
           tb.innerHTML = `<tr><td colspan="4" class="loading">Couldn't load invites: ${esc(err.message)}</td></tr>`;
         }
+      }
+
+      // ---- enrichment integration (admin-only) ----------------------
+      //
+      // Three RPCs power this section: get_enrichment_provider_status
+      // (returns metadata + is_connected), set/delete_enrichment_provider,
+      // and get_enrichment_usage / list_enrichment_log for the read side.
+      // The API key is never returned by any RPC after it's saved — we
+      // only show "Connected (set X by Y)".
+
+      async function loadEnrichment() {
+        const section = document.getElementById("enrichment-section");
+        if (!section) return;
+        section.classList.remove("hidden");
+        const status = document.getElementById("enrichment-status");
+        const config = document.getElementById("enrichment-config");
+        const usage  = document.getElementById("enrichment-usage");
+
+        let statusRows;
+        try {
+          statusRows = await sb.sbFetch("/rest/v1/rpc/get_enrichment_provider_status", {
+            method: "POST",
+            body:   JSON.stringify({ p_org_id: org.id }),
+          });
+        } catch (err) {
+          status.textContent = "Couldn't load.";
+          config.innerHTML = `<div class="loading">Couldn't load enrichment status: ${esc(err.message)}</div>`;
+          return;
+        }
+        const s = (statusRows && statusRows[0]) || { is_connected: false };
+
+        if (s.is_connected) {
+          status.textContent = "Connected";
+          renderEnrichmentConfigConnected(config, s);
+          usage.classList.remove("hidden");
+          await loadEnrichmentUsage();
+          document.getElementById("enrichment-log-btn")
+            .addEventListener("click", openEnrichmentLogModal);
+        } else {
+          status.textContent = "Not connected";
+          renderEnrichmentConfigDisconnected(config);
+          usage.classList.add("hidden");
+        }
+      }
+
+      function renderEnrichmentConfigConnected(root, s) {
+        const setAt = s.set_at ? fmtRelativeTime(s.set_at) : "unknown";
+        const setBy = s.set_by_email ? esc(s.set_by_email) : "an org admin";
+        root.innerHTML = `
+          <div class="enrichment-connected">
+            <div class="enrichment-connected-meta">
+              <strong>Apollo</strong> · key set ${esc(setAt)} by ${setBy}
+            </div>
+            <div class="enrichment-connected-actions">
+              <button id="enrichment-rotate-btn"     class="btn-secondary" type="button">Replace key</button>
+              <button id="enrichment-disconnect-btn" class="btn-danger-soft" type="button">Disconnect</button>
+            </div>
+          </div>
+        `;
+        document.getElementById("enrichment-rotate-btn")
+          .addEventListener("click", () => renderEnrichmentConfigDisconnected(root, true));
+        document.getElementById("enrichment-disconnect-btn")
+          .addEventListener("click", onDisconnectEnrichment);
+      }
+
+      function renderEnrichmentConfigDisconnected(root, isReplace) {
+        const verb = isReplace ? "Replace" : "Connect";
+        root.innerHTML = `
+          <form class="enrichment-form" id="enrichment-form">
+            <label class="enrichment-label" for="enrichment-key">
+              Apollo API key
+              <a href="https://app.apollo.io/#/settings/integrations/api"
+                 target="_blank" rel="noopener" class="enrichment-help-link">Find yours ↗</a>
+            </label>
+            <input id="enrichment-key" class="enrichment-input"
+                   type="password" autocomplete="off"
+                   placeholder="paste your Apollo API key here" />
+            <div class="enrichment-form-actions">
+              ${isReplace ? `<button type="button" class="btn-secondary" id="enrichment-cancel">Cancel</button>` : ""}
+              <button type="submit" class="btn-primary">${verb} Apollo</button>
+            </div>
+            <div id="enrichment-form-error" class="enrichment-form-error"></div>
+          </form>
+        `;
+        const form = document.getElementById("enrichment-form");
+        form.addEventListener("submit", onSaveEnrichmentKey);
+        if (isReplace) {
+          document.getElementById("enrichment-cancel")
+            .addEventListener("click", () => loadEnrichment());
+        }
+      }
+
+      async function onSaveEnrichmentKey(e) {
+        e.preventDefault();
+        const input = document.getElementById("enrichment-key");
+        const errEl = document.getElementById("enrichment-form-error");
+        errEl.textContent = "";
+        const key = (input.value || "").trim();
+        if (!key) {
+          errEl.textContent = "Paste an Apollo API key first.";
+          return;
+        }
+        const submitBtn = e.target.querySelector("button[type='submit']");
+        submitBtn.disabled = true;
+        const prevLabel = submitBtn.textContent;
+        submitBtn.textContent = "Saving…";
+        try {
+          await sb.sbFetch("/rest/v1/rpc/set_enrichment_provider", {
+            method: "POST",
+            body:   JSON.stringify({
+              p_org_id:   org.id,
+              p_provider: "apollo",
+              p_api_key:  key,
+            }),
+          });
+          await loadEnrichment();
+        } catch (err) {
+          errEl.textContent = "Couldn't save: " + (err.message || err);
+          submitBtn.disabled = false;
+          submitBtn.textContent = prevLabel;
+        }
+      }
+
+      async function onDisconnectEnrichment() {
+        if (!confirm("Disconnect the Apollo integration? Saved enrichment data on prospects stays put — only future enrichment calls stop working until you re-add a key.")) {
+          return;
+        }
+        try {
+          await sb.sbFetch("/rest/v1/rpc/delete_enrichment_provider", {
+            method: "POST",
+            body:   JSON.stringify({ p_org_id: org.id, p_provider: "apollo" }),
+          });
+          await loadEnrichment();
+        } catch (err) {
+          alert("Couldn't disconnect: " + (err.message || err));
+        }
+      }
+
+      async function loadEnrichmentUsage() {
+        const root = document.getElementById("enrichment-usage-stats");
+        if (!root) return;
+        try {
+          const rows = await sb.sbFetch("/rest/v1/rpc/get_enrichment_usage", {
+            method: "POST",
+            body:   JSON.stringify({ p_org_id: org.id, p_days: 30 }),
+          });
+          const u = (rows && rows[0]) || {};
+          renderEnrichmentUsage(root, u);
+        } catch (err) {
+          root.innerHTML = `<div class="loading">Couldn't load usage: ${esc(err.message)}</div>`;
+        }
+      }
+
+      function renderEnrichmentUsage(root, u) {
+        const total = u.total_calls || 0;
+        if (total === 0) {
+          root.innerHTML = `<div class="enrichment-usage-empty">No enrichment calls yet in the last 30 days.</div>`;
+          return;
+        }
+        const succeeded = u.succeeded_calls || 0;
+        const emails    = u.emails_returned || 0;
+        const phones    = u.phones_returned || 0;
+        const credits   = Number(u.total_credits || 0);
+        const recent    = u.most_recent_call_at ? fmtRelativeTime(u.most_recent_call_at) : "unknown";
+        const successPct = total > 0 ? Math.round((succeeded / total) * 100) : 0;
+        const emailPct   = total > 0 ? Math.round((emails    / total) * 100) : 0;
+        const phonePct   = total > 0 ? Math.round((phones    / total) * 100) : 0;
+        root.innerHTML = `
+          <div class="enrichment-stat-grid">
+            <div class="enrichment-stat">
+              <div class="enrichment-stat-value">${total}</div>
+              <div class="enrichment-stat-label">calls</div>
+            </div>
+            <div class="enrichment-stat">
+              <div class="enrichment-stat-value">${emails} <span class="enrichment-stat-pct">(${emailPct}%)</span></div>
+              <div class="enrichment-stat-label">emails matched</div>
+            </div>
+            <div class="enrichment-stat">
+              <div class="enrichment-stat-value">${phones} <span class="enrichment-stat-pct">(${phonePct}%)</span></div>
+              <div class="enrichment-stat-label">phones matched</div>
+            </div>
+            <div class="enrichment-stat">
+              <div class="enrichment-stat-value">${credits.toFixed(0)}</div>
+              <div class="enrichment-stat-label">credits charged</div>
+            </div>
+          </div>
+          <div class="enrichment-stat-foot">
+            ${succeeded}/${total} succeeded (${successPct}%) · most recent ${esc(recent)}
+          </div>
+        `;
+      }
+
+      async function openEnrichmentLogModal() {
+        const modal = document.getElementById("enrichment-log-modal");
+        const body  = document.getElementById("enrichment-log-body");
+        modal.classList.remove("hidden");
+        body.innerHTML = `<div class="loading">Loading…</div>`;
+        try {
+          const rows = await sb.sbFetch("/rest/v1/rpc/list_enrichment_log", {
+            method: "POST",
+            body:   JSON.stringify({ p_org_id: org.id, p_offset: 0, p_limit: 100 }),
+          });
+          renderEnrichmentLog(body, rows || []);
+        } catch (err) {
+          body.innerHTML = `<div class="loading">Couldn't load log: ${esc(err.message)}</div>`;
+        }
+      }
+
+      function closeEnrichmentLogModal() {
+        document.getElementById("enrichment-log-modal").classList.add("hidden");
+      }
+
+      function renderEnrichmentLog(root, rows) {
+        if (!rows.length) {
+          root.innerHTML = `<div class="enrichment-usage-empty">No enrichment calls yet.</div>`;
+          return;
+        }
+        const fmtFields = (arr) => Array.isArray(arr) && arr.length
+          ? arr.map(f => `<span class="enrichment-log-pill">${esc(f)}</span>`).join("")
+          : `<span class="enrichment-log-pill enrichment-log-pill-none">no match</span>`;
+        const trigLabel = { manual: "Manual", auto_acceptance: "Auto", bulk: "Bulk" };
+        const html = rows.map(r => `
+          <tr>
+            <td>${esc(fmtRelativeTime(r.called_at))}</td>
+            <td>${esc(r.prospect_name || "—")}</td>
+            <td>${esc(r.client_name || "—")}</td>
+            <td>${esc(r.operator_email || "—")}</td>
+            <td>${esc(trigLabel[r.triggered_by] || r.triggered_by)}</td>
+            <td>
+              ${r.succeeded
+                ? fmtFields(r.fields_returned)
+                : `<span class="enrichment-log-fail" title="${esc(r.error_message || "")}">failed</span>`}
+            </td>
+            <td class="num">${r.api_credits_charged || 0}</td>
+          </tr>
+        `).join("");
+        root.innerHTML = `
+          <table class="client-table enrichment-log-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Prospect</th>
+                <th>Account</th>
+                <th>Triggered by</th>
+                <th>Type</th>
+                <th>Result</th>
+                <th class="num">Credits</th>
+              </tr>
+            </thead>
+            <tbody>${html}</tbody>
+          </table>
+        `;
       }
 
       async function loadActivity() {
