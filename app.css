@@ -2855,19 +2855,6 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   color: var(--danger, #b41e1e);
   border-bottom-color: transparent;
 }
-.pr-enrich-source {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 5px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
 .pr-enrich-btn {
   display: inline-block;
   padding: 3px 8px;

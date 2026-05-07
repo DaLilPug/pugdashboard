@@ -2064,16 +2064,15 @@
                 data-action="retry-enrich-prospect"
                 title="${blocked ? esc(enrichBtnTitle) : 'Apollo could not find a match. Click to retry.'}"
                 ${blocked ? 'disabled' : ''}>N/A</button>`;
-          const sourceBadge = (src) => src && src !== "outreach"
-            ? `<span class="pr-enrich-source" title="Sourced from ${esc(src)}">${esc(src)}</span>`
-            : "";
           // Email is rendered as click-to-copy plain text instead of a
           // mailto: link — clicking mailto: opens the OS mail handler
           // which is universally annoying when you really just want to
           // grab the address. data-action handler writes to clipboard
-          // and flashes a transient "Copied" state.
+          // and flashes a transient "Copied" state. The provenance
+          // (email_source) is not shown in the UI but stays in the
+          // CSV export for downstream analysis.
           const emailCellHtml = p.email
-            ? `<span class="pr-contact-text" data-action="copy-email" data-email="${esc(p.email)}" title="Click to copy: ${esc(p.email)}">${esc(p.email)}</span>${sourceBadge(p.email_source)}`
+            ? `<span class="pr-contact-text" data-action="copy-email" data-email="${esc(p.email)}" title="Click to copy: ${esc(p.email)}">${esc(p.email)}</span>`
             : (p.email_enrich_attempted_at ? naBtn : enrichBtn);
 
           const isChecked = state.selected.has(p.key);
