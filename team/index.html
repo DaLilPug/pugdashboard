@@ -143,20 +143,32 @@
       </div>
     </section>
 
+    <!-- Billing card. Hidden by default; populated by initBilling()
+         only for admins with a configured plan or a Stripe customer
+         on file. Members see nothing here. Sits directly above the
+         Enrichment section so admin-setup surfaces (billing + Apollo
+         API key) read as a logical pair. -->
+    <div id="team-billing-card" class="team-billing-card" hidden></div>
+
     <!-- Apollo enrichment integration: org-level API key for
-         contact enrichment. Visible to admins only; non-admin
+         email enrichment. Visible to admins only; non-admin
          JS hides this section. The key, once saved, is never
          shown back — only "Connected (set X by Y)" metadata. -->
     <section class="team-section hidden" id="enrichment-section">
       <div class="section-head">
-        <h2>Apollo enrichment</h2>
+        <h2>Enrichment</h2>
         <span id="enrichment-status" class="section-meta">Checking…</span>
       </div>
       <p class="section-description">
-        Connect your org's Apollo API key to enable email + phone enrichment on prospects.
+        Connect your org's Apollo API key to enable email enrichment on prospects.
         Calls are billed by Apollo against your account; Uptown stores the key encrypted at rest
         and never charges enrichment costs to you.
-        <a href="https://docs.apollo.io/reference/people-enrichment" target="_blank" rel="noopener">Apollo docs ↗</a>
+        <a href="/guides/#dash-enrichment-section">See the Enrichment guide</a>
+        for the full setup walkthrough.
+      </p>
+      <p class="section-description">
+        New to Apollo? We're an Apollo agency partner — sign up via our affiliate link:<br />
+        <span class="enrichment-affiliate-url">https://get.apollo.io/UptownCreation</span>
       </p>
       <div id="enrichment-config" class="enrichment-config">
         <div class="loading">Loading…</div>
@@ -182,11 +194,6 @@
         <div class="loading">Loading…</div>
       </div>
     </section>
-
-    <!-- Billing card. Hidden by default; populated by initBilling()
-         only for admins with a configured plan or a Stripe customer
-         on file. Members see nothing here. -->
-    <div id="team-billing-card" class="team-billing-card" hidden></div>
 
     <!-- Leave organization. Visible to anyone in the org; the
          leave_organization RPC enforces the rule-table server-side
@@ -743,7 +750,7 @@
           <div class="enrichment-stat-grid">
             <div class="enrichment-stat">
               <div class="enrichment-stat-value">${total}</div>
-              <div class="enrichment-stat-label">calls</div>
+              <div class="enrichment-stat-label">api calls</div>
             </div>
             <div class="enrichment-stat">
               <div class="enrichment-stat-value">${emails} <span class="enrichment-stat-pct">(${emailPct}%)</span></div>

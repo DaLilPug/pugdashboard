@@ -621,6 +621,7 @@
             <li><a href="#dash-meeting">Meeting Links</a></li>
             <li><a href="#dash-team">Team page</a></li>
             <li><a href="#dash-billing">Billing</a></li>
+            <li><a href="#dash-enrichment-section">Enrichment</a></li>
           </ol>
         </li>
         <li><a href="#extension">The Chrome Extension</a>
@@ -1438,67 +1439,19 @@
 
       <h4 id="dash-enrichment">Email enrichment (Apollo)</h4>
       <p>
-        The <strong>Email</strong> column shows known contact info — either
-        captured from outreach events (when a prospect responded with their
-        email visible) or fetched from <strong>Apollo</strong> via the
-        enrichment integration. Apollo-sourced values carry a small
-        <em>apollo</em> badge so you can tell where they came from.
-      </p>
-      <p>To use enrichment, an org admin first connects an Apollo API key on the
-        <a href="/team/">Team page</a>. Once connected:</p>
-      <ul>
-        <li><strong>Per-row enrichment</strong>: any empty Email cell shows an
-            <em>Enrich ↗</em> button. One click fetches the email in a single
-            Apollo call. Admin only.</li>
-        <li><strong>Bulk enrichment</strong>: select multiple prospects via the
-            checkboxes, then click <em>Enrich N</em> in the bulk action bar.
-            Only prospects missing email AND with name + company set get
-            enriched (the N is the actionable count, not the selected count).
-            Admin only.</li>
-        <li><strong>Auto-enrich on acceptance</strong> (off by default per
-            account): when a prospect's status moves into Messaged, Responded,
-            or Meeting, Apollo fires automatically if email is unknown. Toggle
-            via the <em>Auto-enrich: off ▾</em> pill above the prospect
-            filters. Admin only.</li>
-      </ul>
-      <p>
-        As a bonus, when Apollo returns a clean canonical LinkedIn URL
-        (the <code>/in/&lt;slug&gt;</code> vanity form rather than the
-        URN-encoded one), the prospect's profile_url is upgraded automatically.
-        That's free side-effect data quality — improves match rates for future
-        enrichments and makes the LinkedIn link in the row click through
-        cleaner.
+        The <strong>Email</strong> column has an <em>Enrich ↗</em> button on
+        any empty cell. Clicking it fetches the prospect's email from Apollo;
+        the bulk action bar exposes the same as <em>Enrich N</em> for
+        multi-select. There's also a per-account <em>Auto-enrich on
+        acceptance</em> toggle that fires Apollo automatically when a
+        prospect's status moves into Messaged, Responded, or Meeting.
       </p>
       <p>
-        Match rates depend on the prospect's public web presence — Apollo
-        typically returns email for ~70-85% of well-known professionals. The
-        Email column shows <em>N/A</em> when Apollo confirmed no match
-        (clickable to retry); empty cells with no <em>N/A</em> badge mean
-        enrichment hasn't been attempted yet.
+        See <a href="#dash-enrichment-section">6.12 — Enrichment</a> for the
+        full setup walkthrough (getting an Apollo account, finding your API
+        key, wiring it up on the Team page) plus details on cost, match
+        rates, and the auto-enrich behavior.
       </p>
-      <p>
-        Calls are billed by Apollo against the org's own Apollo account
-        (typically 1 credit per email reveal). The <a href="/team/">Team
-        page</a> shows your org's last-30-days usage; for exact charges, check
-        Apollo's own usage dashboard.
-      </p>
-      <p>
-        <em>Phone enrichment is intentionally not part of this integration.</em>
-        Apollo's sync response only returns the company main line (not personal
-        phones), and the paid async path was unreliable in testing. If a
-        prospect has a phone captured from outreach (e.g. they shared one in a
-        reply), it shows up in the prospect's <strong>Edit info</strong> form
-        in the timeline expansion — no enrichment-driven Phone column.
-      </p>
-      <div class="callout note">
-        <div class="callout-title">Enrichment doesn't move funnel data</div>
-        <p>
-          Enrichment writes only to the Email / Phone columns (and the
-          canonical LinkedIn URL when Apollo returns a cleaner one). It never
-          touches Last touch, Status, Sentiment, Event count, or any rollup —
-          those are activity-driven only.
-        </p>
-      </div>
 
       <h3 id="dash-followups">6.5 — Per-account: Follow-ups</h3>
       <p>
@@ -1693,6 +1646,146 @@
           data is preserved through the suspension.
         </p>
       </div>
+
+      <h3 id="dash-enrichment-section">6.12 — Enrichment</h3>
+      <p>
+        Uptown Tracker integrates with <strong>Apollo</strong> to enrich
+        prospect emails directly inside the Prospects tab. Connection requests
+        you sent on Sales Navigator usually leave you without an email address;
+        once a prospect responds (or you book a meeting via your meeting link),
+        you get one — but the gap between "they accepted" and "I have their
+        email" is exactly the window where enrichment helps. One click pulls
+        their email from Apollo's database via the API; we never charge for
+        enrichment, you pay Apollo directly.
+      </p>
+
+      <h4>Don't have Apollo yet? Sign up via our affiliate link</h4>
+      <p>
+        We're an Apollo agency partner. If you don't already have an Apollo
+        account, sign up here:
+      </p>
+      <p style="font-family:'Inter',monospace;font-size:14px;color:var(--navy);">
+        https://get.apollo.io/UptownCreation
+      </p>
+      <p>
+        Apollo offers a free tier with limited credits, plus paid tiers that
+        unlock more email reveals per month. The integration works regardless
+        of plan — you'll only run up against limits if you bulk-enrich at
+        volume.
+      </p>
+
+      <h4>Getting your Apollo API key</h4>
+      <ol>
+        <li>Sign in to Apollo.</li>
+        <li>Click your profile in the upper-right → <strong>Settings</strong>.</li>
+        <li>Scroll the left sidebar to <strong>Integrations</strong> →
+            <strong>API</strong>.</li>
+        <li>Click <strong>Create new key</strong>. Give it a name like
+            "Uptown Tracker" so future-you can identify it.</li>
+        <li>Copy the key. You'll only see it once — Apollo doesn't show it
+            again after you close the panel.</li>
+      </ol>
+      <div class="callout note">
+        <div class="callout-title">Treat the key like a password</div>
+        <p>
+          Anyone with your API key can spend your Apollo credits. Don't paste
+          it into Slack, screenshots, or anywhere outside Uptown's
+          integration form. We store it encrypted at rest and never display
+          it back — once it's saved, the only thing you'll see on the Team
+          page is "Connected (set X by Y)".
+        </p>
+      </div>
+
+      <h4>Adding the key on the Team page</h4>
+      <ol>
+        <li>Go to <a href="/team/">Team</a> (admin only).</li>
+        <li>Scroll down to the <strong>Enrichment</strong> section.</li>
+        <li>Paste your Apollo API key into the form and click
+            <em>Connect Apollo</em>.</li>
+        <li>Status flips to "Connected" and a usage widget appears showing
+            last-30-days API calls + matched emails + credits charged.</li>
+      </ol>
+
+      <h4>Using enrichment</h4>
+      <p>
+        Once connected, the <strong>Email</strong> column on every account's
+        Prospects tab gains an <em>Enrich ↗</em> button on empty cells.
+        There are three trigger paths:
+      </p>
+      <ul>
+        <li><strong>Per-row enrichment</strong>: click <em>Enrich ↗</em> on a
+            single empty Email cell. One Apollo credit, email returns within
+            a second or two. Admin only.</li>
+        <li><strong>Bulk enrichment</strong>: select multiple prospects via
+            the row checkboxes, then click <em>Enrich N</em> in the bulk
+            action bar. <em>N</em> is the actionable count — selected
+            prospects missing email AND with name + company set. Anything
+            else would no-op. Admin only.</li>
+        <li><strong>Auto-enrich on acceptance</strong>: per-account toggle
+            (off by default). Click the <em>Auto-enrich: off ▾</em> pill at
+            the top of the Prospects tab and check the box. From then on,
+            whenever a prospect's status moves into Messaged, Responded, or
+            Meeting (i.e. they accepted your connection request), Apollo
+            fires automatically if the email is unknown. Admin only.</li>
+      </ul>
+
+      <h4>What you'll see</h4>
+      <ul>
+        <li><strong>Match found</strong>: the email replaces the
+            <em>Enrich ↗</em> button as plain click-to-copy text.</li>
+        <li><strong>No match</strong>: the cell shows <em>N/A</em> — Apollo
+            doesn't have this prospect in its database. Click N/A to retry
+            (clears the attempted-flag and runs a fresh call) — useful if
+            you've since updated their company or LinkedIn URL.</li>
+        <li><strong>Already had email</strong>: enrichment skips entirely
+            (no credit charged, no overwrite) so existing emails from
+            outreach event identity propagation or your meeting link
+            integrations stay put.</li>
+      </ul>
+
+      <p>
+        As a free side effect: when Apollo returns a clean canonical
+        LinkedIn URL (the <code>/in/&lt;slug&gt;</code> vanity form), your
+        prospect's <code>profile_url</code> gets upgraded silently from the
+        URN-encoded form Sales Nav gives us. Improves match rates for
+        future enrichments and makes the LinkedIn link in the prospect row
+        click cleaner.
+      </p>
+
+      <h4>Match rates + cost</h4>
+      <p>
+        Match rates depend on the prospect's public web presence — Apollo
+        typically returns email for ~70-85% of well-known professionals.
+        Each successful match costs roughly 1 Apollo credit;
+        no-match calls don't charge. Failed calls (Apollo down, bad API
+        key, etc.) are flagged in the log but don't charge either.
+      </p>
+      <p>
+        The <a href="/team/">Team page</a> usage widget shows last-30-days
+        rollups: total API calls, emails matched, credits charged. For
+        exact charges + remaining credits, check Apollo's own usage
+        dashboard.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">Enrichment doesn't move funnel data</div>
+        <p>
+          Enrichment writes only to the Email column (and the canonical
+          LinkedIn URL when Apollo returns a cleaner one). It never touches
+          Last touch, Status, Sentiment, Event count, or any rollup —
+          those are activity-driven only. Same wall as Rating + Notes.
+        </p>
+      </div>
+
+      <p>
+        <em>Phone enrichment isn't part of this integration.</em>
+        Apollo's sync response only returns the company main line (not
+        personal mobiles), and the paid async reveal path was unreliable
+        in our testing. If a prospect shares a phone in a reply or
+        meeting, it shows up in their <strong>Edit info</strong> form via
+        the timeline expansion — there's just no enrichment-driven Phone
+        column on the table.
+      </p>
 
       <!-- ============================================================== -->
       <h2 id="extension"><span class="num">7.</span>The Chrome Extension</h2>
