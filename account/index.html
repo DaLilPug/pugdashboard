@@ -187,6 +187,20 @@
                   (i.e. they accepted your request), automatically fetch their email
                   via Apollo if we don't already have one. Uses your org's Apollo key.
                 </p>
+
+                <!-- Sub-toggle: only enabled when auto-enrich is on.
+                     Controls whether auto-fired calls also reveal phone
+                     (extra Apollo credits, async via webhook). -->
+                <label class="pr-enrich-label pr-enrich-sublabel" id="pr-enrich-phone-row">
+                  <input type="checkbox" id="pr-enrich-phone-toggle" />
+                  <span>Also include phone reveal</span>
+                </label>
+                <p class="pr-enrich-help pr-enrich-subhelp">
+                  Phone reveals are async and use additional Apollo credits per
+                  attempt (typically 1-2 per phone, regardless of whether one is found).
+                  Phones appear minutes after the email lands.
+                </p>
+
                 <div id="pr-enrich-popover-status" class="pr-enrich-status"></div>
               </div>
             </div>
@@ -445,7 +459,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions,auto_enrich_on_acceptance,auto_enrich_include_phone&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -1473,6 +1487,16 @@
             email_source: r.email_source || null,
             phone_source: r.phone_source || null,
             enriched_at:  r.enriched_at  || null,
+            // Per-field attempt timestamps drive the N/A vs Enrich
+            // vs Pending Apollo... cell states. email is sync so
+            // attempted_at flips immediately; phone is async so
+            // requested_at flips on the initial call and
+            // attempted_at flips when Apollo's webhook delivers a
+            // verdict.
+            email_enrich_attempted_at: r.email_enrich_attempted_at || null,
+            phone_enrich_requested_at: r.phone_enrich_requested_at || null,
+            phone_enrich_attempted_at: r.phone_enrich_attempted_at || null,
+            apollo_person_id:          r.apollo_person_id || null,
             counts: {
               connection:     r.connection_count   || 0,
               message:        r.message_count      || 0,
@@ -1947,6 +1971,10 @@
           // are missing email AND have name + company. Anything else
           // would no-op (already enriched or insufficient inputs),
           // so we surface the actionable count.
+          //
+          // Two buttons:
+          //   - "Enrich N"          → email + phone (full, more credits)
+          //   - "Enrich N (Email)"  → email only (cheaper, no async wait)
           const enrichable = prospects.filter(p =>
             state.selected.has(p.key)
             && (!p.email || !p.email.trim())
@@ -1955,23 +1983,33 @@
           ).length;
           const enrichLocked   = !state.enrichmentAdmin;
           const enrichDisabled = !state.enrichmentConnected || enrichable === 0;
-          const enrichTitle = enrichLocked
+          const blockedMsg = enrichLocked
             ? "Only org admins can enrich"
             : !state.enrichmentConnected
               ? "Connect Apollo on the Team page first"
               : enrichable === 0
                 ? "No selected prospects are missing email + have name and company"
-                : `Enrich ${enrichable} prospect${enrichable === 1 ? "" : "s"} via Apollo`;
-          const enrichBtn = `<button class="btn-secondary pr-bulk-action ${enrichLocked || enrichDisabled ? 'pr-bulk-action-disabled' : ''}"
-            data-action="bulk-enrich-prospects" type="button"
-            title="${esc(enrichTitle)}"
-            ${enrichLocked || enrichDisabled ? 'disabled' : ''}>Enrich ${fmtInt(enrichable)}</button>`;
+                : null;
+          const enrichBlocked = enrichLocked || enrichDisabled;
+          const enrichBtn = `<button class="btn-secondary pr-bulk-action ${enrichBlocked ? 'pr-bulk-action-disabled' : ''}"
+            data-action="bulk-enrich-prospects"
+            data-include-phone="1"
+            type="button"
+            title="${esc(blockedMsg || `Enrich ${enrichable} prospect${enrichable === 1 ? "" : "s"} (email + phone) via Apollo`)}"
+            ${enrichBlocked ? 'disabled' : ''}>Enrich ${fmtInt(enrichable)}</button>`;
+          const enrichEmailOnlyBtn = `<button class="btn-secondary pr-bulk-action ${enrichBlocked ? 'pr-bulk-action-disabled' : ''}"
+            data-action="bulk-enrich-prospects"
+            data-include-phone="0"
+            type="button"
+            title="${esc(blockedMsg || `Enrich ${enrichable} prospect${enrichable === 1 ? "" : "s"} (email only — fewer credits, no async phone wait)`)}"
+            ${enrichBlocked ? 'disabled' : ''}>Enrich ${fmtInt(enrichable)} (Email)</button>`;
           return `
             <div class="pr-bulk-bar" role="region" aria-label="Bulk actions">
               <span class="pr-bulk-count">${fmtInt(count)} prospect${count === 1 ? "" : "s"} selected</span>
               <button class="btn-secondary pr-bulk-action" data-action="bulk-clear-selection" type="button">Clear</button>
               <button class="btn-secondary pr-bulk-action" data-action="bulk-copy-selection" type="button" title="Copy the selected prospects as TSV (paste into Sheets / Excel)">Copy ${fmtInt(count)}</button>
               ${enrichBtn}
+              ${enrichEmailOnlyBtn}
               ${mergeBtn}
               <button class="btn-danger pr-bulk-action" data-action="bulk-delete-prospects" type="button">Delete ${fmtInt(count)}</button>
             </div>
@@ -2031,35 +2069,52 @@
             ? `<div class="pr-notes-display pr-notes-has" data-action="edit-notes-inline" title="Click to edit notes">${esc(p.notes)}</div>`
             : `<div class="pr-notes-display pr-notes-empty" data-action="edit-notes-inline" title="Click to add notes">+ Notes</div>`;
 
-          // Email + phone cells: show the value as a clickable link
-          // when known (mailto: / tel:), or an "Enrich ↗" button when
-          // empty. The Enrich button is admin-gated client-side via
-          // the .pr-enrich-btn-disabled class added on render when
-          // state.enrichmentAdmin is false; the RPC also gates server-
-          // side. The data-action handler below routes both per-cell
-          // and bulk enrichment through the same path.
+          // Email + Phone cells have four possible states each:
+          //   1. Value present  → mailto:/tel: link + source badge
+          //   2. Inflight       → "Enriching…" disabled button
+          //   3. Tried + failed → "N/A — retry" muted, click-to-retry
+          //   4. Pending Apollo → only for phone, when reveal was
+          //                       requested but webhook hasn't fired
+          //   5. Never tried    → "Enrich ↗" button
           const enrichLocked   = !state.enrichmentAdmin;
           const enrichDisabled = !state.enrichmentConnected;
+          const inflight       = state.enrichmentInflight.has(p.id);
           const enrichBtnTitle = enrichLocked
             ? "Only org admins can enrich"
             : enrichDisabled
               ? "Connect Apollo on the Team page first"
-              : "Enrich via Apollo";
-          const enrichBtn = (field) => `<button type="button"
-              class="pr-enrich-btn ${enrichLocked || enrichDisabled ? 'pr-enrich-btn-disabled' : ''}"
-              data-action="enrich-prospect"
-              data-field="${field}"
-              title="${esc(enrichBtnTitle)}"
-              ${enrichLocked || enrichDisabled ? 'disabled' : ''}>Enrich ↗</button>`;
+              : "Enrich email + phone via Apollo (1 click, 1 call)";
+          const blocked = enrichLocked || enrichDisabled;
+          const enrichBtn = (field) => inflight
+            ? `<button type="button" class="pr-enrich-btn pr-enrich-btn-disabled" disabled>Enriching…</button>`
+            : `<button type="button"
+                class="pr-enrich-btn ${blocked ? 'pr-enrich-btn-disabled' : ''}"
+                data-action="enrich-prospect"
+                data-field="${field}"
+                title="${esc(enrichBtnTitle)}"
+                ${blocked ? 'disabled' : ''}>Enrich ↗</button>`;
+          const naBtn = (field) => inflight
+            ? `<button type="button" class="pr-enrich-btn pr-enrich-btn-disabled" disabled>Enriching…</button>`
+            : `<button type="button"
+                class="pr-na-btn ${blocked ? 'pr-na-btn-disabled' : ''}"
+                data-action="retry-enrich-prospect"
+                data-field="${field}"
+                title="${blocked ? esc(enrichBtnTitle) : 'Apollo couldn\\'t find a match. Click to retry.'}"
+                ${blocked ? 'disabled' : ''}>N/A</button>`;
+          const pendingPhone = `<span class="pr-enrich-pending" title="Apollo is still revealing this phone. It'll appear here when the async lookup completes (usually a few minutes).">Pending Apollo…</span>`;
           const sourceBadge = (src) => src && src !== "outreach"
             ? `<span class="pr-enrich-source" title="Sourced from ${esc(src)}">${esc(src)}</span>`
             : "";
           const emailCellHtml = p.email
             ? `<a class="pr-contact-link" href="mailto:${esc(p.email)}" title="${esc(p.email)}">${esc(p.email)}</a>${sourceBadge(p.email_source)}`
-            : enrichBtn("email");
+            : (p.email_enrich_attempted_at ? naBtn("email") : enrichBtn("email"));
           const phoneCellHtml = p.phone
             ? `<a class="pr-contact-link" href="tel:${esc(p.phone)}" title="${esc(p.phone)}">${esc(p.phone)}</a>${sourceBadge(p.phone_source)}`
-            : enrichBtn("phone");
+            : (p.phone_enrich_attempted_at
+                ? naBtn("phone")
+                : (p.phone_enrich_requested_at && !p.phone_enrich_attempted_at)
+                  ? pendingPhone
+                  : enrichBtn("phone"));
 
           const isChecked = state.selected.has(p.key);
 
@@ -2734,13 +2789,22 @@
           }
           if (action === "bulk-enrich-prospects") {
             clickEvt.preventDefault();
-            handleBulkEnrich();
+            // data-include-phone="1" → full enrichment (email + phone)
+            // data-include-phone="0" → email only (cheaper, no async wait)
+            const includePhone = actionEl.dataset.includePhone === "1";
+            handleBulkEnrich(includePhone);
             return;
           }
           if (action === "enrich-prospect") {
             clickEvt.preventDefault();
             clickEvt.stopPropagation();
             handleEnrichProspect(actionEl);
+            return;
+          }
+          if (action === "retry-enrich-prospect") {
+            clickEvt.preventDefault();
+            clickEvt.stopPropagation();
+            handleRetryEnrich(actionEl);
             return;
           }
 
@@ -3127,19 +3191,32 @@
         }
 
         function initEnrichmentSettingsUi() {
-          const wrap     = document.getElementById("pr-enrich-settings-wrap");
-          const btn      = document.getElementById("pr-enrich-settings");
-          const popover  = document.getElementById("pr-enrich-popover");
-          const stateEl  = document.getElementById("pr-enrich-state");
-          const toggle   = document.getElementById("pr-enrich-toggle");
-          const statusEl = document.getElementById("pr-enrich-popover-status");
+          const wrap         = document.getElementById("pr-enrich-settings-wrap");
+          const btn          = document.getElementById("pr-enrich-settings");
+          const popover      = document.getElementById("pr-enrich-popover");
+          const stateEl      = document.getElementById("pr-enrich-state");
+          const toggle       = document.getElementById("pr-enrich-toggle");
+          const phoneRow     = document.getElementById("pr-enrich-phone-row");
+          const phoneToggle  = document.getElementById("pr-enrich-phone-toggle");
+          const statusEl     = document.getElementById("pr-enrich-popover-status");
           if (!wrap || !btn) return;
           wrap.classList.remove("hidden");
 
-          // Seed checkbox + label from current client config.
-          const currentlyOn = !!client.auto_enrich_on_acceptance;
-          toggle.checked = currentlyOn;
-          stateEl.textContent = currentlyOn ? "on" : "off";
+          // Seed both checkboxes from current client config.
+          const currentlyOn   = !!client.auto_enrich_on_acceptance;
+          const phoneCurrent  = !!client.auto_enrich_include_phone;
+          toggle.checked       = currentlyOn;
+          phoneToggle.checked  = phoneCurrent;
+          stateEl.textContent  = currentlyOn ? "on" : "off";
+          // The phone sub-row is disabled (visually + functionally)
+          // when auto-enrich itself is off — sub-setting only
+          // matters once the parent flag is on.
+          paintPhoneSubRow(currentlyOn);
+
+          function paintPhoneSubRow(parentOn) {
+            phoneRow.classList.toggle("pr-enrich-sublabel-disabled", !parentOn);
+            phoneToggle.disabled = !parentOn;
+          }
 
           btn.addEventListener("click", () => {
             const isOpen = !popover.classList.contains("hidden");
@@ -3165,10 +3242,28 @@
               });
               client.auto_enrich_on_acceptance = want;
               stateEl.textContent = want ? "on" : "off";
+              paintPhoneSubRow(want);
               statusEl.textContent = "Saved.";
               setTimeout(() => { statusEl.textContent = ""; }, 1500);
             } catch (err) {
               toggle.checked = !want;
+              statusEl.textContent = "Couldn't save: " + (err.message || err);
+            }
+          });
+
+          phoneToggle.addEventListener("change", async () => {
+            const want = phoneToggle.checked;
+            statusEl.textContent = "Saving…";
+            try {
+              await sb.sbFetch("/rest/v1/rpc/set_auto_enrich_include_phone", {
+                method: "POST",
+                body:   JSON.stringify({ p_client_id: clientId, p_enabled: want }),
+              });
+              client.auto_enrich_include_phone = want;
+              statusEl.textContent = "Saved.";
+              setTimeout(() => { statusEl.textContent = ""; }, 1500);
+            } catch (err) {
+              phoneToggle.checked = !want;
               statusEl.textContent = "Couldn't save: " + (err.message || err);
             }
           });
@@ -3183,32 +3278,65 @@
           if (!prospect) return;
           if (state.enrichmentInflight.has(prospect.id)) return;
 
-          // Optimistic UI: swap the button label to "Enriching…"
-          // before the RPC fires. Any "Enrich" button on this row
-          // (email or phone column) shows the same status.
+          // Mark inflight and rerender — the renderRow path picks up
+          // .enrichmentInflight and paints "Enriching…" across both
+          // cells uniformly. Going through rerender (instead of
+          // mutating the DOM directly) means the cleanup path is
+          // also a rerender — no risk of buttons getting stuck.
           state.enrichmentInflight.add(prospect.id);
-          row.querySelectorAll(".pr-enrich-btn").forEach(b => {
-            b.disabled = true;
-            b.textContent = "Enriching…";
-          });
+          rerender();
 
+          // Per-cell click always includes phone reveal. The user
+          // who explicitly clicked Enrich expects everything Apollo
+          // can give us; the bulk Email-Only button is the
+          // credit-conscious option.
           try {
-            await enrichOne(prospect.id, "manual");
-            // Refresh just this prospect's row from the server.
+            await enrichOne(prospect.id, "manual", true);
             await refreshProspect(prospect.id);
-            rerender();
           } catch (err) {
-            row.querySelectorAll(".pr-enrich-btn").forEach(b => {
-              b.disabled = false;
-              b.textContent = "Enrich ↗";
-            });
             alert("Couldn't enrich: " + (err.message || err));
           } finally {
             state.enrichmentInflight.delete(prospect.id);
+            rerender();
           }
         }
 
-        async function handleBulkEnrich() {
+        async function handleRetryEnrich(btnEl) {
+          // The N/A "retry" path. Server-side reset clears the
+          // attempted_at flags on the prospect first so the next
+          // call shows up as a fresh attempt; then we run the
+          // standard manual enrich.
+          if (!state.enrichmentAdmin || !state.enrichmentConnected) return;
+          const row = btnEl.closest(".pr-row");
+          if (!row) return;
+          const idx = Number(row.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+          if (state.enrichmentInflight.has(prospect.id)) return;
+
+          state.enrichmentInflight.add(prospect.id);
+          rerender();
+
+          try {
+            await sb.sbFetch("/rest/v1/rpc/reset_enrichment_attempt", {
+              method: "POST",
+              body:   JSON.stringify({
+                p_prospect_id: prospect.id,
+                p_email:       !prospect.email,
+                p_phone:       !prospect.phone,
+              }),
+            });
+            await enrichOne(prospect.id, "manual", true);
+            await refreshProspect(prospect.id);
+          } catch (err) {
+            alert("Couldn't retry: " + (err.message || err));
+          } finally {
+            state.enrichmentInflight.delete(prospect.id);
+            rerender();
+          }
+        }
+
+        async function handleBulkEnrich(includePhone) {
           if (!state.enrichmentAdmin || !state.enrichmentConnected) return;
           const targets = state.filtered.filter(p =>
             state.selected.has(p.key)
@@ -3217,17 +3345,17 @@
             && p.company && p.company.trim()
           );
           if (!targets.length) return;
-          if (!confirm(`Enrich ${targets.length} prospect${targets.length === 1 ? "" : "s"} via Apollo? Each call uses 1 Apollo credit. You'll see the results land row-by-row.`)) {
+          const scope = includePhone ? "email + phone" : "email only";
+          const creditNote = includePhone
+            ? "Each call uses 1 credit for email + 1-2 credits per phone reveal (charged whether or not a phone is found, depending on your Apollo plan). Phones arrive minutes later via Apollo's webhook."
+            : "Each call uses 1 Apollo credit for email reveal.";
+          if (!confirm(`Enrich ${targets.length} prospect${targets.length === 1 ? "" : "s"} (${scope}) via Apollo? ${creditNote}`)) {
             return;
           }
 
-          // Mark them all in-flight + repaint row buttons.
           targets.forEach(p => state.enrichmentInflight.add(p.id));
           rerender();
 
-          // Throttled parallelism: 3 in-flight at a time. Apollo
-          // tolerates higher rates but this keeps progress visible
-          // and avoids transient rate-limit errors.
           const PARALLEL = 3;
           let cursor = 0;
           let succeeded = 0;
@@ -3236,7 +3364,7 @@
             while (cursor < targets.length) {
               const p = targets[cursor++];
               try {
-                const res = await enrichOne(p.id, "bulk");
+                const res = await enrichOne(p.id, "bulk", includePhone);
                 if (res && res.fields_returned && res.fields_returned.length) succeeded++;
                 else failed++;
                 await refreshProspect(p.id);
@@ -3244,15 +3372,20 @@
                 failed++;
               } finally {
                 state.enrichmentInflight.delete(p.id);
+                // Repaint after each finishes so the user sees
+                // progress instead of a frozen "Enriching…" mass.
+                rerender();
               }
             }
           };
           await Promise.all(Array.from({ length: PARALLEL }, worker));
-          rerender();
-          alert(`Bulk enrich complete: ${succeeded} matched, ${targets.length - succeeded - failed} no match, ${failed} failed.`);
+          const phoneNote = includePhone
+            ? " Phones may continue trickling in over the next few minutes via Apollo's webhook — refresh the page to see new ones."
+            : "";
+          alert(`Bulk enrich complete: ${succeeded} matched, ${targets.length - succeeded - failed} no match, ${failed} failed.${phoneNote}`);
         }
 
-        async function enrichOne(prospectId, triggeredBy) {
+        async function enrichOne(prospectId, triggeredBy, includePhone) {
           // Calls the enrich-prospect edge function. Returns the
           // parsed { ok, fields_returned } body on success.
           const url = `${window.SUPABASE_CONFIG.url}/functions/v1/enrich-prospect`;
@@ -3266,8 +3399,9 @@
               "apikey":        window.SUPABASE_CONFIG.anonKey,
             },
             body: JSON.stringify({
-              prospect_id:  prospectId,
-              triggered_by: triggeredBy,
+              prospect_id:   prospectId,
+              triggered_by:  triggeredBy,
+              include_phone: !!includePhone,
             }),
           });
           const body = await resp.json().catch(() => ({}));
@@ -3295,8 +3429,12 @@
             return;  // silent — queue processing is best-effort
           }
           if (!Array.isArray(claimed) || !claimed.length) return;
+          // Auto-enrichments respect the per-account
+          // auto_enrich_include_phone setting. Off by default;
+          // operator opts in via the popover sub-toggle.
+          const includePhone = !!client.auto_enrich_include_phone;
           claimed.forEach(row => {
-            enrichOne(row.prospect_id, "auto_acceptance").catch(() => {});
+            enrichOne(row.prospect_id, "auto_acceptance", includePhone).catch(() => {});
           });
         }
 

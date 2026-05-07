@@ -2871,6 +2871,50 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   background: #fff;
   cursor: not-allowed;
 }
+
+/* N/A — Apollo couldn't find a value. Click to retry resets the
+   attempted_at flag and runs a fresh enrichment call. Visually
+   muted so it reads as "tried, no match" not "actionable now". */
+.pr-na-btn {
+  display: inline-block;
+  padding: 3px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-500);
+  background: var(--surface-1);
+  border: 1px dashed var(--gray-300);
+  border-radius: var(--r);
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.pr-na-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  border-style: solid;
+}
+.pr-na-btn-disabled,
+.pr-na-btn-disabled:hover {
+  color: var(--gray-400);
+  border-color: var(--border);
+  background: var(--surface-1);
+  cursor: not-allowed;
+}
+
+/* "Pending Apollo…" — phone reveal was requested but the async
+   webhook hasn't fired yet. Read-only, not clickable. */
+.pr-enrich-pending {
+  display: inline-block;
+  padding: 3px 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--r);
+  font-style: italic;
+}
 .pr-bulk-action-disabled,
 .pr-bulk-action-disabled:hover {
   color: var(--gray-400);
@@ -2916,6 +2960,23 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   color: var(--gray-500);
   margin-top: 8px;
   min-height: 14px;
+}
+
+/* Sub-toggle inside the popover: indented + dim when its parent
+   (auto-enrich) is off. */
+.pr-enrich-sublabel {
+  margin-top: 10px;
+  padding-left: 22px;
+  border-left: 2px solid var(--border);
+}
+.pr-enrich-sublabel-disabled,
+.pr-enrich-sublabel-disabled span {
+  color: var(--gray-400);
+  cursor: not-allowed;
+}
+.pr-enrich-subhelp {
+  padding-left: 22px;
+  margin-top: 4px;
 }
 
 /* Truncate long titles / companies so rows stay single-height. */

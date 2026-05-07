@@ -1448,26 +1448,44 @@
         <a href="/team/">Team page</a>. Once connected:</p>
       <ul>
         <li><strong>Per-row enrichment</strong>: any empty Email or Phone cell
-            shows an <em>Enrich ↗</em> button. Click it to fetch that prospect's
-            contact info — uses 1 Apollo credit. Admin only.</li>
+            shows an <em>Enrich ↗</em> button. One click fetches both email and
+            phone in a single Apollo call. Admin only.</li>
         <li><strong>Bulk enrichment</strong>: select multiple prospects via the
-            checkboxes, then click <em>Enrich N</em> in the bulk action bar.
-            Only prospects missing email AND with name + company set get
-            enriched (the <em>N</em> in the button is the actionable count, not
-            the selected count). Admin only.</li>
+            checkboxes, then click <em>Enrich N</em> (full — email + phone) or
+            <em>Enrich N (Email)</em> (cheaper — email only) in the bulk action
+            bar. Only prospects missing email AND with name + company set get
+            enriched. Admin only.</li>
         <li><strong>Auto-enrich on acceptance</strong> (off by default per
             account): when a prospect's status moves into Messaged, Responded,
-            or Meeting (i.e. they accepted your connection request), Apollo
-            fires automatically if email is unknown. Toggle this in the
-            <em>Auto-enrich: off ▾</em> pill at the top of the Prospects tab.
-            Admin only to change the toggle.</li>
+            or Meeting, Apollo fires automatically if email is unknown. The
+            <em>Auto-enrich: off ▾</em> pill above the prospect filters opens a
+            popover with two checkboxes — the parent toggle, plus an
+            <em>Also include phone reveal</em> sub-toggle that costs extra
+            credits. Admin only.</li>
       </ul>
+      <h5>Email vs. phone</h5>
+      <p>
+        Email is fetched synchronously — it appears in the Email column within
+        a second of the call returning. <strong>Phone reveal is asynchronous</strong>:
+        Apollo queues a background job and POSTs the phone to Uptown's webhook
+        when the reveal completes (usually within minutes). Until then the
+        Phone column shows <em>Pending Apollo…</em>; once delivered, the phone
+        appears on the next page refresh.
+      </p>
       <p>
         Match rates depend on the prospect's public web presence — Apollo
         typically returns email for ~70-85% of well-known professionals and
-        phone for ~30-50%. Calls are billed by Apollo against the org's own
-        Apollo account; the <a href="/team/">Team page</a> shows your org's
-        last-30-days usage.
+        phone for ~30-50%. The Phone column shows <em>N/A</em> when Apollo
+        confirmed no match (clickable to retry); empty cells with no
+        <em>N/A</em> badge mean enrichment hasn't been attempted yet.
+      </p>
+      <p>
+        Calls are billed by Apollo against the org's own Apollo account.
+        <strong>Phone reveals cost extra credits</strong> per Apollo's pricing
+        — typically 1-2 credits per phone reveal regardless of whether one is
+        found, on top of the 1 credit for email. The <a href="/team/">Team
+        page</a> shows your org's last-30-days usage; for exact charges, check
+        Apollo's own usage dashboard.
       </p>
       <div class="callout note">
         <div class="callout-title">Enrichment doesn't move funnel data</div>
