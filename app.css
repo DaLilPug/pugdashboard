@@ -3778,22 +3778,6 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 .section-description a { color: var(--accent); }
 
-/* Apollo affiliate URL — plain-text URL (intentionally not a link)
-   so the operator copies it deliberately rather than clicking. */
-.enrichment-affiliate-url {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 4px 9px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--navy);
-  background: var(--surface-1);
-  border: 1px dashed var(--border);
-  border-radius: var(--r);
-  user-select: all;
-}
-
 .enrichment-config {
   background: var(--surface-1);
   border: 1px solid var(--border);
