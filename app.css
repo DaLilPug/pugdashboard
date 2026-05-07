@@ -2719,6 +2719,119 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   border-color: var(--gray-400);
 }
 
+/* ---- Rating + Notes columns -----------------------------------
+   Per-prospect operator-set fields. Rating is a paired thumb
+   toggle (NULL/up/down); Notes is a click-to-expand pill. Both
+   are dashboard-only — they don't show up in the Sales Nav
+   sidebar. Writing them never touches outreach rollups. */
+
+.pr-col-rating { width: 1%; white-space: nowrap; }
+.pr-col-notes  { width: 1%; white-space: nowrap; }
+.pr-rating-cell { white-space: nowrap; }
+.pr-notes-cell  { white-space: nowrap; }
+
+.pr-thumb {
+  background: none;
+  border: 0;
+  padding: 4px 5px;
+  margin: 0 1px;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  /* Outline-feel by default: desaturate + dim. Active state drops
+     the filter so the emoji renders in full color. */
+  filter: grayscale(1) opacity(0.4);
+  transition: filter .12s, transform .12s;
+  border-radius: 4px;
+}
+.pr-thumb:hover {
+  filter: grayscale(0.4) opacity(0.85);
+  background: var(--surface-1);
+}
+.pr-thumb.active {
+  filter: none;
+  transform: scale(1.08);
+}
+.pr-thumb.active.pr-thumb-up    { background: rgba(40, 167, 69, 0.10); }
+.pr-thumb.active.pr-thumb-down  { background: rgba(220, 53, 69, 0.10); }
+
+.pr-notes-btn {
+  display: inline-block;
+  padding: 4px 9px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.pr-notes-btn.pr-notes-has {
+  color: var(--navy);
+  border-color: var(--navy);
+}
+.pr-notes-btn.pr-notes-empty {
+  color: var(--gray-500);
+  border-style: dashed;
+}
+.pr-notes-btn:hover {
+  background: var(--surface-1);
+}
+
+/* Inline notes editor inside the expanded timeline. Sits between
+   the timeline-head and the events list. */
+.pr-notes-editor {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.pr-notes-editor-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--gray-500);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.pr-notes-editor-text {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--navy);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: #fff;
+  box-sizing: border-box;
+}
+.pr-notes-editor-text:focus {
+  outline: 0;
+  border-color: var(--navy);
+}
+.pr-notes-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pr-notes-editor-feedback {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-right: auto;
+}
+.pr-notes-editor-feedback.pr-notes-saved {
+  color: var(--ok, #228b22);
+}
+
 /* Truncate long titles / companies so rows stay single-height. */
 .pr-table td.pr-company, .pr-table td.pr-title {
   max-width: 260px;

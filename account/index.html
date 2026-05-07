@@ -206,6 +206,22 @@
               <button class="pr-chip"        data-task="none"  type="button">No follow-up</button>
             </div>
           </div>
+          <div class="pr-filter-group">
+            <span class="pr-filter-label">Rating</span>
+            <div class="pr-filter-chips" id="pr-rating-filter">
+              <button class="pr-chip active" data-rating="all"  type="button">All</button>
+              <button class="pr-chip"        data-rating="up"   type="button">Thumbs up</button>
+              <button class="pr-chip"        data-rating="down" type="button">Thumbs down</button>
+            </div>
+          </div>
+          <div class="pr-filter-group">
+            <span class="pr-filter-label">Notes</span>
+            <div class="pr-filter-chips" id="pr-notes-filter">
+              <button class="pr-chip active" data-notes="all"  type="button">All</button>
+              <button class="pr-chip"        data-notes="has"  type="button">Has notes</button>
+              <button class="pr-chip"        data-notes="none" type="button">No notes</button>
+            </div>
+          </div>
         </div>
 
         <div id="pr-meta" class="pr-meta"></div>
@@ -950,6 +966,8 @@
         const statusEl    = document.getElementById("pr-status-filter");
         const sentimentEl = document.getElementById("pr-sentiment-filter");
         const taskEl      = document.getElementById("pr-task-filter");
+        const ratingEl    = document.getElementById("pr-rating-filter");
+        const notesEl     = document.getElementById("pr-notes-filter");
         const exportBtn   = document.getElementById("pr-export");
         const metaEl      = document.getElementById("pr-meta");
         const wrapEl      = document.getElementById("pr-table-wrap");
@@ -959,6 +977,8 @@
         const LAST_STATUS    = `account_${clientId}_pr_status`;
         const LAST_SENTIMENT = `account_${clientId}_pr_sentiment`;
         const LAST_TASK      = `account_${clientId}_pr_task`;
+        const LAST_RATING    = `account_${clientId}_pr_rating`;
+        const LAST_NOTES     = `account_${clientId}_pr_notes`;
         const LAST_SORT_BY   = `account_${clientId}_pr_sort_by`;
         const LAST_SORT_DIR  = `account_${clientId}_pr_sort_dir`;
 
@@ -968,6 +988,10 @@
           sentiment: localStorage.getItem(LAST_SENTIMENT) || "all",
           task:      ["all","has","none"].includes(localStorage.getItem(LAST_TASK))
                        ? localStorage.getItem(LAST_TASK) : "all",
+          rating:    ["all","up","down"].includes(localStorage.getItem(LAST_RATING))
+                       ? localStorage.getItem(LAST_RATING) : "all",
+          notesFilter: ["all","has","none"].includes(localStorage.getItem(LAST_NOTES))
+                       ? localStorage.getItem(LAST_NOTES) : "all",
           // sortBy/sortDir = null means "default" — sort by last_touch DESC.
           // Three-state header click cycle: desc → asc → clear (back to default).
           sortBy:    localStorage.getItem(LAST_SORT_BY)   || null,
@@ -997,6 +1021,8 @@
         setChipActive(statusEl,    "status",    state.status);
         setChipActive(sentimentEl, "sentiment", state.sentiment);
         setChipActive(taskEl,      "task",      state.task);
+        setChipActive(ratingEl,    "rating",    state.rating);
+        setChipActive(notesEl,     "notes",     state.notesFilter);
 
         // ---- events --------------------------------------------------
 
@@ -1038,6 +1064,24 @@
           state.task = btn.dataset.task;
           localStorage.setItem(LAST_TASK, state.task);
           setChipActive(taskEl, "task", state.task);
+          rerender();
+        });
+
+        ratingEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".pr-chip");
+          if (!btn) return;
+          state.rating = btn.dataset.rating;
+          localStorage.setItem(LAST_RATING, state.rating);
+          setChipActive(ratingEl, "rating", state.rating);
+          rerender();
+        });
+
+        notesEl.addEventListener("click", (e) => {
+          const btn = e.target.closest(".pr-chip");
+          if (!btn) return;
+          state.notesFilter = btn.dataset.notes;
+          localStorage.setItem(LAST_NOTES, state.notesFilter);
+          setChipActive(notesEl, "notes", state.notesFilter);
           rerender();
         });
 
@@ -1371,6 +1415,13 @@
             profile_url:    r.profile_url    || null,
             sales_nav_url:  r.sales_nav_url  || null,
             merge_group_id: r.merge_group_id || null,
+            // Operator-set review fields. thumb is true/false/null
+            // (NULL = unrated). notes is null or trimmed text.
+            // Both are written via set_prospect_thumb / set_prospect_notes
+            // RPCs and never touch outreach rollups (last_touch, status,
+            // sentiment, etc. are unaffected).
+            thumb:        (r.thumb === true || r.thumb === false) ? r.thumb : null,
+            notes:        r.notes || "",
             counts: {
               connection:     r.connection_count   || 0,
               message:        r.message_count      || 0,
@@ -1730,6 +1781,15 @@
               if (s.task === "has"  && !has) return false;
               if (s.task === "none" &&  has) return false;
             }
+            if (s.rating !== "all") {
+              if (s.rating === "up"   && p.thumb !== true)  return false;
+              if (s.rating === "down" && p.thumb !== false) return false;
+            }
+            if (s.notesFilter !== "all") {
+              const has = !!(p.notes && p.notes.trim());
+              if (s.notesFilter === "has"  && !has) return false;
+              if (s.notesFilter === "none" &&  has) return false;
+            }
             if (q) {
               const hay = `${p.name} ${p.company} ${p.title}`.toLowerCase();
               if (!hay.includes(q)) return false;
@@ -1799,8 +1859,10 @@
                     <th class="pr-col-title">Title</th>
                     <th class="pr-col-status">Status</th>
                     <th class="pr-col-sent">Sentiment</th>
+                    <th class="pr-col-rating">Rating</th>
                     <th class="pr-col-events num">Events</th>
                     <th class="pr-col-last sortable ${lastSortClass}" data-action="sort-column" data-sort="lastTouch" title="Click to sort">Last touch<span class="sort-caret">${lastSortCaret}</span></th>
+                    <th class="pr-col-notes">Notes</th>
                     <th class="pr-col-sn">Sales Nav</th>
                     <th class="pr-col-link">LinkedIn</th>
                   </tr>
@@ -1866,6 +1928,30 @@
             ? `<a class="pr-link-btn" href="${esc(p.profile_url)}" target="_blank" rel="noopener" title="Open LinkedIn profile">LinkedIn ↗</a>`
             : `<span class="pr-link-empty" title="No LinkedIn URL — add it via Edit info">—</span>`;
 
+          // Rating: two thumb buttons in one cell. NULL = both outline,
+          // TRUE = up filled, FALSE = down filled. Click toggles
+          // (clicking the active one clears it back to NULL).
+          const upActive   = p.thumb === true  ? " active" : "";
+          const downActive = p.thumb === false ? " active" : "";
+          const ratingHtml =
+            `<button type="button" class="pr-thumb pr-thumb-up${upActive}" ` +
+              `data-action="toggle-thumb" data-thumb="up" ` +
+              `title="${p.thumb === true ? 'Clear thumbs up' : 'Mark thumbs up'}" ` +
+              `aria-pressed="${p.thumb === true}">👍</button>` +
+            `<button type="button" class="pr-thumb pr-thumb-down${downActive}" ` +
+              `data-action="toggle-thumb" data-thumb="down" ` +
+              `title="${p.thumb === false ? 'Clear thumbs down' : 'Mark thumbs down'}" ` +
+              `aria-pressed="${p.thumb === false}">👎</button>`;
+
+          // Notes cell: shows a small pill that's filled when notes exist,
+          // muted "+ Notes" prompt when empty. Clicking expands the row
+          // (same toggleTimeline path as clicking anywhere else on the row)
+          // and the notes editor is rendered at the top of the timeline.
+          const hasNotes = !!(p.notes && p.notes.trim());
+          const notesCellHtml = hasNotes
+            ? `<button type="button" class="pr-notes-btn pr-notes-has" data-action="open-notes" title="View / edit notes">Notes ✎</button>`
+            : `<button type="button" class="pr-notes-btn pr-notes-empty" data-action="open-notes" title="Add notes">+ Notes</button>`;
+
           const isChecked = state.selected.has(p.key);
 
           return `
@@ -1884,13 +1970,15 @@
               <td class="pr-title">${esc(p.title || "—")}</td>
               <td><span class="pr-status pr-status-${p.status}">${esc(statusLabel)}</span></td>
               <td>${sentimentHtml}</td>
+              <td class="pr-rating-cell">${ratingHtml}</td>
               <td class="num">${fmtInt(p.eventCount)}</td>
               <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
+              <td class="pr-notes-cell">${notesCellHtml}</td>
               <td class="pr-sn">${snCell}</td>
               <td class="pr-link">${liCell}</td>
             </tr>
             <tr class="pr-timeline-row hidden" data-idx="${idx}">
-              <td colspan="10" class="pr-timeline-cell"></td>
+              <td colspan="12" class="pr-timeline-cell"></td>
             </tr>
           `;
         }
@@ -1993,6 +2081,24 @@
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
                 <button class="btn-secondary pr-action" data-action="show-add-followup-form" type="button" title="Schedule a one-off follow-up reminder for this prospect">Add follow-up</button>
                 ${p.eventCount >= 2 ? `<button class="btn-secondary pr-action" data-action="enter-split-mode" type="button" title="Peel events off this prospect into a new prospect">Split events…</button>` : ""}
+              </div>
+            </div>
+
+            <!-- Notes editor — always visible inside an expanded row. The
+                 textarea seeds from p.notes and writes via the
+                 set_prospect_notes RPC on Save. Saving doesn't touch
+                 last_touch / status / sentiment / event counts. -->
+            <div class="pr-notes-editor">
+              <label class="pr-notes-editor-label" for="pr-notes-${esc(p.key)}">Notes</label>
+              <textarea id="pr-notes-${esc(p.key)}"
+                        class="pr-notes-editor-text"
+                        rows="3"
+                        placeholder="Notes about this prospect — call notes, deal status, why you marked the rating, etc."
+                        maxlength="8000">${esc(p.notes || "")}</textarea>
+              <div class="pr-notes-editor-actions">
+                <span class="pr-notes-editor-feedback"></span>
+                <button type="button" class="btn-secondary pr-action" data-action="cancel-notes-edit">Reset</button>
+                <button type="button" class="btn-primary   pr-action" data-action="save-notes">Save notes</button>
               </div>
             </div>
 
@@ -2296,6 +2402,7 @@
         function buildExportRows(prospects) {
           const header = [
             "Name", "Email", "Phone", "Company", "Title", "Status", "Sentiment",
+            "Rating", "Notes",
             "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
             "Responses", "Positive Responses", "Meetings",
             "Events", "Last Touch",
@@ -2319,6 +2426,10 @@
               e.type === "response" && (e.response || "").trim() !== ""
             )?.response || "";
 
+            const ratingLabel =
+              p.thumb === true  ? "up"
+              : p.thumb === false ? "down"
+              : "";
             return [
               p.name || "",
               p.email || "",
@@ -2327,6 +2438,8 @@
               p.title || "",
               p.status,
               p.sentiment || "",
+              ratingLabel,
+              p.notes || "",
               p.counts.connection,
               p.counts.inmail,
               p.counts.message,
@@ -2522,6 +2635,24 @@
             return;
           }
 
+          // ---- Prospect-row actions (rating + notes-open) ------------
+          // These fire from buttons in the visible .pr-row (not inside a
+          // timeline row), so they look up prospect from .pr-row instead
+          // of .pr-timeline-row. They short-circuit before the
+          // timelineRow guard below — clicking a thumb shouldn't expand.
+          if (action === "toggle-thumb") {
+            clickEvt.preventDefault();
+            clickEvt.stopPropagation();
+            handleToggleThumb(actionEl);
+            return;
+          }
+          if (action === "open-notes") {
+            clickEvt.preventDefault();
+            clickEvt.stopPropagation();
+            handleOpenNotes(actionEl);
+            return;
+          }
+
           // ---- Per-event actions (timeline-row scoped) ---------------
           const timelineRow = actionEl.closest(".pr-timeline-row");
           if (!timelineRow) return;
@@ -2654,6 +2785,18 @@
             return;
           }
 
+          if (action === "save-notes") {
+            clickEvt.preventDefault();
+            handleSaveNotes(actionEl, prospect, timelineRow);
+            return;
+          }
+          if (action === "cancel-notes-edit") {
+            clickEvt.preventDefault();
+            const ta = timelineRow.querySelector(".pr-notes-editor textarea");
+            if (ta) ta.value = prospect.notes || "";
+            return;
+          }
+
           if (action === "show-add-followup-form") {
             clickEvt.preventDefault();
             const form = timelineRow.querySelector(".pr-add-followup-form");
@@ -2683,6 +2826,170 @@
           const d = new Date();
           d.setDate(d.getDate() + 7);
           return d.toISOString().slice(0, 10);
+        }
+
+        // ---- Rating + Notes handlers --------------------------------
+        //
+        // Both are operator-set fields on prospects, written via
+        // SECURITY DEFINER RPCs that don't touch outreach rollups
+        // (last_touch / status / sentiment / counts stay frozen).
+
+        async function handleToggleThumb(btnEl) {
+          const row = btnEl.closest(".pr-row");
+          if (!row) return;
+          const idx = Number(row.dataset.idx);
+          const prospect = state.filtered[idx];
+          if (!prospect) return;
+
+          // Toggle logic: clicking the active thumb clears (NULL).
+          // Clicking the other thumb switches to it.
+          const intent = btnEl.dataset.thumb === "up";
+          const next = (prospect.thumb === intent) ? null : intent;
+          const prev = prospect.thumb;
+
+          // Mutate canonical state first.
+          prospect.thumb = next;
+          const canonical = state.allProspects.find(x => x.id === prospect.id);
+          if (canonical && canonical !== prospect) canonical.thumb = next;
+
+          // Surgical DOM update — flips the active class on each
+          // thumb button without triggering a full rerender. That
+          // matters when the row is expanded (full rerender would
+          // collapse the timeline + close any in-progress notes edit).
+          paintThumbButtons(row, next);
+
+          try {
+            await sb.sbFetch("/rest/v1/rpc/set_prospect_thumb", {
+              method: "POST",
+              body:   JSON.stringify({ p_prospect_id: prospect.id, p_thumb: next }),
+            });
+            // If a Rating filter is active, the prospect may have just
+            // moved into / out of view. Defer rerender so the click
+            // animation is visible first.
+            if (state.rating !== "all") {
+              setTimeout(() => rerender(), 250);
+            }
+          } catch (err) {
+            // Rollback to prev state.
+            prospect.thumb = prev;
+            if (canonical && canonical !== prospect) canonical.thumb = prev;
+            paintThumbButtons(row, prev);
+            alert("Couldn't update rating: " + (err.message || err));
+          }
+        }
+
+        function paintThumbButtons(row, val) {
+          const upBtn   = row.querySelector(".pr-thumb-up");
+          const downBtn = row.querySelector(".pr-thumb-down");
+          if (upBtn) {
+            upBtn.classList.toggle("active", val === true);
+            upBtn.setAttribute("aria-pressed", String(val === true));
+            upBtn.title = val === true ? "Clear thumbs up" : "Mark thumbs up";
+          }
+          if (downBtn) {
+            downBtn.classList.toggle("active", val === false);
+            downBtn.setAttribute("aria-pressed", String(val === false));
+            downBtn.title = val === false ? "Clear thumbs down" : "Mark thumbs down";
+          }
+        }
+
+        function handleOpenNotes(btnEl) {
+          const row = btnEl.closest(".pr-row");
+          if (!row) return;
+          // Expand the row if not already expanded; the notes editor
+          // lives at the top of the rendered timeline. After
+          // toggleTimeline finishes, focus the textarea.
+          (async () => {
+            const idx = row.dataset.idx;
+            const tbody = row.parentElement;
+            const timeline = tbody.querySelector(`.pr-timeline-row[data-idx="${idx}"]`);
+            const wasOpen = timeline && !timeline.classList.contains("hidden");
+            if (!wasOpen) {
+              await toggleTimeline(row);
+            }
+            const tl2 = tbody.querySelector(`.pr-timeline-row[data-idx="${idx}"]`);
+            if (!tl2 || tl2.classList.contains("hidden")) return;
+            const ta = tl2.querySelector(".pr-notes-editor textarea");
+            if (ta) {
+              ta.focus();
+              const end = ta.value.length;
+              ta.setSelectionRange(end, end);
+            }
+          })();
+        }
+
+        async function handleSaveNotes(btnEl, prospect, timelineRow) {
+          const editor = timelineRow.querySelector(".pr-notes-editor");
+          if (!editor) return;
+          const ta = editor.querySelector("textarea");
+          const feedback = editor.querySelector(".pr-notes-editor-feedback");
+          if (!ta) return;
+
+          const raw = ta.value;
+          const trimmed = raw.trim();
+          // Server normalizes whitespace-only to NULL; mirror here so
+          // the canonical state matches what comes back.
+          const stored  = trimmed === "" ? "" : raw;
+          const prev    = prospect.notes || "";
+
+          if (stored === prev) {
+            if (feedback) {
+              feedback.textContent = "No changes.";
+              setTimeout(() => { feedback.textContent = ""; }, 1200);
+            }
+            return;
+          }
+
+          const prevLabel = btnEl.textContent;
+          btnEl.disabled = true;
+          btnEl.textContent = "Saving…";
+          if (feedback) feedback.textContent = "";
+
+          try {
+            await sb.sbFetch("/rest/v1/rpc/set_prospect_notes", {
+              method: "POST",
+              body:   JSON.stringify({ p_prospect_id: prospect.id, p_notes: trimmed === "" ? null : raw }),
+            });
+            prospect.notes = stored;
+            const canonical = state.allProspects.find(x => x.id === prospect.id);
+            if (canonical && canonical !== prospect) canonical.notes = stored;
+
+            // Surgically flip the Notes pill on the visible row above
+            // this timeline row — keeps the editor open so the
+            // operator can keep typing or see the saved confirmation.
+            const idx = timelineRow.dataset.idx;
+            const tbody = timelineRow.parentElement;
+            const visibleRow = tbody.querySelector(`.pr-row[data-idx="${idx}"]`);
+            const pill = visibleRow?.querySelector(".pr-notes-btn");
+            if (pill) {
+              const has = !!stored.trim();
+              pill.classList.toggle("pr-notes-has",   has);
+              pill.classList.toggle("pr-notes-empty", !has);
+              pill.textContent = has ? "Notes ✎" : "+ Notes";
+              pill.title       = has ? "View / edit notes" : "Add notes";
+            }
+
+            if (feedback) {
+              feedback.textContent = "Saved.";
+              feedback.classList.add("pr-notes-saved");
+              setTimeout(() => {
+                feedback.textContent = "";
+                feedback.classList.remove("pr-notes-saved");
+              }, 1500);
+            }
+
+            // If the Notes filter is active, the prospect may have
+            // moved into / out of view. Defer rerender so the
+            // "Saved." flash is visible first.
+            if (state.notesFilter !== "all") {
+              setTimeout(() => rerender(), 1700);
+            }
+          } catch (err) {
+            alert("Couldn't save notes: " + (err.message || err));
+          } finally {
+            btnEl.disabled = false;
+            btnEl.textContent = prevLabel;
+          }
         }
 
         async function handleLogMeeting(btn, prospect) {

@@ -1352,10 +1352,63 @@
             (Connected, Messaged, Responded, Booked, etc.).</li>
         <li><strong>Sentiment</strong> — most recent response sentiment (positive
             / neutral / negative). Inline-editable via the small pill.</li>
+        <li><strong>Rating</strong> — your own thumbs up / thumbs down on this
+            prospect. Click 👍 or 👎 to set; click the same one again to clear.
+            See <em>Rating &amp; Notes</em> below for how to use this.</li>
+        <li><strong>Event count</strong> — total touches scoped to the active
+            timeframe. Click the row to expand the full event timeline.</li>
         <li><strong>Last touch</strong> — sortable; three-state click cycle (desc → asc → clear).</li>
-        <li><strong>Event count</strong> &amp; expand chevron — click the row to
-            see the full event timeline.</li>
+        <li><strong>Notes</strong> — click <em>+ Notes</em> (or the
+            <em>Notes ✎</em> pill if you've already written something) to expand
+            the row and edit your notes for this prospect. See <em>Rating &amp;
+            Notes</em> below.</li>
       </ul>
+
+      <h4 id="dash-rating-notes">Rating &amp; Notes — post-pipeline evaluation</h4>
+      <p>
+        Rating and Notes are <strong>your own qualitative read</strong> on each
+        prospect, separate from the activity-based funnel data. They're meant
+        for evaluating connections and meetings <em>after</em> they're already
+        in pipeline — not for grading raw outreach volume.
+      </p>
+      <p>Examples:</p>
+      <ul>
+        <li>A connection accepts and replies positively, but on a discovery call
+            it's clear they're not a fit. <strong>Thumbs down + a one-line note</strong>
+            ("not enough headcount, recheck in 6 months") so future-you doesn't
+            waste a follow-up slot on them.</li>
+        <li>A meeting closes a deal. <strong>Thumbs up + notes</strong> ("closed
+            $X / signed Y date / referred to Z") so the win is one search away
+            in the Prospects tab forever.</li>
+        <li>Mid-pipeline gut call — a thread is going somewhere good but you
+            don't have a meeting yet. <strong>Thumbs up + notes</strong> capture
+            the context so the next operator (or you in two weeks) knows why this
+            one matters.</li>
+      </ul>
+      <p>
+        Use the <strong>Rating</strong> and <strong>Notes</strong> filter chips
+        above the table to slice by either: e.g. <em>Rating: Thumbs up</em> +
+        <em>Status: Meeting</em> = your best closed/closing prospects across the
+        timeframe. Rating and Notes also export to CSV.
+      </p>
+      <div class="callout tip">
+        <div class="callout-title">Rating and Notes don't move "Last touch"</div>
+        <p>
+          Setting a rating or saving notes is a metadata-only update — it
+          doesn't bump the prospect's Last touch date, status, sentiment, or
+          event counts. Those only change when real outreach activity is logged.
+          So you can rate and re-rate without rearranging your sort order.
+        </p>
+      </div>
+      <div class="callout note">
+        <div class="callout-title">Dashboard-only</div>
+        <p>
+          Rating and Notes live in the <strong>dashboard's Prospects tab</strong>
+          only — they don't show up in the Sales Nav sidebar. The sidebar is for
+          logging outreach as you go; rating and notes are for evaluating
+          prospects after they're in pipeline.
+        </p>
+      </div>
 
       <h4>Editing events</h4>
       <p>
