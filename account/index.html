@@ -2099,7 +2099,7 @@
                 class="pr-na-btn ${blocked ? 'pr-na-btn-disabled' : ''}"
                 data-action="retry-enrich-prospect"
                 data-field="${field}"
-                title="${blocked ? esc(enrichBtnTitle) : 'Apollo couldn\\'t find a match. Click to retry.'}"
+                title="${blocked ? esc(enrichBtnTitle) : 'Apollo could not find a match. Click to retry.'}"
                 ${blocked ? 'disabled' : ''}>N/A</button>`;
           const pendingPhone = `<span class="pr-enrich-pending" title="Apollo is still revealing this phone. It'll appear here when the async lookup completes (usually a few minutes).">Pending Apollo…</span>`;
           const sourceBadge = (src) => src && src !== "outreach"
