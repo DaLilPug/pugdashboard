@@ -14,10 +14,9 @@ window.SUPABASE_CONFIG = {
   // begins with pk_live_, test key with pk_test_. Set this when
   // Stripe is configured (see BILLING_SETUP.md).
   stripePublishableKey: "pk_live_GnliOtGC76yQtYsV59tPjQga",
-  // Chrome Web Store URL for the Uptown extension. Empty string =
-  // hide the "Get the Chrome extension" link in the dashboard header.
-  // Fill in after the Web Store review approves and you have the
-  // store id; the URL pattern is
-  // https://chrome.google.com/webstore/detail/<extension-id>
-  chromeExtensionUrl: "",
+  // Chrome Web Store URL for the Uptown Tracker extension. Empty
+  // string hides the "Get the Chrome extension" link in the
+  // dashboard header. The dashboard's reveal-on-load JS reads this
+  // and unhides #chrome-ext-link when it's non-empty.
+  chromeExtensionUrl: "https://chromewebstore.google.com/detail/uptown-%E2%80%94-linkedin-outreac/oiojmfjjdgpjpanoienjmnoigjpjlhlc",
 };
