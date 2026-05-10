@@ -458,13 +458,21 @@
         const gifted    = s.seats_gifted    || 0;
         const total     = s.seats_paid      || 0;
         const used      = s.seats_used      || 0;
+        // A canceled subscription is effectively "no plan" from a
+        // billing perspective even though we keep the stripe_subscription_id
+        // around for reference. Show the same "No active plan" line we'd
+        // show for a never-subscribed org, and suppress the renewal date
+        // (which is actually the END date on a canceled sub, not a future
+        // renew).
+        const isCanceled = status === "canceled";
+        const hasActivePlan = s.has_subscription && !isCanceled;
 
-        const planLine = s.has_subscription
+        const planLine = hasActivePlan
           ? `${purchased} paid seat${purchased === 1 ? "" : "s"} × $${unitPrice}/${interval} = $${purchased * unitPrice}/${interval}`
           : `No active plan`;
-        const renewLine = s.current_period_end
+        const renewLine = (hasActivePlan && s.current_period_end)
           ? `Renews ${new Date(s.current_period_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
-          : (s.has_subscription ? "" : "");
+          : "";
         const trialLine = (status === "trialing" && s.trial_end)
           ? `Trial ends ${new Date(s.trial_end).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`
           : "";
@@ -500,7 +508,7 @@
           <div class="team-billing-actions">
             <button data-action="add-seat">+ Add seat</button>
             <button data-action="remove-seat" ${reduceDisabled ? "disabled" : ""}>− Remove seat</button>
-            ${s.has_subscription ? `<button data-action="switch-interval">${esc(switchLabel)}</button>` : ""}
+            ${hasActivePlan ? `<button data-action="switch-interval">${esc(switchLabel)}</button>` : ""}
             ${s.has_payment_method ? `<button data-action="portal">Manage payment & invoices</button>` : ""}
           </div>
         `;
