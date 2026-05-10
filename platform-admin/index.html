@@ -244,22 +244,15 @@
             const prev = btn.textContent;
             btn.disabled = true; btn.textContent = "Deleting…";
             try {
-              const res = await fetch(
-                `${window.SUPABASE_CONFIG.url}/functions/v1/platform-admin-delete-user`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Authorization": `Bearer ${session.access_token}`,
-                    "Content-Type":  "application/json",
-                    "apikey":        window.SUPABASE_CONFIG.anonKey,
-                  },
-                  body: JSON.stringify({ operator_id: id }),
-                }
-              );
-              const data = await res.json().catch(() => ({}));
-              if (!res.ok) {
-                throw new Error(data.message || data.error || `delete failed (${res.status})`);
-              }
+              // sb.sbFetch wraps the call in ensureFreshSession() so a
+              // stale access_token gets refreshed before the request.
+              // The raw fetch + captured session.access_token pattern
+              // used to fail with "unauthorized" whenever the page sat
+              // open past the token's 1-hour expiry.
+              await sb.sbFetch("/functions/v1/platform-admin-delete-user", {
+                method: "POST",
+                body:   JSON.stringify({ operator_id: id }),
+              });
               // Drop the row from local cache + re-render so the UI
               // updates instantly without a full re-fetch.
               allUsers = allUsers.filter(u => u.operator_id !== id);
