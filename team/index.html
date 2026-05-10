@@ -1181,7 +1181,7 @@
         // email send through an Edge Function; today it's a stub that
         // gives the admin a way to refresh the "Invited" date after
         // pinging the invitee elsewhere.
-        const resendBtn = `<button type="button" class="btn-row-action btn-resend-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}" title="Bump the invite timestamp. (Real email sending lands in a later phase.)">Resend</button>`;
+        const resendBtn = `<button type="button" class="btn-row-action btn-resend-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}" title="Re-send the invite email and bump the invited-on date.">Resend</button>`;
 
         // Pre-assign per-client access for member-role invites. Admins
         // get all-account access automatically, so the button is hidden
@@ -1354,6 +1354,20 @@
       // signup link instead. Doesn't block the rest of the post-invite
       // flow.
       async function sendInviteEmail({ email, role, accept_url, is_new_user }, resultEl) {
+        // resultEl is optional: the create-invite flow passes the
+        // inline result block so we can append a "share the link
+        // manually" note on failure; the resend flow doesn't have one
+        // and falls back to a console warning.
+        const surfaceFailure = (label) => {
+          console.warn(label);
+          if (!resultEl) return;
+          const note = document.createElement("div");
+          note.className = "invite-result-info";
+          note.style.marginTop = "8px";
+          note.textContent =
+            "Heads-up: we couldn't send the invite email automatically. Share the link directly with them above.";
+          resultEl.appendChild(note);
+        };
         try {
           const inviterName =
             session.user?.user_metadata?.name ||
@@ -1380,22 +1394,10 @@
           );
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            console.warn("invite email send failed:", res.status, data);
-            const note = document.createElement("div");
-            note.className = "invite-result-info";
-            note.style.marginTop = "8px";
-            note.textContent =
-              "Heads-up: we couldn't send the invite email automatically. Share the link directly with them above.";
-            resultEl.appendChild(note);
+            surfaceFailure(`invite email send failed: ${res.status} ${JSON.stringify(data)}`);
           }
         } catch (err) {
-          console.warn("invite email send threw:", err);
-          const note = document.createElement("div");
-          note.className = "invite-result-info";
-          note.style.marginTop = "8px";
-          note.textContent =
-            "Heads-up: we couldn't send the invite email automatically. Share the link directly with them above.";
-          resultEl.appendChild(note);
+          surfaceFailure(`invite email send threw: ${err?.message || err}`);
         }
       }
 
@@ -1465,13 +1467,27 @@
             method: "POST",
             body:   JSON.stringify({ invite_id: inviteId }),
           });
+          // Re-fire the branded email via the same edge function the
+          // initial invite uses. Look up role / new-vs-existing from
+          // the in-memory invite cache so we send the matching
+          // template (new-user gets a Create-Account CTA; existing-user
+          // gets a Sign-in-to-accept CTA).
+          const inv = invites.find(x => x.id === inviteId);
+          if (inv) {
+            await sendInviteEmail({
+              email,
+              role:        inv.role,
+              accept_url:  buildSignupLink(email),
+              is_new_user: !inv.target_operator_id,
+            });
+          }
           btn.textContent = "Resent ✓";
           // Refresh the invites table to reflect the new invited_at
           // and the activity panel to show invite.resent.
           await Promise.all([loadInvites(), loadActivity()]);
           // loadInvites re-renders the row, so this btn reference is
           // stale. The new row's button starts in its default "Resend"
-          // state, which is fine — the user already saw the "Resent ✓"
+          // state, which is fine: the user already saw the "Resent ✓"
           // flash before the re-render replaced the DOM.
         } catch (err) {
           btn.disabled = false;
