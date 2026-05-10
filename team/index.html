@@ -573,8 +573,10 @@
           // invite (null, signup link is useful) or an existing-user
           // invite (uuid, target must accept from their own dashboard).
           // Renderer branches on it to pick the right row actions.
+          // pending_client_ids is the pre-assigned access list applied
+          // automatically on accept (member-role only).
           const rows = await sb.sbFetch(
-            `/rest/v1/pending_invites?select=id,email,role,invited_at,target_operator_id&org_id=eq.${encodeURIComponent(org.id)}&order=invited_at.desc`
+            `/rest/v1/pending_invites?select=id,email,role,invited_at,target_operator_id,pending_client_ids&org_id=eq.${encodeURIComponent(org.id)}&order=invited_at.desc`
           );
           invites = rows || [];
           renderInvites();
@@ -1173,6 +1175,19 @@
         // pinging the invitee elsewhere.
         const resendBtn = `<button type="button" class="btn-row-action btn-resend-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}" title="Bump the invite timestamp. (Real email sending lands in a later phase.)">Resend</button>`;
 
+        // Pre-assign per-client access for member-role invites. Admins
+        // get all-account access automatically, so the button is hidden
+        // for that role. Label reflects current state so the admin can
+        // see at a glance whether anything is queued.
+        let manageAccessBtn = "";
+        if (inv.role === "member") {
+          const preCount = Array.isArray(inv.pending_client_ids) ? inv.pending_client_ids.length : 0;
+          const label = preCount > 0
+            ? `Manage access (${preCount})`
+            : `Manage access`;
+          manageAccessBtn = `<button type="button" class="btn-row-action btn-manage-invite-access" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}" title="Pre-assign which accounts they'll see when they accept.">${label}</button>`;
+        }
+
         return `
           <tr data-invite="${esc(inv.id)}">
             <td>${esc(inv.email)}</td>
@@ -1184,6 +1199,7 @@
             <td>${fmtDate(inv.invited_at)}</td>
             <td class="col-actions">
               ${primaryAction}
+              ${manageAccessBtn}
               ${resendBtn}
               <button type="button" class="btn-row-action btn-row-action-danger btn-revoke-invite" data-invite="${esc(inv.id)}" data-email="${esc(inv.email)}">Revoke</button>
             </td>
@@ -1201,6 +1217,9 @@
         });
         tb.querySelectorAll(".btn-revoke-invite").forEach(btn => {
           btn.addEventListener("click", () => onRevokeInvite(btn.dataset.invite, btn.dataset.email));
+        });
+        tb.querySelectorAll(".btn-manage-invite-access").forEach(btn => {
+          btn.addEventListener("click", () => openInviteAccessModal(btn.dataset.invite));
         });
       }
 
@@ -1472,6 +1491,7 @@
         const body  = document.getElementById("access-modal-body");
         sub.textContent = `${m.name} · ${m.email}`;
         modal.dataset.op = operatorId;
+        delete modal.dataset.invite;
 
         if (!clients.length) {
           body.innerHTML = `<div class="loading">This org doesn't have any accounts yet. Add accounts from the dashboard first, then come back here to assign access.</div>`;
@@ -1509,6 +1529,159 @@
               ?.addEventListener("click", () => onBulkAccess(operatorId, false));
         }
         modal.classList.remove("hidden");
+      }
+
+      // Pending-invite variant of the access modal. Shares the same DOM
+      // and visual layout; saves go to set_invite_client_access (a
+      // whole-array update) instead of per-row grant/revoke RPCs.
+      function openInviteAccessModal(inviteId) {
+        const inv = invites.find(x => x.id === inviteId);
+        if (!inv) return;
+        const modal = document.getElementById("access-modal");
+        const sub   = document.getElementById("access-modal-sub");
+        const body  = document.getElementById("access-modal-body");
+        sub.textContent = `${inv.email} · pending invite`;
+        modal.dataset.invite = inviteId;
+        delete modal.dataset.op;
+
+        if (!clients.length) {
+          body.innerHTML = `<div class="loading">This org doesn't have any accounts yet. Add accounts from the dashboard first, then come back here to pre-assign access.</div>`;
+        } else {
+          const preSelected = new Set(Array.isArray(inv.pending_client_ids) ? inv.pending_client_ids : []);
+          body.innerHTML = `
+            <div class="access-grid-head">
+              Pre-assign which accounts ${esc(inv.email)} will see when they accept.
+              Changes save immediately and apply on acceptance.
+            </div>
+            <div class="access-grid-toolbar">
+              <button type="button" class="btn-row-action btn-access-select-all">Select all</button>
+              <button type="button" class="btn-row-action btn-access-clear-all">Clear all</button>
+              <span class="access-grid-bulk-status" aria-live="polite"></span>
+            </div>
+            <ul class="access-grid-list">
+              ${clients.map(c => `
+                <li class="access-grid-row">
+                  <label class="access-grid-label">
+                    <input type="checkbox" class="access-grid-check"
+                           data-client="${esc(c.id)}"
+                           ${preSelected.has(c.id) ? "checked" : ""} />
+                    <span>${esc(c.name)}</span>
+                  </label>
+                  <span class="access-grid-status" data-status-for="${esc(c.id)}"></span>
+                </li>
+              `).join("")}
+            </ul>
+          `;
+          body.querySelectorAll(".access-grid-check").forEach(cb => {
+            cb.addEventListener("change", () => onToggleInviteAccess(inviteId, cb));
+          });
+          body.querySelector(".btn-access-select-all")
+              ?.addEventListener("click", () => onBulkInviteAccess(inviteId, true));
+          body.querySelector(".btn-access-clear-all")
+              ?.addEventListener("click", () => onBulkInviteAccess(inviteId, false));
+        }
+        modal.classList.remove("hidden");
+      }
+
+      // Send the full client_ids array for the current modal state.
+      // Used by both single-toggle and bulk handlers in pending-invite
+      // mode. set_invite_client_access is whole-array, so there's no
+      // benefit to per-row RPCs (and one network call beats N).
+      async function saveInviteAccessFromModal(inviteId) {
+        const body = document.getElementById("access-modal-body");
+        const ids = [...body.querySelectorAll(".access-grid-check")]
+          .filter(cb => cb.checked)
+          .map(cb => cb.dataset.client);
+        await sb.sbFetch("/rest/v1/rpc/set_invite_client_access", {
+          method: "POST",
+          body:   JSON.stringify({
+            p_invite_id:  inviteId,
+            p_client_ids: ids,
+          }),
+        });
+        // Update local cache so the row badge updates without a refetch.
+        const inv = invites.find(x => x.id === inviteId);
+        if (inv) inv.pending_client_ids = ids;
+      }
+
+      async function onToggleInviteAccess(inviteId, cb) {
+        const clientId = cb.dataset.client;
+        const wantGrant = cb.checked;
+        const statusEl = document.querySelector(`[data-status-for="${CSS.escape(clientId)}"]`);
+        cb.disabled = true;
+        if (statusEl) statusEl.textContent = "Saving…";
+        try {
+          await saveInviteAccessFromModal(inviteId);
+          if (statusEl) {
+            statusEl.textContent = "Saved";
+            setTimeout(() => { if (statusEl.textContent === "Saved") statusEl.textContent = ""; }, 1500);
+          }
+          updateInviteRowAccessLabel(inviteId);
+        } catch (err) {
+          cb.checked = !wantGrant;
+          if (statusEl) statusEl.textContent = "";
+          alert(`Couldn't update pre-assigned access: ${err.message}`);
+        } finally {
+          cb.disabled = false;
+        }
+      }
+
+      async function onBulkInviteAccess(inviteId, grantAll) {
+        const body = document.getElementById("access-modal-body");
+        const statusEl = body.querySelector(".access-grid-bulk-status");
+        const checks   = [...body.querySelectorAll(".access-grid-check")];
+        if (!checks.length) return;
+
+        const toChange = checks.filter(cb => cb.checked !== grantAll);
+        if (!toChange.length) {
+          if (statusEl) {
+            statusEl.textContent = grantAll ? "Already pre-assigned to all." : "Already had no pre-assignment.";
+            setTimeout(() => { statusEl.textContent = ""; }, 1600);
+          }
+          return;
+        }
+
+        const verb = grantAll ? "Setting" : "Clearing";
+        if (statusEl) statusEl.textContent = `${verb} ${toChange.length} account${toChange.length === 1 ? "" : "s"}…`;
+
+        checks.forEach(cb => { cb.disabled = true; });
+        const btnSelect = body.querySelector(".btn-access-select-all");
+        const btnClear  = body.querySelector(".btn-access-clear-all");
+        if (btnSelect) btnSelect.disabled = true;
+        if (btnClear)  btnClear.disabled  = true;
+
+        // Apply the new state to checkboxes optimistically, then push
+        // the full array in one call. If the call fails we roll back.
+        const prevStates = checks.map(cb => cb.checked);
+        checks.forEach(cb => { cb.checked = grantAll; });
+
+        try {
+          await saveInviteAccessFromModal(inviteId);
+          if (statusEl) {
+            statusEl.textContent = grantAll ? "All accounts pre-assigned." : "Pre-assignment cleared.";
+            setTimeout(() => { statusEl.textContent = ""; }, 1600);
+          }
+          updateInviteRowAccessLabel(inviteId);
+        } catch (err) {
+          checks.forEach((cb, i) => { cb.checked = prevStates[i]; });
+          if (statusEl) statusEl.textContent = "";
+          alert(`Couldn't update pre-assigned access: ${err.message}`);
+        } finally {
+          checks.forEach(cb => { cb.disabled = false; });
+          if (btnSelect) btnSelect.disabled = false;
+          if (btnClear)  btnClear.disabled  = false;
+        }
+      }
+
+      // Repaint the "Manage access (N)" button label on a pending
+      // invite row without re-rendering the whole table.
+      function updateInviteRowAccessLabel(inviteId) {
+        const inv = invites.find(x => x.id === inviteId);
+        if (!inv) return;
+        const btn = document.querySelector(`.btn-manage-invite-access[data-invite="${CSS.escape(inviteId)}"]`);
+        if (!btn) return;
+        const n = Array.isArray(inv.pending_client_ids) ? inv.pending_client_ids.length : 0;
+        btn.textContent = n > 0 ? `Manage access (${n})` : `Manage access`;
       }
 
       // Bulk grant (grantAll=true) or bulk revoke (grantAll=false) every
@@ -1589,6 +1762,7 @@
         const modal = document.getElementById("access-modal");
         modal.classList.add("hidden");
         delete modal.dataset.op;
+        delete modal.dataset.invite;
       }
 
       async function onToggleAccess(operatorId, cb) {
