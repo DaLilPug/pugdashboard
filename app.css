@@ -5504,6 +5504,50 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 
 
 /* ==============================================================
+   API key reveal modal (Integrations tab on /account/)
+   --------------------------------------------------------------
+   One-shot display of a freshly generated key. Visual treatment
+   reuses .dz-modal-backdrop / .dz-modal; .ak-reveal-* classes
+   target the inner content layout (key row + copy button).
+   ============================================================== */
+.ak-reveal-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ak-reveal-name {
+  font-size: 14px;
+  color: #15212b;
+}
+.ak-reveal-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.ak-reveal-key {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid #cad5dd;
+  border-radius: 6px;
+  background: #f7fafc;
+  color: #0f2138;
+  letter-spacing: 0;
+}
+.ak-reveal-copy {
+  padding: 0 16px;
+  white-space: nowrap;
+}
+.ak-reveal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+
+/* ==============================================================
    Orphan empty-state on /dashboard/
    --------------------------------------------------------------
    Shown when the signed-in user has no organization_members row

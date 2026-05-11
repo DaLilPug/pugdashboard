@@ -64,6 +64,7 @@
     <button class="sub-tab"        data-tab="replyinst"     type="button">Reply Instructions</button>
     <button class="sub-tab"        data-tab="cadence"       type="button">Cadence</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
+    <button class="sub-tab"        data-tab="integrations"  type="button">Integrations</button>
   </div>
 
   <main class="main main-wide">
@@ -386,6 +387,52 @@
       </div>
     </section>
 
+    <!-- =================== INTEGRATIONS ==================== -->
+    <!-- Account-scoped credentials for third-party automation (Zapier,
+         Make.com, custom scripts). Phase 1 ships API keys; native HubSpot
+         + per-trigger field-mapping lands in Phase 2 in the same panel. -->
+    <section id="panel-integrations" class="sub-panel hidden">
+      <div class="cad-editor">
+        <div class="cad-head">
+          <h2>Integrations</h2>
+          <p class="page-sub">
+            Connect this account to Zapier, Make.com, or any tool that supports API keys.
+            Use the API key below as the credential when setting up your integration; everything
+            it accesses is scoped to this account only.
+          </p>
+        </div>
+
+        <section class="panel-card" id="api-keys-card">
+          <div class="panel-card-head">
+            <h3>API Keys</h3>
+            <button id="api-key-generate" class="cad-add" type="button">+ Generate new key</button>
+          </div>
+          <p class="section-blurb">
+            Generated keys are shown <strong>once</strong> at creation. Save the key in your
+            integration tool right away; we don't store the raw value and can't show it again.
+            Revoke and re-create if a key is lost.
+          </p>
+          <div class="table-wrap">
+            <table class="client-table" id="api-keys-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Prefix</th>
+                  <th>Created</th>
+                  <th>Last used</th>
+                  <th>Status</th>
+                  <th class="col-actions" aria-label="Row actions"></th>
+                </tr>
+              </thead>
+              <tbody id="api-keys-tbody">
+                <tr><td colspan="6" class="loading">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
   </main>
 
   <script src="/config.js"></script>
@@ -484,7 +531,7 @@
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, prospects: false, followups: false, templates: false, replyinst: false, cadence: false, "meeting-links": false };
+      const loaded = { summary: false, prospects: false, followups: false, templates: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false };
 
       tabs.addEventListener("click", (e) => {
         const btn = e.target.closest(".sub-tab");
@@ -511,6 +558,7 @@
           else if (name === "replyinst") initReplyInstructions();
           else if (name === "cadence")   initCadence();
           else if (name === "meeting-links") initMeetingLinks();
+          else if (name === "integrations")  initIntegrations();
           loaded[name] = true;
         }
         // Mirror the active tab into the URL hash so a hard reload
@@ -6530,6 +6578,150 @@
         load();
       }
 
+      // ================= INTEGRATIONS =================================
+      // Per-account API keys. Phase 1 of the integrations roadmap.
+      // Anyone with has_client_access to this account can view, create,
+      // and revoke keys. The bearer credential used by Zapier and any
+      // other tool that polls the /functions/v1/zapier-api edge function.
+
+      function initIntegrations() {
+        const tbody = document.getElementById("api-keys-tbody");
+        const generateBtn = document.getElementById("api-key-generate");
+
+        async function load() {
+          tbody.innerHTML = `<tr><td colspan="6" class="loading">Loading…</td></tr>`;
+          try {
+            const rows = await sb.sbFetch(
+              "/rest/v1/account_api_keys?select=id,name,key_prefix,created_at,last_used_at,revoked_at" +
+              `&client_id=eq.${encodeURIComponent(clientId)}` +
+              "&order=created_at.desc"
+            );
+            render(rows || []);
+          } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="6" class="loading">Couldn't load keys: ${esc(err.message)}</td></tr>`;
+          }
+        }
+
+        function render(rows) {
+          if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="loading">No API keys yet. Click "Generate new key" to make one.</td></tr>`;
+            return;
+          }
+          tbody.innerHTML = rows.map(r => {
+            const revoked = !!r.revoked_at;
+            const status  = revoked
+              ? `<span class="role-badge role-member">Revoked</span>`
+              : `<span class="role-badge role-admin">Active</span>`;
+            const lastUsed = r.last_used_at
+              ? new Date(r.last_used_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
+              : "never";
+            const created  = new Date(r.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+            const actions  = revoked
+              ? ""
+              : `<button type="button" class="btn-row-action btn-row-action-danger btn-revoke-api-key" data-key-id="${esc(r.id)}" data-key-name="${esc(r.name)}">Revoke</button>`;
+            return `
+              <tr ${revoked ? 'style="opacity:0.55"' : ""}>
+                <td>${esc(r.name)}</td>
+                <td><code>${esc(r.key_prefix)}...</code></td>
+                <td>${created}</td>
+                <td>${lastUsed}</td>
+                <td>${status}</td>
+                <td class="col-actions">${actions}</td>
+              </tr>
+            `;
+          }).join("");
+          tbody.querySelectorAll(".btn-revoke-api-key").forEach(btn => {
+            btn.addEventListener("click", () => onRevoke(btn.dataset.keyId, btn.dataset.keyName));
+          });
+        }
+
+        async function onGenerate() {
+          const name = prompt(
+            'Give this key a name so you can identify it later\n(e.g. "Zapier prod", "Make.com automation", "Internal script"):'
+          );
+          if (name === null) return;
+          const trimmed = (name || "").trim();
+          if (!trimmed) return;
+          generateBtn.disabled = true;
+          const prev = generateBtn.textContent;
+          generateBtn.textContent = "Generating…";
+          try {
+            const rawKey = await sb.sbFetch("/rest/v1/rpc/create_account_api_key", {
+              method: "POST",
+              body:   JSON.stringify({ p_client_id: clientId, p_name: trimmed }),
+            });
+            await load();
+            showKeyReveal(trimmed, rawKey);
+          } catch (err) {
+            alert(`Couldn't generate key: ${err.message || err}`);
+          } finally {
+            generateBtn.disabled = false;
+            generateBtn.textContent = prev;
+          }
+        }
+
+        async function onRevoke(keyId, keyName) {
+          if (!confirm(`Revoke API key "${keyName}"?\n\nAny integration using it will stop working immediately. This cannot be undone (generate a new key to replace).`)) return;
+          try {
+            await sb.sbFetch("/rest/v1/rpc/revoke_account_api_key", {
+              method: "POST",
+              body:   JSON.stringify({ p_id: keyId }),
+            });
+            await load();
+          } catch (err) {
+            alert(`Couldn't revoke key: ${err.message || err}`);
+          }
+        }
+
+        // Reveal modal: shown once, the raw key is never retrievable.
+        function showKeyReveal(name, rawKey) {
+          const backdrop = document.getElementById("api-key-reveal-backdrop");
+          const body     = document.getElementById("api-key-reveal-body");
+          body.innerHTML = `
+            <div class="ak-reveal-card">
+              <h3>API key generated</h3>
+              <p class="section-blurb">
+                Copy this key now. We don't store the raw value and can't show it again.
+                If you lose it, revoke it from the list and create a new one.
+              </p>
+              <div class="ak-reveal-name"><strong>${esc(name)}</strong></div>
+              <div class="ak-reveal-key-row">
+                <input type="text" class="ak-reveal-key" readonly value="${esc(rawKey)}" />
+                <button type="button" class="btn-primary ak-reveal-copy">Copy</button>
+              </div>
+              <div class="ak-reveal-actions">
+                <button type="button" class="btn-row-action ak-reveal-done">Done</button>
+              </div>
+            </div>
+          `;
+          backdrop.classList.add("open");
+          const input = body.querySelector(".ak-reveal-key");
+          input.focus();
+          input.select();
+          body.querySelector(".ak-reveal-copy").addEventListener("click", async (ev) => {
+            try {
+              await navigator.clipboard.writeText(rawKey);
+              ev.currentTarget.textContent = "Copied";
+              setTimeout(() => { ev.currentTarget.textContent = "Copy"; }, 1600);
+            } catch {
+              input.select();
+              document.execCommand("copy");
+            }
+          });
+          const close = () => {
+            backdrop.classList.remove("open");
+            body.innerHTML = "";
+          };
+          body.querySelector(".ak-reveal-done").addEventListener("click", close);
+          backdrop.addEventListener("click", function once(e) {
+            if (e.target === backdrop) { close(); backdrop.removeEventListener("click", once); }
+          });
+        }
+
+        generateBtn.addEventListener("click", onGenerate);
+        load();
+      }
+
       // ================= helpers ======================================
 
       function activatePill(root, v) {
@@ -6965,6 +7157,13 @@
        overlay the whole page; .open class on the backdrop reveals it. -->
   <div id="dz-modal-backdrop" class="dz-modal-backdrop" role="dialog" aria-modal="true">
     <div class="dz-modal" id="dz-modal-body"></div>
+  </div>
+
+  <!-- One-shot reveal modal for a newly generated API key. The raw
+       value is shown exactly once; user copies it and the modal
+       closes. Reuses the dz-modal-backdrop visual treatment. -->
+  <div id="api-key-reveal-backdrop" class="dz-modal-backdrop" role="dialog" aria-modal="true">
+    <div class="dz-modal" id="api-key-reveal-body"></div>
   </div>
 
   <script src="/mobile-nav.js" defer></script>
