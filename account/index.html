@@ -389,18 +389,42 @@
 
     <!-- =================== INTEGRATIONS ==================== -->
     <!-- Account-scoped credentials for third-party automation (Zapier,
-         Make.com, custom scripts). Phase 1 ships API keys; native HubSpot
-         + per-trigger field-mapping lands in Phase 2 in the same panel. -->
+         Make.com, n8n, custom scripts). Phase 1 ships API keys + a
+         direct Zapier connect link; native HubSpot + per-trigger
+         field-mapping lands in Phase 2 in the same panel. -->
     <section id="panel-integrations" class="sub-panel hidden">
       <div class="cad-editor">
         <div class="cad-head">
           <h2>Integrations</h2>
           <p class="page-sub">
-            Connect this account to Zapier, Make.com, or any tool that supports API keys.
-            Use the API key below as the credential when setting up your integration; everything
-            it accesses is scoped to this account only.
+            Generate an API key below and use it to connect this account to Zapier, Make.com, n8n,
+            or any tool that supports HTTP API key authentication. Each key is scoped to this account
+            only - other accounts in your organization are not exposed.
           </p>
         </div>
+
+        <section class="panel-card" id="zapier-connect-card">
+          <div class="panel-card-head">
+            <h3>Connect to Zapier</h3>
+          </div>
+          <p class="section-blurb">
+            Zapier is the fastest way to wire Uptown Tracker triggers into your other tools.
+            Push new meetings into HubSpot or Salesforce, ping Slack on positive responses,
+            log new connection requests into a Google Sheet, and more - all without code.
+          </p>
+          <ol class="integrations-howto">
+            <li>Generate an API key below (Step 2).</li>
+            <li>Click the Zapier button to open the Uptown Tracker integration.</li>
+            <li>Paste the API key when Zapier asks for credentials.</li>
+            <li>Build whatever zap you want.</li>
+          </ol>
+          <a id="zapier-connect-link"
+             href="https://zapier.com/developer/public-invite/241594/e38f1df0151df5fb802c44175832ff94/"
+             target="_blank" rel="noopener noreferrer"
+             class="btn-zapier-connect">
+            Open Uptown Tracker on Zapier <span aria-hidden="true">↗</span>
+          </a>
+        </section>
 
         <section class="panel-card" id="api-keys-card">
           <div class="panel-card-head">
@@ -409,7 +433,7 @@
           </div>
           <p class="section-blurb">
             Generated keys are shown <strong>once</strong> at creation. Save the key in your
-            integration tool right away; we don't store the raw value and can't show it again.
+            integration tool right away - we don't store the raw value and can't show it again.
             Revoke and re-create if a key is lost.
           </p>
           <div class="table-wrap">
