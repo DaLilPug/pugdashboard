@@ -7180,9 +7180,21 @@
 
         // --- Load + render ---
         async function load() {
+          // Explicit column list rather than select=* because
+          // public.integrations has column-level GRANTs that shield
+          // the OAuth token columns; select=* would 42501 against
+          // those ungranted columns before RLS even runs.
+          const COLS = [
+            "id","client_id","provider","purpose",
+            "scope_metadata",
+            "enabled_triggers","response_sentiment_filter",
+            "field_mapping","name_match_enabled",
+            "last_sync_ok_at","last_sync_error_at","last_sync_error",
+            "connected_by","created_at",
+          ].join(",");
           try {
             const rows = await sb.sbFetch(
-              "/rest/v1/integrations?select=*" +
+              `/rest/v1/integrations?select=${COLS}` +
               `&client_id=eq.${encodeURIComponent(clientId)}` +
               "&provider=eq.hubspot" +
               "&purpose=eq.outreach_sync" +
