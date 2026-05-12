@@ -623,6 +623,7 @@
             <li><a href="#dash-billing">Billing</a></li>
             <li><a href="#dash-enrichment-section">Enrichment</a></li>
             <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
+            <li><a href="#dash-hubspot-sync">Native HubSpot sync</a></li>
           </ol>
         </li>
         <li><a href="#extension">The Chrome Extension</a>
@@ -1920,6 +1921,159 @@
           even if the operator who created the key also has access to other
           accounts. If you want to wire up multiple accounts, generate one
           key per account and configure separate Zapier connections.
+        </p>
+      </div>
+
+      <h3 id="dash-hubspot-sync">6.14 - Per-account: Native HubSpot sync</h3>
+      <p>
+        On the same Integrations tab, a separate card lets you connect HubSpot
+        natively - no Zapier in the middle. Outreach events push out to HubSpot
+        in real time as contact upserts, with the fields you choose mapped onto
+        whichever HubSpot contact properties you choose.
+      </p>
+
+      <h4>Native HubSpot vs. the Zapier path - when to use which</h4>
+      <ul>
+        <li>
+          <strong>Use native</strong> if HubSpot is your CRM and you want
+          contacts to stay current with every outreach action. Setup takes about
+          two minutes and there's no third-party hop, so latency is on the order
+          of seconds not 15-minute polling windows.
+        </li>
+        <li>
+          <strong>Use Zapier</strong> if you need to route events somewhere
+          besides HubSpot (Salesforce, Slack, a Google Sheet, etc.) or chain
+          actions across multiple tools per event. Native HubSpot is one path;
+          Zapier is the swiss-army-knife alternative.
+        </li>
+        <li>You can use both at the same time on the same account - they're independent.</li>
+      </ul>
+
+      <h4>Connecting</h4>
+      <ol class="steps">
+        <li>
+          Open the account → <strong>Integrations</strong> tab. Find the
+          <strong>HubSpot (native sync)</strong> card.
+        </li>
+        <li>
+          Click <strong>Connect HubSpot</strong>. You'll be redirected to
+          HubSpot's consent screen.
+        </li>
+        <li>
+          Pick which HubSpot account to grant access to and approve the
+          requested scopes (read + write contacts, read contact properties).
+        </li>
+        <li>
+          HubSpot bounces you back to the Integrations tab with a "Connected"
+          status pill. Default triggers and a starter field mapping are
+          pre-filled - you can start syncing right away, or tune them first.
+        </li>
+      </ol>
+
+      <h4>Triggers - which events fire a sync</h4>
+      <p>
+        Four checkboxes control which outreach events push to HubSpot. All on
+        by default; uncheck whichever you don't want syncing:
+      </p>
+      <ul>
+        <li><strong>Connection request sent</strong> - a CR you sent.</li>
+        <li><strong>First message sent (CR accepted)</strong> - the first message after acceptance.</li>
+        <li>
+          <strong>Response received</strong> - a prospect replied. Has an
+          inline <em>sentiment filter</em> dropdown so you can fire only on
+          positive responses (or negative, or neutral) if you'd rather keep
+          HubSpot focused on engaged leads.
+        </li>
+        <li><strong>Meeting booked</strong> - a meeting was scheduled.</li>
+      </ul>
+      <p>
+        Each event upserts the same HubSpot contact (matched by email, then
+        name, else created). A prospect who progresses through all four stages
+        results in one contact updated four times, not four separate contacts.
+      </p>
+
+      <h4>Contact lookup</h4>
+      <p>
+        When a sync fires, we look up the matching HubSpot contact in this
+        order:
+      </p>
+      <ol>
+        <li>If we've synced this prospect before, we use the cached HubSpot contact id.</li>
+        <li>Otherwise, search by email (if the prospect has one).</li>
+        <li>Otherwise, search by first name + last name (if "Also match contacts by name" is on).</li>
+        <li>If no match is found, we create a new contact.</li>
+      </ol>
+      <p>
+        Turn the name-match toggle off if your HubSpot has many people with
+        identical names - the email-only path will create new contacts when
+        no email match is found, which is safer than risking false matches.
+      </p>
+
+      <h4>Field mapping</h4>
+      <p>
+        Each mapping row pairs one HubSpot contact property with one source. A
+        source is either an <strong>Uptown field</strong> (data from this
+        outreach event) or a <strong>static value</strong> (a constant string
+        you type once, like setting Lead Source to "LinkedIn").
+      </p>
+      <p>Default mappings populated on first connect:</p>
+      <ul>
+        <li>HubSpot <code>firstname</code> ← Prospect First Name</li>
+        <li>HubSpot <code>lastname</code> ← Prospect Last Name</li>
+        <li>HubSpot <code>email</code> ← Prospect Email</li>
+        <li>HubSpot <code>phone</code> ← Prospect Phone</li>
+        <li>HubSpot <code>hs_linkedin_url</code> ← LinkedIn Profile URL</li>
+        <li>HubSpot <code>company</code> ← Company</li>
+        <li>HubSpot <code>jobtitle</code> ← Job Title</li>
+      </ul>
+      <p>Available Uptown fields you can map (any of these to any HubSpot property):</p>
+      <ul>
+        <li><strong>Identity</strong>: Prospect Name (full), Prospect First Name, Prospect Last Name, Prospect Email, Prospect Phone, LinkedIn Profile URL, Sales Navigator URL, Company, Job Title.</li>
+        <li><strong>Event metadata</strong>: Last Outreach Type ("Connection request sent" / "Messaged (new connection)" / "Response received" / "Meeting booked"), Last Outreach Date, Uptown Account Name.</li>
+        <li><strong>Conversation context</strong>: Outbound Message Text, Response Text, Response Sentiment, Response Sentiment Detail.</li>
+      </ul>
+      <p>
+        <strong>Empty values do not overwrite existing data.</strong> If you
+        map "Response Text" to a HubSpot field, a Connection Request event
+        leaves the field alone (it has no response text), and a later Response
+        event populates it. The contact accumulates context as you progress
+        through the funnel.
+      </p>
+
+      <h4>Want a "synced from Uptown" list in HubSpot?</h4>
+      <p>
+        We don't add contacts to HubSpot Static Lists directly. Instead, build
+        a HubSpot <strong>Active List</strong> with a rule like
+        <em>"Lead Source equals LinkedIn"</em> (mapping a static value gets you
+        this) or <em>"Last Outreach Type equals Response received"</em>.
+        Active Lists rebuild membership automatically, so you don't have to
+        worry about lists going stale.
+      </p>
+
+      <h4>Status pill</h4>
+      <p>The pill at the top of the card tells you how syncing is going:</p>
+      <ul>
+        <li><strong>Connected</strong> - integration set up, no events synced yet.</li>
+        <li><strong>Active</strong> - last sync was successful. Hover for the timestamp.</li>
+        <li><strong>Last sync failed</strong> - the most recent sync errored. Hover for the error message. Common causes: a HubSpot property you mapped was deleted, or the OAuth grant was revoked on HubSpot's side.</li>
+      </ul>
+
+      <h4>Disconnecting</h4>
+      <p>
+        Click <strong>Disconnect</strong> at the bottom of the connected-state
+        card and confirm. We stop syncing immediately and clear our cache of
+        contact ids. Existing contacts in HubSpot are not deleted - we just
+        stop pushing updates. Reconnect any time to resume; if you reconnect to
+        a different HubSpot account, we'll resolve contacts fresh.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">One HubSpot per account</div>
+        <p>
+          Each Uptown Tracker account connects to one HubSpot portal at a time.
+          You can't have two parallel native-HubSpot integrations on the same
+          account, but you can have a different HubSpot connected per account
+          across your organization.
         </p>
       </div>
 

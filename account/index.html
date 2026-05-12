@@ -445,6 +445,86 @@
           </a>
         </section>
 
+        <section class="panel-card" id="hubspot-connect-card">
+          <div class="panel-card-head">
+            <h3>HubSpot (native sync)</h3>
+            <span id="hubspot-status-pill" class="hubspot-status-pill hidden"></span>
+          </div>
+          <p class="section-blurb">
+            Sync this account's outreach events directly into HubSpot as contact upserts. Faster and tighter than the
+            Zapier path - real-time on every event, no third-party hop. Pick which events trigger a sync and map Uptown
+            fields onto HubSpot contact properties.
+          </p>
+
+          <div id="hubspot-disconnected" class="hidden">
+            <button id="hubspot-connect-btn" type="button" class="btn-zapier-connect">
+              Connect HubSpot <span aria-hidden="true">↗</span>
+            </button>
+          </div>
+
+          <div id="hubspot-connected" class="hidden">
+            <div class="hubspot-portal-info">
+              Connected to <strong id="hubspot-portal-name">HubSpot</strong>
+            </div>
+            <div id="hubspot-feedback" class="hubspot-feedback"></div>
+
+            <div class="hubspot-subsection">
+              <h4>Triggers</h4>
+              <p class="section-blurb">Sync to HubSpot when any of these happen.</p>
+              <div class="hubspot-triggers">
+                <label class="hubspot-trigger-row">
+                  <input type="checkbox" data-trigger="connection" />
+                  <span>Connection request sent</span>
+                </label>
+                <label class="hubspot-trigger-row">
+                  <input type="checkbox" data-trigger="message" />
+                  <span>First message sent (CR accepted)</span>
+                </label>
+                <label class="hubspot-trigger-row">
+                  <input type="checkbox" data-trigger="response" />
+                  <span>Response received</span>
+                  <select id="hubspot-sentiment-filter" class="hubspot-sentiment-select">
+                    <option value="">All sentiments</option>
+                    <option value="positive">Positive only</option>
+                    <option value="negative">Negative only</option>
+                    <option value="neutral">Neutral only</option>
+                  </select>
+                </label>
+                <label class="hubspot-trigger-row">
+                  <input type="checkbox" data-trigger="meeting_booked" />
+                  <span>Meeting booked</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="hubspot-subsection">
+              <h4>Contact lookup</h4>
+              <label class="hubspot-trigger-row">
+                <input type="checkbox" id="hubspot-name-match" />
+                <span>Also match contacts by name when no email is available</span>
+              </label>
+              <p class="section-blurb hubspot-blurb-sub">
+                Turn off if you have a large HubSpot where many people share names - matches can be noisy.
+              </p>
+            </div>
+
+            <div class="hubspot-subsection">
+              <h4>Field mapping</h4>
+              <p class="section-blurb">
+                Map Uptown data onto HubSpot contact properties. Empty values do not overwrite existing data,
+                so earlier event data persists on the contact.
+              </p>
+              <div id="hubspot-mapping-rows" class="hubspot-mapping-rows"></div>
+              <button id="hubspot-add-mapping-btn" type="button" class="cad-add">+ Add mapping</button>
+            </div>
+
+            <div class="hubspot-actions">
+              <button id="hubspot-save-config-btn" type="button" class="btn-primary">Save changes</button>
+              <button id="hubspot-disconnect-btn" type="button" class="btn-row-action btn-row-action-danger">Disconnect</button>
+            </div>
+          </div>
+        </section>
+
         <section class="panel-card" id="api-keys-card">
           <div class="panel-card-head">
             <h3>API Keys</h3>
@@ -7008,6 +7088,415 @@
         }
 
         generateBtn.addEventListener("click", onGenerate);
+        load();
+        initHubspotIntegration();
+      }
+
+      // ================= NATIVE HUBSPOT (outreach-sync) ===============
+      // Phase 2 of the integrations roadmap. Per-account HubSpot OAuth
+      // connection that pushes outreach events out to HubSpot as
+      // contact upserts on every selected trigger. Edge functions:
+      //   hubspot-oauth-init      — opens the OAuth handshake
+      //   hubspot-oauth-callback  — completes it, seeds defaults
+      //   hubspot-admin           — list_properties / configure / disconnect
+      //   hubspot-sync            — fires on outreach insert (DB webhook)
+
+      // Uptown fields available as sources in the field-mapping editor.
+      // Keys here match the resolveUptownFields() output in
+      // pugextension/supabase/functions/hubspot-sync/index.ts — adding
+      // a field here without matching it in the sync function will
+      // silently no-op.
+      const HUBSPOT_UPTOWN_FIELDS = [
+        { key: "prospect_name",             label: "Prospect Name (full)" },
+        { key: "prospect_first_name",       label: "Prospect First Name" },
+        { key: "prospect_last_name",        label: "Prospect Last Name" },
+        { key: "prospect_email",            label: "Prospect Email" },
+        { key: "prospect_phone",            label: "Prospect Phone" },
+        { key: "profile_url",               label: "LinkedIn Profile URL" },
+        { key: "sales_nav_url",             label: "Sales Navigator URL" },
+        { key: "company",                   label: "Company" },
+        { key: "title",                     label: "Job Title" },
+        { key: "last_outreach_type",        label: "Last Outreach Type" },
+        { key: "last_outreach_date",        label: "Last Outreach Date" },
+        { key: "uptown_account_name",       label: "Uptown Account Name" },
+        { key: "outbound_message_text",     label: "Outbound Message Text" },
+        { key: "response_text",             label: "Response Text" },
+        { key: "response_sentiment",        label: "Response Sentiment" },
+        { key: "response_sentiment_detail", label: "Response Sentiment Detail" },
+      ];
+
+      function initHubspotIntegration() {
+        const card             = document.getElementById("hubspot-connect-card");
+        const disconnectedView = document.getElementById("hubspot-disconnected");
+        const connectedView    = document.getElementById("hubspot-connected");
+        const statusPill       = document.getElementById("hubspot-status-pill");
+        const feedbackEl       = document.getElementById("hubspot-feedback");
+        const portalNameEl     = document.getElementById("hubspot-portal-name");
+        const sentimentSelect  = document.getElementById("hubspot-sentiment-filter");
+        const nameMatchCb      = document.getElementById("hubspot-name-match");
+        const mappingContainer = document.getElementById("hubspot-mapping-rows");
+        const addMappingBtn    = document.getElementById("hubspot-add-mapping-btn");
+        const saveBtn          = document.getElementById("hubspot-save-config-btn");
+        const disconnectBtn    = document.getElementById("hubspot-disconnect-btn");
+        const connectBtn       = document.getElementById("hubspot-connect-btn");
+
+        let integration = null;
+        let hubspotProperties = []; // cached from hubspot-admin list_properties
+
+        // --- Toast helper (local, doesn't touch the meeting-links one) ---
+        let feedbackTimer = null;
+        function showFeedback(msg, kind = "ok") {
+          if (feedbackTimer) clearTimeout(feedbackTimer);
+          feedbackEl.textContent = msg;
+          feedbackEl.className   = `hubspot-feedback ${kind}`;
+          feedbackTimer = setTimeout(() => {
+            feedbackEl.textContent = "";
+            feedbackEl.className   = "hubspot-feedback";
+          }, 4000);
+        }
+
+        // --- OAuth callback handler ---
+        // hubspot-oauth-callback redirects with ?integration_purpose=outreach_sync
+        // so we can distinguish from meeting-link callbacks (which the
+        // meeting-links tab handles separately). Toast + strip params.
+        function handleCallbackParams() {
+          const params  = new URLSearchParams(location.search);
+          if (params.get("integration_purpose") !== "outreach_sync") return;
+          const status  = params.get("integration_status");
+          const reason  = params.get("integration_reason") || "";
+          if (status === "success") {
+            showFeedback("HubSpot connected.");
+          } else if (status) {
+            showFeedback(`Connection failed: ${reason || "unknown error"}`, "err");
+          }
+          ["integration_status","integration_provider","integration_purpose","integration_reason"]
+            .forEach(k => params.delete(k));
+          history.replaceState(
+            null, "",
+            location.pathname + (params.toString() ? "?" + params.toString() : "") + "#integrations",
+          );
+        }
+
+        // --- Load + render ---
+        async function load() {
+          try {
+            const rows = await sb.sbFetch(
+              "/rest/v1/integrations?select=*" +
+              `&client_id=eq.${encodeURIComponent(clientId)}` +
+              "&provider=eq.hubspot" +
+              "&purpose=eq.outreach_sync" +
+              "&limit=1"
+            );
+            integration = (rows && rows[0]) || null;
+            render();
+          } catch (err) {
+            console.warn("hubspot integration load failed:", err);
+            renderDisconnected();
+          }
+        }
+
+        function render() {
+          if (!integration) renderDisconnected();
+          else renderConnected();
+        }
+
+        function renderDisconnected() {
+          disconnectedView.classList.remove("hidden");
+          connectedView.classList.add("hidden");
+          statusPill.classList.add("hidden");
+        }
+
+        async function renderConnected() {
+          disconnectedView.classList.add("hidden");
+          connectedView.classList.remove("hidden");
+
+          // Portal name from OAuth response (e.g., "myorg.hubspot.com").
+          const portal = integration.scope_metadata?.hub_domain
+            || integration.scope_metadata?.portal_id
+            || "HubSpot";
+          portalNameEl.textContent = portal;
+
+          // Status pill: error wins, then ok, then "connected" if neither
+          // has fired yet (fresh connect, no sync events yet).
+          statusPill.classList.remove("hidden");
+          if (integration.last_sync_error) {
+            statusPill.textContent = "Last sync failed";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-err";
+            statusPill.title       = integration.last_sync_error;
+          } else if (integration.last_sync_ok_at) {
+            statusPill.textContent = "Active";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-ok";
+            statusPill.title       = `Last sync: ${new Date(integration.last_sync_ok_at).toLocaleString()}`;
+          } else {
+            statusPill.textContent = "Connected";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-neutral";
+            statusPill.title       = "No outreach events synced yet";
+          }
+
+          // Triggers
+          const enabled = new Set(integration.enabled_triggers || []);
+          connectedView.querySelectorAll("input[data-trigger]").forEach(cb => {
+            cb.checked = enabled.has(cb.dataset.trigger);
+          });
+
+          // Sentiment filter
+          sentimentSelect.value = integration.response_sentiment_filter || "";
+          updateSentimentDisabled();
+
+          // Name match toggle
+          nameMatchCb.checked = integration.name_match_enabled !== false;
+
+          // Load HubSpot properties once, then build mapping rows.
+          if (hubspotProperties.length === 0) {
+            try {
+              const result = await sb.sbFetch("/functions/v1/hubspot-admin", {
+                method: "POST",
+                body:   JSON.stringify({ action: "list_properties", integration_id: integration.id }),
+              });
+              hubspotProperties = (result?.items || []).sort((a,b) =>
+                (a.label || a.name).localeCompare(b.label || b.name)
+              );
+            } catch (err) {
+              showFeedback(`Couldn't load HubSpot properties: ${err.message || err}`, "err");
+            }
+          }
+          renderMappingRows();
+        }
+
+        // --- Sentiment dropdown enable/disable mirrors Response checkbox ---
+        function updateSentimentDisabled() {
+          const responseCb = connectedView.querySelector('input[data-trigger="response"]');
+          sentimentSelect.disabled = !responseCb?.checked;
+        }
+
+        // --- Field mapping rows ---
+        function renderMappingRows() {
+          mappingContainer.innerHTML = "";
+          const rows = integration.field_mapping || [];
+          if (rows.length === 0) {
+            mappingContainer.innerHTML =
+              `<p class="section-blurb hubspot-blurb-sub">No field mappings yet. Click "+ Add mapping" below to start.</p>`;
+            return;
+          }
+          rows.forEach((row, idx) => {
+            mappingContainer.appendChild(buildMappingRow(row, idx));
+          });
+        }
+
+        function buildMappingRow(row, idx) {
+          const wrap = document.createElement("div");
+          wrap.className = "hubspot-mapping-row";
+          wrap.dataset.idx = String(idx);
+
+          // HubSpot property dropdown
+          const propSelect = document.createElement("select");
+          propSelect.className = "hubspot-mapping-prop";
+          propSelect.dataset.kind = "hubspot_property";
+          let optsHtml = `<option value="">— pick HubSpot property —</option>`;
+          for (const p of hubspotProperties) {
+            const selected = p.name === row.hubspot_property ? " selected" : "";
+            optsHtml += `<option value="${esc(p.name)}"${selected}>${esc(p.label || p.name)}</option>`;
+          }
+          propSelect.innerHTML = optsHtml;
+          wrap.appendChild(propSelect);
+
+          // Source type dropdown
+          const srcSelect = document.createElement("select");
+          srcSelect.className = "hubspot-mapping-src";
+          srcSelect.dataset.kind = "source_type";
+          srcSelect.innerHTML = `
+            <option value="uptown_field"${row.source_type === "uptown_field" ? " selected" : ""}>From Uptown field</option>
+            <option value="static"${row.source_type === "static" ? " selected" : ""}>Static value</option>
+          `;
+          wrap.appendChild(srcSelect);
+
+          // Value input (varies by source type + property type)
+          const valueWrap = document.createElement("span");
+          valueWrap.className = "hubspot-mapping-val";
+          wrap.appendChild(valueWrap);
+          renderValueInput(valueWrap, row, propSelect.value);
+
+          // Remove button
+          const rmBtn = document.createElement("button");
+          rmBtn.type = "button";
+          rmBtn.className = "btn-row-action btn-row-action-danger";
+          rmBtn.textContent = "×";
+          rmBtn.title = "Remove this mapping";
+          rmBtn.addEventListener("click", () => {
+            integration.field_mapping.splice(idx, 1);
+            renderMappingRows();
+          });
+          wrap.appendChild(rmBtn);
+
+          // Re-render value input when property or source type changes
+          propSelect.addEventListener("change", () => {
+            integration.field_mapping[idx].hubspot_property = propSelect.value;
+            renderValueInput(valueWrap, integration.field_mapping[idx], propSelect.value);
+          });
+          srcSelect.addEventListener("change", () => {
+            integration.field_mapping[idx].source_type = srcSelect.value;
+            // Reset source_value when toggling between types — the prior
+            // value rarely makes sense for the new source type.
+            integration.field_mapping[idx].source_value = "";
+            renderValueInput(valueWrap, integration.field_mapping[idx], propSelect.value);
+          });
+
+          return wrap;
+        }
+
+        function renderValueInput(container, row, hubspotPropertyName) {
+          container.innerHTML = "";
+          const idx = Number(container.parentElement.dataset.idx);
+          const prop = hubspotProperties.find(p => p.name === hubspotPropertyName);
+
+          if (row.source_type === "uptown_field") {
+            const sel = document.createElement("select");
+            sel.innerHTML = `<option value="">— pick Uptown field —</option>` +
+              HUBSPOT_UPTOWN_FIELDS.map(f => {
+                const selected = f.key === row.source_value ? " selected" : "";
+                return `<option value="${esc(f.key)}"${selected}>${esc(f.label)}</option>`;
+              }).join("");
+            sel.addEventListener("change", () => {
+              integration.field_mapping[idx].source_value = sel.value;
+            });
+            container.appendChild(sel);
+            return;
+          }
+
+          // Static value. If the HubSpot property is enumeration with
+          // options, render a select. Otherwise free text.
+          if (prop && prop.options && prop.options.length > 0) {
+            const sel = document.createElement("select");
+            sel.innerHTML = `<option value="">— pick value —</option>` +
+              prop.options.map(o => {
+                const selected = o.value === row.source_value ? " selected" : "";
+                return `<option value="${esc(o.value)}"${selected}>${esc(o.label)}</option>`;
+              }).join("");
+            sel.addEventListener("change", () => {
+              integration.field_mapping[idx].source_value = sel.value;
+            });
+            container.appendChild(sel);
+          } else {
+            const inp = document.createElement("input");
+            inp.type = "text";
+            inp.placeholder = "Static value";
+            inp.value = row.source_value || "";
+            inp.addEventListener("input", () => {
+              integration.field_mapping[idx].source_value = inp.value;
+            });
+            container.appendChild(inp);
+          }
+        }
+
+        // --- Connect / Save / Disconnect ---
+        async function onConnect() {
+          connectBtn.disabled = true;
+          const prev = connectBtn.textContent;
+          connectBtn.textContent = "Opening HubSpot...";
+          try {
+            const result = await sb.sbFetch("/functions/v1/hubspot-oauth-init", {
+              method: "POST",
+              body:   JSON.stringify({ client_id: clientId }),
+            });
+            if (!result?.authorize_url) throw new Error("no_authorize_url");
+            // Full navigation, not a popup — matches the meeting-links
+            // flow and avoids cross-window callback gymnastics.
+            window.location.href = result.authorize_url;
+          } catch (err) {
+            alert(`Couldn't start HubSpot connection: ${err.message || err}`);
+            connectBtn.disabled = false;
+            connectBtn.textContent = prev;
+          }
+        }
+
+        async function onSave() {
+          // Collect current UI state, then PUT via hubspot-admin configure.
+          const enabledTriggers = [];
+          connectedView.querySelectorAll("input[data-trigger]").forEach(cb => {
+            if (cb.checked) enabledTriggers.push(cb.dataset.trigger);
+          });
+          const sentiment = sentimentSelect.value || null;
+          const nameMatch = !!nameMatchCb.checked;
+
+          // Field mapping is already kept up-to-date on the integration
+          // object as the operator edits — but filter out blank rows.
+          const fieldMapping = (integration.field_mapping || []).filter(r =>
+            r.hubspot_property && r.source_type && (r.source_value || r.source_type === "static")
+          );
+
+          saveBtn.disabled = true;
+          const prev = saveBtn.textContent;
+          saveBtn.textContent = "Saving...";
+          try {
+            await sb.sbFetch("/functions/v1/hubspot-admin", {
+              method: "POST",
+              body:   JSON.stringify({
+                action:                    "configure",
+                integration_id:            integration.id,
+                enabled_triggers:          enabledTriggers,
+                response_sentiment_filter: sentiment,
+                name_match_enabled:        nameMatch,
+                field_mapping:             fieldMapping,
+              }),
+            });
+            // Re-pull the row so we see the canonical server state.
+            await load();
+            showFeedback("Saved.");
+          } catch (err) {
+            showFeedback(`Couldn't save: ${err.message || err}`, "err");
+          } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = prev;
+          }
+        }
+
+        async function onDisconnect() {
+          const portal = integration.scope_metadata?.hub_domain || "HubSpot";
+          if (!confirm(
+            `Disconnect HubSpot (${portal})?\n\n` +
+            `New outreach events will stop syncing immediately. Existing contacts in HubSpot are not deleted - ` +
+            `we just stop pushing updates. You can reconnect any time.`
+          )) return;
+
+          disconnectBtn.disabled = true;
+          const prev = disconnectBtn.textContent;
+          disconnectBtn.textContent = "Disconnecting...";
+          try {
+            await sb.sbFetch("/functions/v1/hubspot-admin", {
+              method: "POST",
+              body:   JSON.stringify({ action: "disconnect", integration_id: integration.id }),
+            });
+            integration = null;
+            hubspotProperties = []; // force refetch on next connect
+            render();
+            showFeedback("Disconnected.");
+          } catch (err) {
+            showFeedback(`Couldn't disconnect: ${err.message || err}`, "err");
+            disconnectBtn.disabled = false;
+            disconnectBtn.textContent = prev;
+          }
+        }
+
+        function onAddMapping() {
+          if (!integration.field_mapping) integration.field_mapping = [];
+          integration.field_mapping.push({
+            hubspot_property: "",
+            source_type:      "uptown_field",
+            source_value:     "",
+          });
+          renderMappingRows();
+        }
+
+        // Wire events
+        connectBtn.addEventListener("click", onConnect);
+        saveBtn.addEventListener("click", onSave);
+        disconnectBtn.addEventListener("click", onDisconnect);
+        addMappingBtn.addEventListener("click", onAddMapping);
+        connectedView.addEventListener("change", (e) => {
+          if (e.target.matches('input[data-trigger="response"]')) updateSentimentDisabled();
+        });
+
+        handleCallbackParams();
         load();
       }
 

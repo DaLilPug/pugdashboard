@@ -5986,3 +5986,170 @@ body.header-drawer-open { overflow: hidden; }
   box-shadow: 0 0 0 3px rgba(1,58,82,.08);
 }
 
+
+/* ==============================================================
+   Native HubSpot integration card (Integrations tab)
+   --------------------------------------------------------------
+   Phase 2 of the integrations roadmap. Lives alongside the Zapier
+   card and API Keys card in #panel-integrations. Two visual
+   states: disconnected (short blurb + Connect button) and
+   connected (status pill, triggers, field mapping editor,
+   disconnect button).
+   ============================================================== */
+
+.hubspot-status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: default;
+}
+.hubspot-status-pill-ok      { background: #e8f5ee; color: #107a3e; border-color: #c8e8d4; }
+.hubspot-status-pill-err     { background: #fdecec; color: #c01111; border-color: #f3c8c8; }
+.hubspot-status-pill-neutral { background: var(--gray-100, #f1f3f5); color: var(--gray-600, #6e7a87); border-color: rgba(0,0,0,.06); }
+
+.hubspot-portal-info {
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  color: var(--gray-600, #6e7a87);
+  margin-bottom: 12px;
+}
+.hubspot-portal-info strong {
+  color: var(--navy, #013A52);
+  font-weight: 600;
+}
+
+.hubspot-feedback {
+  min-height: 18px;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  margin: 4px 0 12px 0;
+}
+.hubspot-feedback.ok  { color: #107a3e; }
+.hubspot-feedback.err { color: #c01111; }
+
+.hubspot-subsection {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(1, 58, 82, 0.06);
+}
+.hubspot-subsection h4 {
+  font-family: Montserrat, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--navy, #013A52);
+  margin: 0 0 6px 0;
+}
+.hubspot-blurb-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--gray-600, #6e7a87);
+}
+
+.hubspot-triggers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hubspot-trigger-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: Inter, sans-serif;
+  font-size: 14px;
+  color: var(--navy, #013A52);
+  cursor: pointer;
+}
+.hubspot-trigger-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--navy, #013A52);
+}
+.hubspot-sentiment-select {
+  margin-left: 12px;
+  padding: 3px 8px;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  color: var(--navy, #013A52);
+  border: 1px solid var(--gray-200, #e1e5e9);
+  border-radius: 6px;
+  background: #fff;
+}
+.hubspot-sentiment-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.hubspot-mapping-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 12px 0;
+}
+.hubspot-mapping-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, auto) minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.hubspot-mapping-row select,
+.hubspot-mapping-row input[type="text"] {
+  width: 100%;
+  padding: 6px 10px;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  color: var(--navy, #013A52);
+  border: 1px solid var(--gray-200, #e1e5e9);
+  border-radius: 6px;
+  background: #fff;
+}
+.hubspot-mapping-row select:focus,
+.hubspot-mapping-row input[type="text"]:focus {
+  outline: none;
+  border-color: var(--navy, #013A52);
+  box-shadow: 0 0 0 3px rgba(1,58,82,.08);
+}
+.hubspot-mapping-val {
+  display: block;
+}
+.hubspot-mapping-val select,
+.hubspot-mapping-val input[type="text"] {
+  width: 100%;
+}
+
+.hubspot-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(1, 58, 82, 0.06);
+}
+.hubspot-actions .btn-row-action-danger {
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .hubspot-mapping-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "prop  remove"
+      "src   src"
+      "val   val";
+  }
+  .hubspot-mapping-prop { grid-area: prop; }
+  .hubspot-mapping-src  { grid-area: src; }
+  .hubspot-mapping-val  { grid-area: val; }
+  .hubspot-mapping-row > .btn-row-action { grid-area: remove; }
+  .hubspot-sentiment-select { margin-left: 0; margin-top: 4px; }
+}
+
