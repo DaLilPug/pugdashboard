@@ -1033,6 +1033,21 @@
           case "auto_enrich.disabled":
             return `${actor} turned <strong>auto-enrich on acceptance</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
 
+          // Native HubSpot outreach-sync (Phase 2) + meeting-link
+          // connect / disconnect lifecycle. Payloads carry client_name.
+          case "integration.hubspot_connected": {
+            const verb = p.reconnect ? "reconnected" : "connected";
+            return `${actor} ${verb} <strong>HubSpot</strong> for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          }
+          case "integration.hubspot_disconnected":
+            return `${actor} disconnected <strong>HubSpot</strong> for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "integration.hubspot_config_changed":
+            return `${actor} updated <strong>HubSpot sync settings</strong> for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "integration.calendly_disconnected":
+            return `${actor} disconnected <strong>Calendly</strong> meeting link for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "integration.meeting_link_hubspot_disconnected":
+            return `${actor} disconnected <strong>HubSpot</strong> meeting link for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+
           default:
             return `${actor} performed <code>${esc(ev.action)}</code>`;
         }
