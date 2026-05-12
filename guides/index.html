@@ -1985,6 +1985,15 @@
           HubSpot focused on engaged leads.
         </li>
         <li><strong>Meeting booked</strong> - a meeting was scheduled.</li>
+        <li>
+          <strong>Email address changed</strong> - the prospect's email went
+          from missing to known (or got corrected to a different valid one).
+          Especially useful if you have Apollo enrichment turned on: an
+          accepted CR triggers enrichment, and once the email lands a few
+          seconds later, this trigger pushes the email to HubSpot without
+          waiting for the next outreach event. Fires on real changes only,
+          not on the "N/A" sentinel enrichment uses when it can't find one.
+        </li>
       </ul>
       <p>
         Each event upserts the same HubSpot contact (matched by email, then
