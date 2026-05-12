@@ -1017,6 +1017,22 @@
             return `${actor} split off ${tail} into a new prospect`;
           }
 
+          // Per-account toggle flips emitted by the clients_log_toggle_changes
+          // trigger (see add_client_toggle_audit.sql). payload carries
+          // client_name + previous_value + new_value.
+          case "cadence.enabled":
+            return `${actor} turned <strong>follow-up cadence</strong> ON for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "cadence.disabled":
+            return `${actor} turned <strong>follow-up cadence</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "positive_cadence.enabled":
+            return `${actor} turned <strong>positive cadence</strong> ON for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "positive_cadence.disabled":
+            return `${actor} turned <strong>positive cadence</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "auto_enrich.enabled":
+            return `${actor} turned <strong>auto-enrich on acceptance</strong> ON for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+          case "auto_enrich.disabled":
+            return `${actor} turned <strong>auto-enrich on acceptance</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+
           default:
             return `${actor} performed <code>${esc(ev.action)}</code>`;
         }
