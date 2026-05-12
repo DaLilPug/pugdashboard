@@ -5988,6 +5988,32 @@ body.header-drawer-open { overflow: hidden; }
 
 
 /* ==============================================================
+   Integrations tab two-column layout
+   --------------------------------------------------------------
+   Splits the Integrations sub-panel into a left box (Zapier +
+   API Keys, wrapped in a .cad-editor) and a right box (HubSpot
+   native sync card on its own). Stacks vertically below 1100px.
+   ============================================================== */
+.integrations-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.integrations-grid > .cad-editor {
+  margin-top: 0;
+}
+.integrations-grid > .panel-card {
+  margin-top: 0;
+}
+@media (max-width: 1100px) {
+  .integrations-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ==============================================================
    Native HubSpot integration card (Integrations tab)
    --------------------------------------------------------------
    Phase 2 of the integrations roadmap. Lives alongside the Zapier

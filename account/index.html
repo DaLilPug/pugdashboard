@@ -412,18 +412,18 @@
          direct Zapier connect link; native HubSpot + per-trigger
          field-mapping lands in Phase 2 in the same panel. -->
     <section id="panel-integrations" class="sub-panel hidden">
-      <div class="cad-editor">
-        <div class="cad-head">
-          <h2>Integrations</h2>
-          <p class="page-sub">
-            Connect this account's outreach data to outside tools. Pick the option below that fits:
-            a no-code Zapier workflow, per-account API keys for Make.com / n8n / custom scripts, or
-            the native HubSpot sync for real-time contact upserts. Every option is scoped to this
-            account only - other accounts in your organization are not exposed.
-          </p>
-        </div>
+      <div class="integrations-grid">
+        <div class="cad-editor">
+          <div class="cad-head">
+            <h2>Zapier Integration and API Keys</h2>
+            <p class="page-sub">
+              Generate API keys to use this account from Zapier, Make.com, n8n, or any tool that
+              supports HTTP API key authentication. Keys are scoped to this account only - other
+              accounts in your organization are not exposed.
+            </p>
+          </div>
 
-        <section class="panel-card" id="zapier-connect-card">
+          <section class="panel-card" id="zapier-connect-card">
           <div class="panel-card-head">
             <h3>Connect to Zapier</h3>
           </div>
@@ -474,6 +474,7 @@
             </table>
           </div>
         </section>
+        </div>
 
         <section class="panel-card" id="hubspot-connect-card">
           <div class="panel-card-head">
