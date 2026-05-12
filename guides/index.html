@@ -622,6 +622,7 @@
             <li><a href="#dash-team">Team page</a></li>
             <li><a href="#dash-billing">Billing</a></li>
             <li><a href="#dash-enrichment-section">Enrichment</a></li>
+            <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
           </ol>
         </li>
         <li><a href="#extension">The Chrome Extension</a>
@@ -1784,6 +1785,143 @@
         the timeline expansion — there's just no enrichment-driven Phone
         column on the table.
       </p>
+
+      <h3 id="dash-integrations">6.13 - Per-account: Integrations (API keys + Zapier)</h3>
+      <p>
+        Per-account credentials for plugging Uptown Tracker into outside tools.
+        Anyone with access to the account (admins always; members only when
+        you've granted them access) can generate, use, and revoke keys for it.
+        Each key is scoped to one account - it can read that account's outreach
+        data and nothing else.
+      </p>
+
+      <h4>What you can do with a key</h4>
+      <p>
+        The API key is a generic HTTP credential. Any tool that accepts an
+        <code>Authorization: Bearer ...</code> header can hit Uptown Tracker's
+        endpoints. The first-class supported path is <strong>Zapier</strong>,
+        but the same key works with Make.com, n8n, Pipedream, or a custom
+        script you write yourself.
+      </p>
+
+      <h4>Connecting to Zapier</h4>
+      <ol class="steps">
+        <li>
+          Open the account you want to connect (top-level dashboard → click
+          the account name) and click the <strong>Integrations</strong> tab.
+        </li>
+        <li>
+          Click <strong>+ Generate new key</strong>. Give it a memorable name
+          (e.g. "Zapier prod" or "Make.com automation"). You'll see the full
+          key exactly once - copy it to your clipboard right then.
+        </li>
+        <li>
+          Click <strong>Open Uptown Tracker on Zapier</strong> in the same
+          tab. That opens the integration in Zapier and walks you through
+          adding it to your Zapier account.
+        </li>
+        <li>
+          When Zapier asks for credentials, paste the API key you just
+          generated. Click test - Zapier verifies the key resolves to your
+          account and shows the account name as the connection label.
+        </li>
+        <li>Build your zap. Pick from the trigger list below.</li>
+      </ol>
+
+      <h4>Available triggers</h4>
+      <p>
+        Every trigger polls every 15 minutes (Zapier's free-tier cadence;
+        paid Zapier tiers poll faster). Each fires once per new event
+        matching the trigger type:
+      </p>
+      <ul>
+        <li>
+          <strong>New Meeting Booked</strong> - a prospect booked a meeting.
+          Includes the prior response that led to the booking (text + sentiment)
+          and the message you sent that prompted that response, so the zap
+          knows the conversational context.
+        </li>
+        <li>
+          <strong>New Connection Request Sent</strong> - you sent a CR.
+          Includes the CR's custom note text if any.
+        </li>
+        <li>
+          <strong>New Connection Accepted</strong> - a CR was accepted and
+          you sent the first message. Includes the message body.
+        </li>
+        <li>
+          <strong>New Response</strong> - a prospect replied. Includes the
+          response text, AI-classified sentiment (positive / negative /
+          neutral) plus an optional nuance tag (wants_meeting, not_right_time,
+          etc.), and the outbound message they replied to. Has an optional
+          sentiment filter so you can build a zap that only fires on
+          positive replies.
+        </li>
+        <li>
+          <strong>New InMail Sent</strong> - you sent an InMail.
+        </li>
+        <li>
+          <strong>New Retargeting Message Sent</strong> - you sent a
+          retargeting message.
+        </li>
+      </ul>
+
+      <h4>What each event includes</h4>
+      <p>
+        Every trigger returns the same field shape so zaps stay consistent
+        across triggers. Fields that don't apply to a given event come back
+        as <code>null</code>.
+      </p>
+      <ul>
+        <li><strong>id</strong>, <strong>occurred_at</strong>, <strong>account_name</strong> - always populated.</li>
+        <li><strong>prospect_name</strong>, <strong>prospect_email</strong>, <strong>prospect_phone</strong>, <strong>company</strong>, <strong>title</strong>, <strong>profile_url</strong>, <strong>sales_nav_url</strong> - the prospect's identity.</li>
+        <li><strong>outbound_message_text</strong> - the message you sent for this event (CR note, first message, InMail body, etc.) or the message that prompted the reply, on response triggers.</li>
+        <li><strong>response_text</strong>, <strong>sentiment</strong>, <strong>sentiment_detail</strong> - populated on response triggers (and on meeting-booked rows that have a known prior response).</li>
+      </ul>
+
+      <h4>Common zap recipes</h4>
+      <ul>
+        <li>
+          <strong>Push new meetings into HubSpot / Salesforce.</strong>
+          Trigger: New Meeting Booked. Action: HubSpot → Create or Update
+          Contact (map <code>prospect_name</code>, <code>prospect_email</code>,
+          <code>company</code>, <code>title</code> to HubSpot fields, set
+          a lifecycle stage). Add a second action: Create Engagement / Note
+          with the response text + sentiment so the rep has context when they
+          open the contact.
+        </li>
+        <li>
+          <strong>Slack alert on positive responses.</strong>
+          Trigger: New Response with sentiment = positive. Action: Slack
+          → Send Channel Message: "Hot reply from <code>prospect_name</code>
+          at <code>company</code>: \"<code>response_text</code>\""
+        </li>
+        <li>
+          <strong>Log CRs into a Google Sheet.</strong>
+          Trigger: New Connection Request Sent. Action: Google Sheets →
+          Create Row. Useful for clients who track outbound volume outside
+          Uptown Tracker.
+        </li>
+      </ul>
+
+      <h4>Revoking a key</h4>
+      <p>
+        On the Integrations tab, click <strong>Revoke</strong> next to any
+        key. The key stops working immediately for every integration using
+        it. The row stays in the list as a revoked entry for audit purposes.
+        Generate a new key and update your integration if you need to rotate.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">One key = one account</div>
+        <p>
+          Each API key is scoped to a single Uptown Tracker account. A key
+          generated for John Kratz's account can only read John Kratz's data,
+          even if the operator who created the key also has access to other
+          accounts. If you want to wire up multiple accounts, generate one
+          key per account and configure separate Zapier connections.
+        </p>
+      </div>
 
       <!-- ============================================================== -->
       <h2 id="extension"><span class="num">7.</span>The Chrome Extension</h2>
