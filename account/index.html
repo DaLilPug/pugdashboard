@@ -119,6 +119,25 @@
         </div>
       </section>
 
+      <!-- Daily Activity: same metric rows as Period Comparison but with
+           one column per day of the visible week. Reuses the dailyBuckets
+           data already fetched by initSummary's "all" timeframe, so no
+           extra RPC calls. Prev/Next/Today navigate weeks. -->
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Daily Activity</h2>
+          <div class="daily-nav">
+            <button class="daily-nav-btn" data-daily-nav="prev" type="button" aria-label="Previous week">&lt;</button>
+            <span class="daily-nav-label" id="daily-week-label">—</span>
+            <button class="daily-nav-btn" data-daily-nav="next" type="button" aria-label="Next week">&gt;</button>
+            <button class="daily-nav-today" data-daily-nav="today" type="button">Today</button>
+          </div>
+        </div>
+        <div id="sum-daily" class="period-wrap">
+          <div class="loading">Loading…</div>
+        </div>
+      </section>
+
       <!-- Danger zone: only rendered for archived accounts AND only
            when the signed-in operator is admin of this account's
            org (or platform admin). Reveal logic + click handlers
@@ -614,6 +633,12 @@
         const canvas    = document.getElementById("sum-chart");
         const trendsEl  = document.getElementById("sum-trends");
         const compareEl = document.getElementById("sum-compare");
+        const dailyEl   = document.getElementById("sum-daily");
+
+        // Daily Activity state. weekStart is a YYYY-MM-DD string for
+        // the Sunday of the visible week (in America/Chicago, matching
+        // how the daily buckets are bucketed server-side).
+        let dailyWeekStart = chicagoCurrentWeekStart();
 
         const LAST_TF = `account_${clientId}_tf`;
         let tf = localStorage.getItem(LAST_TF) || "all";
@@ -677,7 +702,22 @@
           renderScoped();
           renderTrendsByPeriodCached(trendsEl, summaryByTf);
           renderPeriodComparisonCached(compareEl, summaryByTf);
+          renderDailyActivityCached(dailyEl, summaryByTf, dailyWeekStart);
         }
+
+        // Wire prev / next / today navigation. Buttons live in the
+        // static HTML; we attach once here (initSummary itself only
+        // runs once per page load via the tab-loaded guard).
+        document.querySelectorAll("[data-daily-nav]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            if (!summaryByTf) return;
+            const action = btn.dataset.dailyNav;
+            if (action === "prev")  dailyWeekStart = addDaysStr(dailyWeekStart, -7);
+            if (action === "next")  dailyWeekStart = addDaysStr(dailyWeekStart, 7);
+            if (action === "today") dailyWeekStart = chicagoCurrentWeekStart();
+            renderDailyActivityCached(dailyEl, summaryByTf, dailyWeekStart);
+          });
+        });
 
         // Fetch one timeframe via the client_summary_for_period RPC.
         // Returns { metrics, dailyBuckets } in the shape the renderers
@@ -4727,6 +4767,231 @@
                 ${byPeriod.map(p =>
                   `<th class="${p.tf === 'all' ? 'period-all' : ''}">${esc(p.label)}</th>`
                 ).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${rowDefs.map(buildRow).join("")}
+            </tbody>
+          </table>
+        `;
+      }
+
+      // ================= DAILY ACTIVITY ===============================
+      // Mirrors Period Comparison's row structure (same 9 funnel rows +
+      // 4 additional-outreach rows) but with one column per day of the
+      // visible week + a Week total. Reuses the dailyBuckets array from
+      // the 'all' timeframe entry that initSummary already loads, so
+      // there are zero extra RPC calls. Prev / Next / Today navigate
+      // weeks; the function re-renders from cached data on each click.
+
+      function chicagoDateParts() {
+        const f = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/Chicago",
+          year:    "numeric",
+          month:   "2-digit",
+          day:     "2-digit",
+          weekday: "short",
+        });
+        const parts = Object.fromEntries(
+          f.formatToParts(new Date()).map(p => [p.type, p.value])
+        );
+        return {
+          yyyy: parts.year,
+          mm:   parts.month,
+          dd:   parts.day,
+          dow:  parts.weekday,  // Sun, Mon, Tue, ...
+        };
+      }
+
+      function chicagoTodayStr() {
+        const { yyyy, mm, dd } = chicagoDateParts();
+        return `${yyyy}-${mm}-${dd}`;
+      }
+
+      // YYYY-MM-DD arithmetic. We use UTC midnight as the parsing base
+      // to avoid local-timezone drift; the result is still a date-only
+      // string so day-of-week math lines up with the buckets.
+      // DOW name array is inlined inside helpers (not declared as a
+      // module-level const) so initSummary's first synchronous call
+      // to chicagoCurrentWeekStart() at the top of the page-load
+      // doesn't hit a temporal-dead-zone error - function decls are
+      // hoisted, consts aren't.
+      function addDaysStr(yyyymmdd, n) {
+        const [y, m, d] = yyyymmdd.split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        dt.setUTCDate(dt.getUTCDate() + n);
+        return dt.toISOString().slice(0, 10);
+      }
+
+      function chicagoCurrentWeekStart() {
+        const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const idx = DOW.indexOf(chicagoDateParts().dow);
+        return addDaysStr(chicagoTodayStr(), -idx);
+      }
+
+      function fmtDayHeader(yyyymmdd) {
+        const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        const [y, m, d] = yyyymmdd.split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        return `${DOW[dt.getUTCDay()]} ${dt.getUTCMonth() + 1}/${dt.getUTCDate()}`;
+      }
+
+      function fmtWeekLabel(startStr) {
+        const endStr = addDaysStr(startStr, 6);
+        const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const [sy, sm, sd] = startStr.split("-").map(Number);
+        const [ey, em, ed] = endStr.split("-").map(Number);
+        if (sm === em && sy === ey) {
+          return `${MONTHS[sm - 1]} ${sd} - ${ed}, ${sy}`;
+        }
+        if (sy === ey) {
+          return `${MONTHS[sm - 1]} ${sd} - ${MONTHS[em - 1]} ${ed}, ${sy}`;
+        }
+        return `${MONTHS[sm - 1]} ${sd}, ${sy} - ${MONTHS[em - 1]} ${ed}, ${ey}`;
+      }
+
+      function renderDailyActivityCached(root, summaryByTf, weekStart) {
+        // The 'all' timeframe contains every day of activity for the
+        // account, which is what we slice from. If somehow missing,
+        // fall back to whatever timeframe has buckets.
+        const allEntry = summaryByTf?.all
+          || Object.values(summaryByTf || {}).find(e => e?.dailyBuckets?.length);
+        const buckets = allEntry?.dailyBuckets || [];
+
+        // Update header label + prev/next button enablement.
+        const labelEl = document.getElementById("daily-week-label");
+        if (labelEl) labelEl.textContent = fmtWeekLabel(weekStart);
+        const today = chicagoTodayStr();
+        const nextBtn = document.querySelector('[data-daily-nav="next"]');
+        if (nextBtn) {
+          const nextWeekStart = addDaysStr(weekStart, 7);
+          nextBtn.disabled = nextWeekStart > today;
+        }
+
+        // Build the 7 day cells. Index by date string so we don't do
+        // a linear scan inside the loop.
+        const bucketByDay = new Map();
+        for (const b of buckets) bucketByDay.set(b.day, b);
+
+        const dayCells = [];
+        for (let i = 0; i < 7; i++) {
+          const dayStr = addDaysStr(weekStart, i);
+          const b = bucketByDay.get(dayStr) || {};
+          dayCells.push({
+            dayStr,
+            isFuture: dayStr > today,
+            isToday:  dayStr === today,
+            conn:   Number(b.connection)   || 0,
+            msg:    Number(b.message)      || 0,
+            resp:   Number(b.response)     || 0,
+            pos:    Number(b.positive)     || 0,
+            meet:   Number(b.meeting)      || 0,
+            regFu:  Number(b.reg_followup) || 0,
+            posFu:  Number(b.pos_followup) || 0,
+            inmail: Number(b.inmail)       || 0,
+            retgt:  Number(b.retargeting)  || 0,
+          });
+        }
+
+        // Week totals across all 7 days. Future days contribute 0,
+        // which is correct - they haven't happened yet.
+        const total = dayCells.reduce((a, c) => ({
+          conn:   a.conn   + c.conn,
+          msg:    a.msg    + c.msg,
+          resp:   a.resp   + c.resp,
+          pos:    a.pos    + c.pos,
+          meet:   a.meet   + c.meet,
+          regFu:  a.regFu  + c.regFu,
+          posFu:  a.posFu  + c.posFu,
+          inmail: a.inmail + c.inmail,
+          retgt:  a.retgt  + c.retgt,
+        }), { conn:0, msg:0, resp:0, pos:0, meet:0, regFu:0, posFu:0, inmail:0, retgt:0 });
+
+        // For rate cells, future days return null (rendered as '—') so
+        // we don't display misleading 0% for days that haven't happened.
+        function cellVal(c, key) {
+          if (c.isFuture && (
+            key === "accRate" || key === "respRate" ||
+            key === "posRespRate" || key === "posBookRate"
+          )) return null;
+          if (key === "accRate")     return rate(c.msg, c.conn);
+          if (key === "respRate")    return rate(c.resp, c.msg);
+          if (key === "posRespRate") return rate(c.pos, c.resp);
+          if (key === "posBookRate") return rate(c.meet, c.pos);
+          return c[key];
+        }
+        function weekVal(key) {
+          if (key === "accRate")     return rate(total.msg,  total.conn);
+          if (key === "respRate")    return rate(total.resp, total.msg);
+          if (key === "posRespRate") return rate(total.pos,  total.resp);
+          if (key === "posBookRate") return rate(total.meet, total.pos);
+          return total[key];
+        }
+
+        const rowDefs = [
+          { label: "Connections Sent",    key: "conn",        isRate: false },
+          { label: "Messages Sent",       key: "msg",         isRate: false },
+          { label: "Acceptance Rate",     key: "accRate",     isRate: true  },
+          { label: "Responses",           key: "resp",        isRate: false },
+          { label: "Response Rate",       key: "respRate",    isRate: true  },
+          { label: "Positives",           key: "pos",         isRate: false },
+          { label: "Pos. Response Rate",  key: "posRespRate", isRate: true  },
+          { label: "Meetings Booked",     key: "meet",        isRate: false },
+          { label: "Pos. Booking Rate",   key: "posBookRate", isRate: true  },
+          { sectionHeader: "Additional Outreach" },
+          { label: "Regular Follow Ups",  key: "regFu",       isRate: false },
+          { label: "Positive Follow Ups", key: "posFu",       isRate: false },
+          { label: "InMails",             key: "inmail",      isRate: false },
+          { label: "Retargeting",         key: "retgt",       isRate: false },
+        ];
+
+        const buildRow = (def) => {
+          if (def.sectionHeader) {
+            const cols = dayCells.length + 2; // label col + 7 day cols + week col
+            return `<tr class="period-section-row"><th colspan="${cols}">${esc(def.sectionHeader)}</th></tr>`;
+          }
+          const { label, key, isRate } = def;
+          const dayCellsHtml = dayCells.map(c => {
+            const v = cellVal(c, key);
+            const display = (v == null)
+              ? "&mdash;"
+              : (isRate ? fmtPct(v) : fmtInt(v));
+            const cls = [
+              c.isFuture ? "daily-future" : "",
+              c.isToday  ? "daily-today-col" : "",
+              isRate && !c.isFuture ? rateClass(v) : "",
+            ].filter(Boolean).join(" ");
+            return `<td class="${cls}"><div class="period-cell"><span class="period-cell-val">${display}</span></div></td>`;
+          }).join("");
+
+          const wv = weekVal(key);
+          const wDisplay = isRate ? fmtPct(wv) : fmtInt(wv);
+          const wCls = ["period-all", isRate ? rateClass(wv) : ""].filter(Boolean).join(" ");
+
+          const shortLabel = label
+            .replace(/\bRate\b/g, "%")
+            .replace(/Follow Ups/g, "FU's")
+            .replace(/ Sent\b/g, "")
+            .replace(/ Booked\b/g, "");
+          const trCls = isRate ? "period-rate-row" : "";
+
+          return `<tr class="${trCls}">
+            <th><span class="period-label-full">${esc(label)}</span><span class="period-label-short">${esc(shortLabel)}</span></th>
+            ${dayCellsHtml}
+            <td class="${wCls}"><div class="period-cell"><span class="period-cell-val">${wDisplay}</span></div></td>
+          </tr>`;
+        };
+
+        root.innerHTML = `
+          <table class="period-table">
+            <thead>
+              <tr>
+                <th></th>
+                ${dayCells.map(c => {
+                  const cls = c.isToday ? "daily-today-col" : "";
+                  return `<th class="${cls}">${esc(fmtDayHeader(c.dayStr))}</th>`;
+                }).join("")}
+                <th class="period-all">Week</th>
               </tr>
             </thead>
             <tbody>

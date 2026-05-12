@@ -2390,6 +2390,64 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .period-wrap {
   overflow-x: auto;
 }
+
+/* Daily Activity navigator (prev / week label / next / Today).
+   Same metric rows as Period Comparison but one column per day of
+   the visible week. Cells with .daily-future show '—' in muted
+   color; .daily-today-col highlights today's column subtly. */
+.daily-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.daily-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cad5dd;
+  background: #ffffff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #0f2138;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+.daily-nav-btn:hover:not(:disabled) {
+  background: #f7fafc;
+}
+.daily-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.daily-nav-label {
+  min-width: 170px;
+  text-align: center;
+  font-weight: 600;
+  color: #0f2138;
+}
+.daily-nav-today {
+  margin-left: 4px;
+  padding: 4px 10px;
+  border: 1px solid #cad5dd;
+  background: #ffffff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #0f2138;
+}
+.daily-nav-today:hover {
+  background: #f7fafc;
+}
+.daily-future {
+  color: #cad5dd;
+}
+.daily-today-col {
+  background: rgba(15, 33, 56, 0.04);
+}
 .period-table {
   width: 100%;
   border-collapse: collapse;
