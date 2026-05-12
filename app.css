@@ -6002,6 +6002,10 @@ body.header-drawer-open { overflow: hidden; }
 }
 .integrations-grid > .cad-editor {
   margin-top: 0;
+  /* Override the global .cad-editor max-width: 720px so the left
+     box fills its grid column instead of leaving a gap to the
+     right. Mirrors the .cad-grid > .cad-editor override pattern. */
+  max-width: none;
 }
 .integrations-grid > .panel-card {
   margin-top: 0;
