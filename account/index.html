@@ -416,9 +416,10 @@
         <div class="cad-head">
           <h2>Integrations</h2>
           <p class="page-sub">
-            Generate an API key below and use it to connect this account to Zapier, Make.com, n8n,
-            or any tool that supports HTTP API key authentication. Each key is scoped to this account
-            only - other accounts in your organization are not exposed.
+            Connect this account's outreach data to outside tools. Pick the option below that fits:
+            a no-code Zapier workflow, per-account API keys for Make.com / n8n / custom scripts, or
+            the native HubSpot sync for real-time contact upserts. Every option is scoped to this
+            account only - other accounts in your organization are not exposed.
           </p>
         </div>
 
@@ -443,6 +444,35 @@
              class="btn-zapier-connect">
             Open Uptown Tracker on Zapier <span aria-hidden="true">↗</span>
           </a>
+        </section>
+
+        <section class="panel-card" id="api-keys-card">
+          <div class="panel-card-head">
+            <h3>API Keys</h3>
+            <button id="api-key-generate" class="cad-add" type="button">+ Generate new key</button>
+          </div>
+          <p class="section-blurb">
+            Generated keys are shown <strong>once</strong> at creation. Save the key in your
+            integration tool right away - we don't store the raw value and can't show it again.
+            Revoke and re-create if a key is lost.
+          </p>
+          <div class="table-wrap">
+            <table class="client-table" id="api-keys-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Prefix</th>
+                  <th>Created</th>
+                  <th>Last used</th>
+                  <th>Status</th>
+                  <th class="col-actions" aria-label="Row actions"></th>
+                </tr>
+              </thead>
+              <tbody id="api-keys-tbody">
+                <tr><td colspan="6" class="loading">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section class="panel-card" id="hubspot-connect-card">
@@ -522,35 +552,6 @@
               <button id="hubspot-save-config-btn" type="button" class="btn-primary">Save changes</button>
               <button id="hubspot-disconnect-btn" type="button" class="btn-row-action btn-row-action-danger">Disconnect</button>
             </div>
-          </div>
-        </section>
-
-        <section class="panel-card" id="api-keys-card">
-          <div class="panel-card-head">
-            <h3>API Keys</h3>
-            <button id="api-key-generate" class="cad-add" type="button">+ Generate new key</button>
-          </div>
-          <p class="section-blurb">
-            Generated keys are shown <strong>once</strong> at creation. Save the key in your
-            integration tool right away - we don't store the raw value and can't show it again.
-            Revoke and re-create if a key is lost.
-          </p>
-          <div class="table-wrap">
-            <table class="client-table" id="api-keys-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Prefix</th>
-                  <th>Created</th>
-                  <th>Last used</th>
-                  <th>Status</th>
-                  <th class="col-actions" aria-label="Row actions"></th>
-                </tr>
-              </thead>
-              <tbody id="api-keys-tbody">
-                <tr><td colspan="6" class="loading">Loading…</td></tr>
-              </tbody>
-            </table>
           </div>
         </section>
       </div>
