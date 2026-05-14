@@ -1924,6 +1924,209 @@
         </p>
       </div>
 
+      <h4 id="dash-api-endpoints">Endpoint reference</h4>
+      <p>
+        Developer reference for the endpoints behind the triggers above.
+        Useful if you're building a custom integration against the same
+        Application Programming Interface (API).
+      </p>
+
+      <p><strong>Base URL</strong></p>
+      <p>
+        <code>https://api.uptown.com/functions/v1/zapier-api</code>
+      </p>
+      <p>
+        Also reachable at
+        <code>https://svikzdeqovrtrxsqmnbv.supabase.co/functions/v1/zapier-api</code>.
+        Both routes are equivalent and stable.
+      </p>
+
+      <p><strong>Authentication</strong></p>
+      <p>
+        Every request requires a per-account API key in the
+        <code>Authorization</code> header:
+      </p>
+      <p style="padding-left: 22px;">
+        <code>Authorization: Bearer up_&lt;raw key&gt;</code>
+      </p>
+      <p>
+        Generate keys on the Integrations tab of any account (see
+        <a href="#dash-integrations">Connecting to Zapier</a> above).
+        Revoked or invalid keys return <code>401</code>.
+      </p>
+
+      <p><strong>Endpoints</strong></p>
+      <table style="width:100%; border-collapse:collapse; margin: 8px 0 20px; font-size:13.5px;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--gray-200);">
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500);">Method &amp; Path</th>
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500);">Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:10px; vertical-align:top;"><code>GET /auth-test</code></td>
+            <td style="padding:10px;">Validates the key. Returns <code>{ ok, account_id, account_name, key_name }</code>. Used by Zapier during connection setup.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-meetings</code></td>
+            <td style="padding:10px;">Latest meeting bookings (up to 100). Each row includes the prior response that led to the booking (text + sentiment) plus the outbound message that prompted it.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-connection-requests</code></td>
+            <td style="padding:10px;">Latest connection requests sent (up to 100). Includes the custom note text if any.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-connections-accepted</code></td>
+            <td style="padding:10px;">Latest first messages sent after a connection request was accepted (up to 100).</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-responses</code></td>
+            <td style="padding:10px;">Latest replies received (up to 100). Optional query param <code>?sentiment=positive</code>, <code>negative</code>, or <code>neutral</code> filters by AI-classified sentiment.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-inmails</code></td>
+            <td style="padding:10px;">Latest InMails sent (up to 100).</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-retargeting-messages</code></td>
+            <td style="padding:10px;">Latest retargeting messages sent (up to 100).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        All trigger endpoints return up to 100 rows ordered by
+        <code>occurred_at</code> descending. Consumers dedup by
+        <code>id</code>; there is no cursor parameter.
+      </p>
+
+      <p><strong>Response shape (trigger endpoints)</strong></p>
+      <p>
+        Every trigger returns a JavaScript Object Notation (JSON) array of
+        event objects with the same field set. Fields that don't apply to a
+        given event are <code>null</code>.
+      </p>
+      <table style="width:100%; border-collapse:collapse; margin: 8px 0 20px; font-size:13.5px;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--gray-200);">
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500); width:35%;">Field</th>
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500);">Type and description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>id</code></td>
+            <td style="padding:8px 10px;">String. Stable unique id for the event. Use as the dedup key.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>occurred_at</code></td>
+            <td style="padding:8px 10px;">ISO 8601 timestamp with millisecond precision and <code>Z</code> suffix (e.g. <code>2026-05-12T17:02:31.632Z</code>).</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>account_name</code></td>
+            <td style="padding:8px 10px;">String. The Uptown Tracker account name the key is scoped to.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>prospect_name</code></td>
+            <td style="padding:8px 10px;">String or null.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>prospect_email</code></td>
+            <td style="padding:8px 10px;">String or null.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>prospect_phone</code></td>
+            <td style="padding:8px 10px;">String or null.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>company</code></td>
+            <td style="padding:8px 10px;">String or null.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>title</code></td>
+            <td style="padding:8px 10px;">String or null.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>profile_url</code></td>
+            <td style="padding:8px 10px;">String or null. The prospect's profile URL.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>sales_nav_url</code></td>
+            <td style="padding:8px 10px;">String or null.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>outbound_message_text</code></td>
+            <td style="padding:8px 10px;">String or null. Connection request note, first message body, InMail body, retargeting message body, or the message that prompted a reply (on response and meeting triggers).</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>response_text</code></td>
+            <td style="padding:8px 10px;">String or null. Populated on response triggers, and on meeting-booked rows that have a known prior response.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px; vertical-align:top;"><code>sentiment</code></td>
+            <td style="padding:8px 10px;">One of <code>positive</code>, <code>negative</code>, <code>neutral</code>, or null. AI-classified.</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px; vertical-align:top;"><code>sentiment_detail</code></td>
+            <td style="padding:8px 10px;">String or null. Optional nuance tag (e.g. <code>wants_meeting</code>, <code>not_right_time</code>).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Errors</strong></p>
+      <p>
+        Errors return a JSON body of the shape
+        <code>{ "error": "&lt;code&gt;" }</code>, sometimes with an
+        additional context field. Status codes:
+      </p>
+      <table style="width:100%; border-collapse:collapse; margin: 8px 0 20px; font-size:13.5px;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--gray-200);">
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500); width:14%;">Status</th>
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500); width:30%;">Error code</th>
+            <th style="text-align:left; padding:8px 10px; font-family:'Montserrat',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-500);">Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px;"><code>401</code></td>
+            <td style="padding:8px 10px;"><code>missing_bearer</code></td>
+            <td style="padding:8px 10px;">No <code>Authorization</code> header, or not in <code>Bearer ...</code> form.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px;"><code>401</code></td>
+            <td style="padding:8px 10px;"><code>invalid_key_format</code></td>
+            <td style="padding:8px 10px;">Bearer token does not start with <code>up_</code> or is too short.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px;"><code>401</code></td>
+            <td style="padding:8px 10px;"><code>invalid_or_revoked_key</code></td>
+            <td style="padding:8px 10px;">Bearer token does not match any active key.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px;"><code>404</code></td>
+            <td style="padding:8px 10px;"><code>unknown_trigger</code></td>
+            <td style="padding:8px 10px;">Path matches the triggers prefix but the trigger slug is not recognized.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px;"><code>404</code></td>
+            <td style="padding:8px 10px;"><code>not_found</code></td>
+            <td style="padding:8px 10px;">Path is not a known endpoint.</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--gray-100);">
+            <td style="padding:8px 10px;"><code>405</code></td>
+            <td style="padding:8px 10px;"><code>method_not_allowed</code></td>
+            <td style="padding:8px 10px;">HTTP method other than <code>GET</code> or <code>POST</code> or <code>OPTIONS</code>.</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 10px;"><code>500</code></td>
+            <td style="padding:8px 10px;"><code>internal</code></td>
+            <td style="padding:8px 10px;">Unhandled server error. Retried automatically by polling consumers like Zapier.</td>
+          </tr>
+        </tbody>
+      </table>
+
       <h3 id="dash-hubspot-sync">6.14 - Per-account: Native HubSpot sync</h3>
       <p>
         On the same Integrations tab, a separate card lets you connect HubSpot
