@@ -1838,17 +1838,20 @@
       <ul>
         <li>
           <strong>New Meeting Booked</strong> - a prospect booked a meeting.
-          Includes the prior response that led to the booking (text + sentiment)
-          and the message you sent that prompted that response, so the zap
-          knows the conversational context.
+          When the same prospect has a prior logged response, the trigger
+          hydrates with that response (text + sentiment + nuance tag) and
+          the outbound message that prompted it, so the zap knows the
+          conversational context.
         </li>
         <li>
           <strong>New Connection Request Sent</strong> - you sent a CR.
-          Includes the CR's custom note text if any.
+          Fires with the prospect's identity (name, email, title, company,
+          profile URLs). The CR note itself isn't captured.
         </li>
         <li>
           <strong>New Connection Accepted</strong> - a CR was accepted and
-          you sent the first message. Includes the message body.
+          you sent the first message. Fires with the prospect's identity.
+          The message body isn't captured for this event type.
         </li>
         <li>
           <strong>New Response</strong> - a prospect replied. Includes the
@@ -1859,11 +1862,12 @@
           positive replies.
         </li>
         <li>
-          <strong>New InMail Sent</strong> - you sent an InMail.
+          <strong>New InMail Sent</strong> - you sent an InMail. Fires with
+          the prospect's identity.
         </li>
         <li>
           <strong>New Retargeting Message Sent</strong> - you sent a
-          retargeting message.
+          retargeting message. Fires with the prospect's identity.
         </li>
       </ul>
 
@@ -1875,9 +1879,9 @@
       </p>
       <ul>
         <li><strong>id</strong>, <strong>occurred_at</strong>, <strong>account_name</strong> - always populated.</li>
-        <li><strong>prospect_name</strong>, <strong>prospect_email</strong>, <strong>prospect_phone</strong>, <strong>company</strong>, <strong>title</strong>, <strong>profile_url</strong>, <strong>sales_nav_url</strong> - the prospect's identity.</li>
-        <li><strong>outbound_message_text</strong> - the message you sent for this event (CR note, first message, InMail body, etc.) or the message that prompted the reply, on response triggers.</li>
-        <li><strong>response_text</strong>, <strong>sentiment</strong>, <strong>sentiment_detail</strong> - populated on response triggers (and on meeting-booked rows that have a known prior response).</li>
+        <li><strong>prospect_name</strong>, <strong>prospect_email</strong>, <strong>prospect_phone</strong>, <strong>company</strong>, <strong>title</strong>, <strong>profile_url</strong>, <strong>sales_nav_url</strong> - the prospect's identity. Populated on every trigger.</li>
+        <li><strong>outbound_message_text</strong> - on <em>response</em> triggers, the outbound message the prospect is replying to. On <em>meeting-booked</em> triggers, the outbound message that prompted the prior response, if one exists. Null on all other triggers (the extension logs the act of sending, not the message body, for CRs, first messages, InMails, and retargeting messages).</li>
+        <li><strong>response_text</strong>, <strong>sentiment</strong>, <strong>sentiment_detail</strong> - populated on response triggers, and on meeting-booked rows that have a known prior response. Null on all other triggers.</li>
       </ul>
 
       <h4>Common zap recipes</h4>
@@ -1974,7 +1978,7 @@
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-connection-requests</code></td>
-            <td style="padding:10px;">Latest connection requests sent (up to 100). Includes the custom note text if any.</td>
+            <td style="padding:10px;">Latest connection requests sent (up to 100). Prospect identity only; the request's note text is not captured.</td>
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:10px; vertical-align:top;"><code>GET /triggers/new-connections-accepted</code></td>
@@ -2057,19 +2061,19 @@
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:8px 10px; vertical-align:top;"><code>outbound_message_text</code></td>
-            <td style="padding:8px 10px;">String or null. Connection request note, first message body, InMail body, retargeting message body, or the message that prompted a reply (on response and meeting triggers).</td>
+            <td style="padding:8px 10px;">String or null. On <code>new-responses</code>, the outbound message the prospect is replying to. On <code>new-meetings</code>, the outbound message that prompted the prior response, if one exists for that prospect. Null on all other triggers (the extension logs the act of sending, not the message body, for CRs, first messages, InMails, and retargeting messages).</td>
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:8px 10px; vertical-align:top;"><code>response_text</code></td>
-            <td style="padding:8px 10px;">String or null. Populated on response triggers, and on meeting-booked rows that have a known prior response.</td>
+            <td style="padding:8px 10px;">String or null. Populated on <code>new-responses</code>, and on <code>new-meetings</code> rows where the prospect has a prior logged response. Null on all other triggers.</td>
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:8px 10px; vertical-align:top;"><code>sentiment</code></td>
-            <td style="padding:8px 10px;">One of <code>positive</code>, <code>negative</code>, <code>neutral</code>, or null. AI-classified.</td>
+            <td style="padding:8px 10px;">One of <code>positive</code>, <code>negative</code>, <code>neutral</code>, or null. AI-classified. Populated on the same triggers as <code>response_text</code>.</td>
           </tr>
           <tr>
             <td style="padding:8px 10px; vertical-align:top;"><code>sentiment_detail</code></td>
-            <td style="padding:8px 10px;">String or null. Optional nuance tag (e.g. <code>wants_meeting</code>, <code>not_right_time</code>).</td>
+            <td style="padding:8px 10px;">String or null. Optional nuance tag (e.g. <code>wants_meeting</code>, <code>not_right_time</code>). Populated on the same triggers as <code>response_text</code>.</td>
           </tr>
         </tbody>
       </table>
