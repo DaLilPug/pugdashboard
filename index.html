@@ -2,29 +2,898 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="robots" content="noindex, nofollow" />
-  <title>Uptown Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uptown Reply Buddy - AI replies and outreach tracking for LinkedIn</title>
+  <meta name="description" content="The Chrome extension that drafts your next LinkedIn reply the moment a message lands. Free. Works on every LinkedIn surface." />
   <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+  <style>
+    /* Landing page-specific styles. The shared tokens (--navy, --green,
+       etc.) live in app.css; everything below is layout for index.html. */
+
+    body { background: var(--white); }
+
+    /* ── Top bar ──────────────────────────────────────────────────── */
+    .lp-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .lp-nav-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .lp-nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--navy);
+    }
+    .lp-nav-logo img { height: 36px; width: auto; display: block; }
+    .lp-nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .lp-nav-link {
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--navy);
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: var(--r-pill);
+      transition: background 0.12s ease;
+    }
+    .lp-nav-link:hover { background: var(--navy-mid); }
+
+    /* ── Buttons ──────────────────────────────────────────────────── */
+    .lp-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 22px;
+      border-radius: var(--r-pill);
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .lp-btn-primary {
+      background: var(--green);
+      color: #fff;
+      box-shadow: 0 4px 16px var(--green-glow);
+    }
+    .lp-btn-primary:hover {
+      background: var(--green-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 22px var(--green-glow);
+    }
+    .lp-btn-secondary {
+      background: var(--navy);
+      color: #fff;
+    }
+    .lp-btn-secondary:hover {
+      background: var(--navy-dark);
+    }
+    .lp-btn-ghost {
+      background: transparent;
+      color: var(--navy);
+      border: 1.5px solid var(--navy);
+    }
+    .lp-btn-ghost:hover {
+      background: var(--navy);
+      color: #fff;
+    }
+    .lp-btn svg { width: 18px; height: 18px; }
+    .lp-btn-lg {
+      font-size: 16px;
+      padding: 16px 30px;
+    }
+
+    /* ── Hero ─────────────────────────────────────────────────────── */
+    .lp-hero {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 80px 24px 64px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+    @media (max-width: 880px) {
+      .lp-hero { grid-template-columns: 1fr; gap: 40px; padding: 48px 24px 40px; }
+    }
+    .lp-hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: var(--green-light);
+      color: var(--green-dark);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border-radius: var(--r-pill);
+      margin-bottom: 20px;
+    }
+    .lp-hero-eyebrow::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px var(--green-glow);
+    }
+    .lp-hero h1 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: clamp(36px, 5vw, 56px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--navy);
+      margin-bottom: 18px;
+    }
+    .lp-hero h1 .accent { color: var(--green); }
+    .lp-hero-sub {
+      font-size: 18px;
+      line-height: 1.55;
+      color: var(--gray-600);
+      margin-bottom: 28px;
+      max-width: 520px;
+    }
+    .lp-hero-ctas {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .lp-hero-trust {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 13px;
+      color: var(--gray-600);
+      flex-wrap: wrap;
+    }
+    .lp-hero-trust-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lp-hero-trust-check {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      color: var(--green);
+    }
+
+    /* ── Hero visual (mock screenshot of Reply Buddy) ──────────────── */
+    .lp-hero-visual {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      background: linear-gradient(135deg, var(--navy-light) 0%, #fff 100%);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    /* Faux LinkedIn chrome */
+    .lp-mock-chrome {
+      height: 32px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+    }
+    .lp-mock-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--gray-200);
+    }
+    /* Faux LinkedIn page area */
+    .lp-mock-body {
+      display: grid;
+      grid-template-columns: 1fr 220px;
+      height: calc(100% - 32px);
+    }
+    .lp-mock-page {
+      padding: 16px;
+      background: #f3f6f8;
+    }
+    .lp-mock-page-thread {
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-xs);
+    }
+    .lp-mock-msg {
+      background: var(--navy-mid);
+      height: 8px;
+      border-radius: 3px;
+      margin-bottom: 6px;
+    }
+    .lp-mock-msg:nth-child(2) { width: 75%; }
+    .lp-mock-msg:nth-child(3) { width: 60%; margin-bottom: 0; }
+    /* Faux Reply Buddy sidebar */
+    .lp-mock-sidebar {
+      background: #fff;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .lp-mock-sidebar-header {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      padding: 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lp-mock-sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--gray-600);
+    }
+    .lp-mock-tab {
+      flex: 1;
+      padding: 8px 6px;
+      text-align: center;
+    }
+    .lp-mock-tab.active {
+      color: var(--navy);
+      border-bottom: 2px solid var(--green);
+    }
+    .lp-mock-sidebar-card {
+      padding: 12px;
+      flex: 1;
+    }
+    .lp-mock-card {
+      background: var(--green-light);
+      border-left: 3px solid var(--green);
+      border-radius: 4px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .lp-mock-card-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--green-dark);
+      margin-bottom: 4px;
+    }
+    .lp-mock-card-line {
+      background: var(--navy);
+      height: 5px;
+      border-radius: 2px;
+      margin-bottom: 3px;
+      opacity: 0.65;
+    }
+    .lp-mock-card-line:nth-child(2) { width: 90%; }
+    .lp-mock-card-line:nth-child(3) { width: 78%; }
+    .lp-mock-card-line:nth-child(4) { width: 50%; margin-bottom: 0; }
+    .lp-mock-pill {
+      display: inline-block;
+      background: var(--green);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 8px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: var(--r-pill);
+      margin-top: 4px;
+    }
+    /* "Blurb ready" callout label */
+    .lp-mock-callout {
+      position: absolute;
+      bottom: 12%;
+      left: -14px;
+      background: var(--navy);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 7px 12px;
+      border-radius: var(--r-pill);
+      box-shadow: var(--shadow-md);
+      animation: fadeUp 0.6s ease 0.2s both;
+    }
+    .lp-mock-callout::after {
+      content: "";
+      position: absolute;
+      right: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 6px solid transparent;
+      border-left-color: var(--navy);
+    }
+
+    /* ── Sections ─────────────────────────────────────────────────── */
+    .lp-section {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 80px 24px;
+    }
+    .lp-section-alt {
+      background: var(--surface-2);
+    }
+    .lp-section-alt-wrap {
+      background: var(--surface-2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .lp-section-head {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 48px;
+    }
+    .lp-section-eyebrow {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--green-dark);
+      margin-bottom: 12px;
+    }
+    .lp-section h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 700;
+      line-height: 1.15;
+      color: var(--navy);
+      margin-bottom: 14px;
+      letter-spacing: -0.01em;
+    }
+    .lp-section-sub {
+      font-size: 17px;
+      line-height: 1.55;
+      color: var(--gray-600);
+    }
+
+    /* ── How it works (3 steps) ──────────────────────────────────── */
+    .lp-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 880px) {
+      .lp-steps { grid-template-columns: 1fr; }
+    }
+    .lp-step {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-xs);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .lp-step:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+    .lp-step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: var(--green);
+      color: #fff;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      border-radius: 50%;
+      margin-bottom: 18px;
+    }
+    .lp-step h3 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 10px;
+    }
+    .lp-step p {
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--gray-600);
+    }
+
+    /* ── Feature grid ────────────────────────────────────────────── */
+    .lp-features {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 700px) {
+      .lp-features { grid-template-columns: 1fr; }
+    }
+    .lp-feature {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .lp-feature-icon {
+      flex-shrink: 0;
+      width: 44px;
+      height: 44px;
+      background: var(--green-light);
+      color: var(--green-dark);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lp-feature-icon svg { width: 22px; height: 22px; }
+    .lp-feature h3 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+    .lp-feature p {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--gray-600);
+    }
+
+    /* ── Power-user (Tracker) section ─────────────────────────────── */
+    .lp-tracker {
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
+      color: #fff;
+      border-radius: var(--r-lg);
+      padding: 56px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+    }
+    @media (max-width: 880px) {
+      .lp-tracker { grid-template-columns: 1fr; padding: 40px 28px; }
+    }
+    .lp-tracker-eyebrow {
+      display: inline-block;
+      background: rgba(255,255,255,0.10);
+      color: var(--green-light);
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: var(--r-pill);
+      margin-bottom: 18px;
+    }
+    .lp-tracker h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: clamp(26px, 3.5vw, 34px);
+      font-weight: 700;
+      line-height: 1.2;
+      color: #fff;
+      margin-bottom: 14px;
+    }
+    .lp-tracker p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 22px;
+    }
+    .lp-tracker-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 26px;
+    }
+    .lp-tracker-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 15px;
+      color: rgba(255,255,255,0.92);
+    }
+    .lp-tracker-list li::before {
+      content: "";
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      margin-top: 4px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(30,182,131,0.15);
+    }
+    .lp-tracker-visual {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: var(--r);
+      padding: 20px;
+      font-family: 'Inter', sans-serif;
+    }
+    .lp-tracker-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      font-size: 14px;
+    }
+    .lp-tracker-stat:last-child { border-bottom: none; }
+    .lp-tracker-stat-label {
+      color: rgba(255,255,255,0.65);
+    }
+    .lp-tracker-stat-val {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--green);
+    }
+
+    /* ── Final CTA ────────────────────────────────────────────────── */
+    .lp-final {
+      text-align: center;
+      padding: 80px 24px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+    .lp-final h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: clamp(28px, 4vw, 38px);
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 14px;
+      letter-spacing: -0.01em;
+    }
+    .lp-final p {
+      font-size: 17px;
+      color: var(--gray-600);
+      margin-bottom: 28px;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────── */
+    .lp-footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 24px;
+      max-width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 13px;
+      color: var(--gray-600);
+    }
+    .lp-footer-links {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+    .lp-footer-links a {
+      color: var(--gray-600);
+      text-decoration: none;
+      transition: color 0.12s ease;
+    }
+    .lp-footer-links a:hover { color: var(--navy); }
+
+    /* Initial hidden state for fade-in (set via JS after auth check) */
+    .lp-hidden { visibility: hidden; }
+  </style>
 </head>
-<body>
+<body class="lp-hidden">
+  <!--
+    Routing:
+    - Password recovery hash → forward to /reset/ (preserved from prior
+      router behavior; sometimes Supabase falls back to Site URL).
+    - Signed-in users → /dashboard/ (skip the marketing page).
+    - Everyone else → see this landing page.
+
+    We mark <body> as hidden until the auth check resolves so signed-in
+    operators never see a flash of the marketing page.
+  -->
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script>
-    // Belt-and-suspenders for password recovery: if Supabase falls back
-    // to the Site URL (= root) because the redirect_to in the recovery
-    // email didn't match the auth.redirect_urls allowlist exactly,
-    // the recovery hash still lands here — forward it to /reset/ with
-    // the hash preserved so the user can finish setting their password.
     if (location.hash && location.hash.includes("type=recovery")) {
       window.location.replace("/reset/" + location.hash);
     } else {
-      // Standard root-routing: signed-in users go to the dashboard,
-      // everyone else to login. Avoids a flash of the login page for
-      // signed-in users hitting the root URL.
       sb.ensureFreshSession()
-        .then(s => window.location.replace(s ? "/dashboard/" : "/login/"))
-        .catch(() => window.location.replace("/login/"));
+        .then(s => {
+          if (s) {
+            window.location.replace("/dashboard/");
+          } else {
+            document.body.classList.remove("lp-hidden");
+          }
+        })
+        .catch(() => {
+          document.body.classList.remove("lp-hidden");
+        });
     }
+  </script>
+
+  <nav class="lp-nav">
+    <div class="lp-nav-inner">
+      <a class="lp-nav-logo" href="/">
+        <img src="/assets/logo-tracker-navy.png" alt="Uptown" />
+      </a>
+      <div class="lp-nav-actions">
+        <a class="lp-nav-link" href="/guides/">Guides</a>
+        <a class="lp-nav-link" href="/login/">Sign in</a>
+        <a class="lp-btn lp-btn-secondary" id="lp-nav-install" target="_blank" rel="noopener">
+          Add to Chrome
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="lp-hero">
+    <div>
+      <div class="lp-hero-eyebrow">New &middot; Free Chrome extension</div>
+      <h1>
+        Reply on LinkedIn <span class="accent">in seconds,</span><br />
+        not minutes.
+      </h1>
+      <p class="lp-hero-sub">
+        Uptown Reply Buddy reads the thread, drafts your reply in your voice, and lines up the next follow-up. Open a chat, get a blurb, keep the conversation moving.
+      </p>
+      <div class="lp-hero-ctas">
+        <a class="lp-btn lp-btn-primary lp-btn-lg" id="lp-hero-install" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <circle cx="12" cy="12" r="4"/>
+            <line x1="21.17" y1="8" x2="12" y2="8"/>
+            <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+            <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+          </svg>
+          Add to Chrome - it's free
+        </a>
+        <a class="lp-btn lp-btn-ghost lp-btn-lg" href="#how">See how it works</a>
+      </div>
+      <div class="lp-hero-trust">
+        <span class="lp-hero-trust-item">
+          <svg class="lp-hero-trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Works on every LinkedIn surface
+        </span>
+        <span class="lp-hero-trust-item">
+          <svg class="lp-hero-trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Reads your tone, not just keywords
+        </span>
+        <span class="lp-hero-trust-item">
+          <svg class="lp-hero-trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Free to install
+        </span>
+      </div>
+    </div>
+    <div class="lp-hero-visual" aria-hidden="true">
+      <div class="lp-mock-chrome">
+        <span class="lp-mock-dot" style="background:#e85b5b"></span>
+        <span class="lp-mock-dot" style="background:#f5b942"></span>
+        <span class="lp-mock-dot" style="background:#42c97f"></span>
+      </div>
+      <div class="lp-mock-body">
+        <div class="lp-mock-page">
+          <div class="lp-mock-page-thread">
+            <div class="lp-mock-msg"></div>
+            <div class="lp-mock-msg"></div>
+            <div class="lp-mock-msg"></div>
+          </div>
+          <div class="lp-mock-page-thread">
+            <div class="lp-mock-msg"></div>
+            <div class="lp-mock-msg"></div>
+          </div>
+        </div>
+        <div class="lp-mock-sidebar">
+          <div class="lp-mock-sidebar-header">
+            <span style="font-family:'Montserrat';font-weight:800;">U</span>
+            Reply Buddy
+          </div>
+          <div class="lp-mock-sidebar-tabs">
+            <div class="lp-mock-tab active">Reply Buddy</div>
+            <div class="lp-mock-tab">Follow-ups</div>
+          </div>
+          <div class="lp-mock-sidebar-card">
+            <div class="lp-mock-card">
+              <div class="lp-mock-card-label">Suggested Reply</div>
+              <div class="lp-mock-card-line"></div>
+              <div class="lp-mock-card-line"></div>
+              <div class="lp-mock-card-line"></div>
+              <span class="lp-mock-pill">Copy</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lp-mock-callout">Blurb ready in 800ms</div>
+    </div>
+  </section>
+
+  <div class="lp-section-alt-wrap">
+    <section class="lp-section" id="how">
+      <div class="lp-section-head">
+        <div class="lp-section-eyebrow">How it works</div>
+        <h2>Three steps from inbox to sent.</h2>
+        <p class="lp-section-sub">No new tabs, no copy-paste, no rewriting from scratch every time. Reply Buddy lives inside LinkedIn.</p>
+      </div>
+      <div class="lp-steps">
+        <div class="lp-step">
+          <div class="lp-step-num">1</div>
+          <h3>Open any LinkedIn chat</h3>
+          <p>The inbox, a profile, a chat bubble from the home feed - Reply Buddy notices the moment a thread opens and starts reading.</p>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">2</div>
+          <h3>Get a reply, drafted for you</h3>
+          <p>A "Blurb" appears in your sidebar within a second. Written in your tone, anchored on what they actually said. Edit or send as-is.</p>
+        </div>
+        <div class="lp-step">
+          <div class="lp-step-num">3</div>
+          <h3>One click queues the follow-up</h3>
+          <p>Hit the envelope icon when you send. Reply Buddy logs the message and lines up the next nudge so warm threads stay warm.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="lp-section">
+    <div class="lp-section-head">
+      <div class="lp-section-eyebrow">What's inside</div>
+      <h2>Built around how you already work on LinkedIn.</h2>
+      <p class="lp-section-sub">Every feature exists because the people running outreach asked for it.</p>
+    </div>
+    <div class="lp-features">
+      <div class="lp-feature">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <div>
+          <h3>Replies that sound like you</h3>
+          <p>Reply Buddy learns your voice from past threads - your closes, your style, your defaults. Drafts come out feeling written, not generated.</p>
+        </div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        </div>
+        <div>
+          <h3>Works everywhere on LinkedIn</h3>
+          <p>The inbox, a profile, a chat bubble on the home feed - any place LinkedIn lets you message someone, Reply Buddy is there too.</p>
+        </div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div>
+          <h3>Follow-ups that show up</h3>
+          <p>One click after you send lines up the next nudge. Reply Buddy keeps the queue so you don't have to remember who's waiting on what.</p>
+        </div>
+      </div>
+      <div class="lp-feature">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <div>
+          <h3>Reads the tone of replies</h3>
+          <p>Inbound responses get an instant sentiment read - positive, neutral, negative - so you can prioritize who to write back to first.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="lp-section-alt-wrap">
+    <section class="lp-section">
+      <div class="lp-tracker">
+        <div>
+          <div class="lp-tracker-eyebrow">For power users</div>
+          <h2>Add the Uptown Tracker when you're ready to scale.</h2>
+          <p>Reply Buddy keeps your inbox moving. Uptown Tracker is what you turn on when you're running outreach across a list, a team, or both.</p>
+          <ul class="lp-tracker-list">
+            <li>Log every send from Sales Navigator in one click</li>
+            <li>See conversion at every stage - send to reply to meeting</li>
+            <li>Catch the patterns that work and the ones that don't</li>
+            <li>Run cadences across your whole team, not just your own threads</li>
+          </ul>
+          <a class="lp-btn lp-btn-primary" href="/login/">Sign in to Uptown Tracker</a>
+        </div>
+        <div class="lp-tracker-visual">
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Connection requests sent</span>
+            <span class="lp-tracker-stat-val">1,284</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Acceptance rate</span>
+            <span class="lp-tracker-stat-val">42%</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Replies received</span>
+            <span class="lp-tracker-stat-val">218</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Meetings booked</span>
+            <span class="lp-tracker-stat-val">37</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="lp-final">
+    <h2>Install Reply Buddy and write your next message tomorrow morning.</h2>
+    <p>Free Chrome extension. Sign in optional. Install once and Reply Buddy lives in every LinkedIn tab.</p>
+    <a class="lp-btn lp-btn-primary lp-btn-lg" id="lp-final-install" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="21.17" y1="8" x2="12" y2="8"/>
+        <line x1="3.95" y1="6.06" x2="8.54" y2="14"/>
+        <line x1="10.88" y1="21.94" x2="15.46" y2="14"/>
+      </svg>
+      Add to Chrome
+    </a>
+  </section>
+
+  <footer class="lp-footer">
+    <span>&copy; <span id="lp-year"></span> Uptown Creation</span>
+    <div class="lp-footer-links">
+      <a href="/guides/">Guides</a>
+      <a href="/login/">Sign in</a>
+      <a href="/terms/">Terms</a>
+      <a href="/privacy/">Privacy</a>
+    </div>
+  </footer>
+
+  <script>
+    // Wire up the Chrome Web Store URL from config to every install button.
+    // Hide install buttons entirely if no URL is set (e.g. local dev where
+    // chromeExtensionUrl is empty), since pointing them at nothing would
+    // be worse than not showing them.
+    (function () {
+      const url = (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.chromeExtensionUrl) || "";
+      const ids = ["lp-nav-install", "lp-hero-install", "lp-final-install"];
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (url) {
+          el.href = url;
+        } else {
+          el.style.display = "none";
+        }
+      }
+      document.getElementById("lp-year").textContent = new Date().getFullYear();
+    })();
   </script>
 </body>
 </html>
