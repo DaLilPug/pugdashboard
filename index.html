@@ -314,29 +314,23 @@
       border-radius: var(--r-pill);
       margin-top: 4px;
     }
-    /* "Blurb ready" callout label */
+    /* "Blurb ready" callout label. Positioned inside the visual frame
+       (left: 12px) so the leading "B" never clips on viewports that
+       crop the page edge. Arrow points right toward the suggested
+       reply card. */
     .lp-mock-callout {
       position: absolute;
       bottom: 12%;
-      left: -14px;
+      left: 12px;
       background: var(--navy);
       color: #fff;
       font-family: 'Inter', sans-serif;
       font-size: 11px;
       font-weight: 600;
-      padding: 7px 12px;
+      padding: 7px 14px;
       border-radius: var(--r-pill);
       box-shadow: var(--shadow-md);
       animation: fadeUp 0.6s ease 0.2s both;
-    }
-    .lp-mock-callout::after {
-      content: "";
-      position: absolute;
-      right: -6px;
-      top: 50%;
-      transform: translateY(-50%);
-      border: 6px solid transparent;
-      border-left-color: var(--navy);
     }
 
     /* ── Sections ─────────────────────────────────────────────────── */
