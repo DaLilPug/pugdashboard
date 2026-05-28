@@ -187,150 +187,294 @@
       color: var(--green);
     }
 
-    /* ── Hero visual (mock screenshot of Reply Buddy) ──────────────── */
+    /* ── Hero visual (mock screenshot of the Reply Buddy sidebar) ──── */
+    /* Mirrors the actual extension layout: navy header w/ logo +
+       Test Client chip + Uptown.com wordmark + X close, tab row
+       (Reply Buddy active), person card, Message Sent + LinkedIn
+       Response cards, collapsed Edit reply instructions toggle,
+       Suggested Reply card w/ Blurb ready status, sentiment pills
+       (Positive selected), Log Response button. Sizing tuned to
+       fit a 300px-wide sidebar inside the hero's aspect-ratio
+       container without scrolling. */
     .lp-hero-visual {
       position: relative;
-      aspect-ratio: 4 / 3;
+      aspect-ratio: 4 / 3.4;
       background: linear-gradient(135deg, var(--navy-light) 0%, #fff 100%);
       border-radius: var(--r-lg);
       box-shadow: var(--shadow-lg);
       overflow: hidden;
       border: 1px solid var(--border);
     }
-    /* Faux LinkedIn chrome */
+    /* Browser chrome strip at the top */
     .lp-mock-chrome {
-      height: 32px;
+      height: 26px;
       background: #fff;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 0 12px;
+      gap: 5px;
+      padding: 0 10px;
     }
     .lp-mock-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: var(--gray-200);
     }
-    /* Faux LinkedIn page area */
+    /* Body: left = faux LinkedIn page hint, right = Reply Buddy sidebar */
     .lp-mock-body {
       display: grid;
-      grid-template-columns: 1fr 220px;
-      height: calc(100% - 32px);
+      grid-template-columns: 1fr 300px;
+      height: calc(100% - 26px);
     }
     .lp-mock-page {
-      padding: 16px;
+      padding: 14px;
       background: #f3f6f8;
     }
     .lp-mock-page-thread {
       background: #fff;
       border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
       box-shadow: var(--shadow-xs);
     }
     .lp-mock-msg {
-      background: var(--navy-mid);
-      height: 8px;
+      background: var(--gray-200);
+      height: 7px;
       border-radius: 3px;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
-    .lp-mock-msg:nth-child(2) { width: 75%; }
-    .lp-mock-msg:nth-child(3) { width: 60%; margin-bottom: 0; }
-    /* Faux Reply Buddy sidebar */
-    .lp-mock-sidebar {
+    .lp-mock-msg:nth-child(2) { width: 78%; }
+    .lp-mock-msg:nth-child(3) { width: 62%; margin-bottom: 0; }
+
+    /* ── Reply Buddy sidebar ──────────────────────────────────────── */
+    .lp-mock-sb {
       background: #fff;
       border-left: 1px solid var(--border);
       display: flex;
       flex-direction: column;
+      font-family: 'Inter', sans-serif;
     }
-    .lp-mock-sidebar-header {
+    .lp-mock-sb-header {
       background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
       color: #fff;
-      padding: 12px;
-      font-family: 'Inter', sans-serif;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 7px 10px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      gap: 6px;
     }
-    .lp-mock-sidebar-tabs {
+    .lp-mock-sb-brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lp-mock-sb-logo {
+      width: 18px;
+      height: 18px;
+      background: rgba(255,255,255,0.14);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Montserrat', sans-serif;
+      font-size: 10px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .lp-mock-sb-chip {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 7px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 999px;
+      letter-spacing: 0.02em;
+      color: rgba(255,255,255,0.92);
+    }
+    .lp-mock-sb-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lp-mock-sb-domain {
+      font-size: 9px;
+      color: rgba(255,255,255,0.6);
+      font-weight: 500;
+    }
+    .lp-mock-sb-x {
+      width: 15px;
+      height: 15px;
+      background: rgba(255,255,255,0.10);
+      border-radius: 3px;
+      color: #fff;
+      font-size: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .lp-mock-sb-tabs {
       display: flex;
       border-bottom: 1px solid var(--border);
-      font-family: 'Inter', sans-serif;
       font-size: 10px;
       font-weight: 600;
-      color: var(--gray-600);
+      flex-shrink: 0;
     }
-    .lp-mock-tab {
+    .lp-mock-sb-tab {
       flex: 1;
-      padding: 8px 6px;
+      padding: 7px 6px;
       text-align: center;
+      color: var(--gray-500);
+      border-bottom: 2px solid transparent;
     }
-    .lp-mock-tab.active {
+    .lp-mock-sb-tab.active {
       color: var(--navy);
-      border-bottom: 2px solid var(--green);
+      border-bottom-color: #2d7ab8;
     }
-    .lp-mock-sidebar-card {
-      padding: 12px;
-      flex: 1;
-    }
-    .lp-mock-card {
-      background: var(--green-light);
-      border-left: 3px solid var(--green);
-      border-radius: 4px;
+
+    /* Scrollable content area */
+    .lp-mock-sb-body {
       padding: 8px;
-      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      overflow: hidden;
     }
-    .lp-mock-card-label {
-      font-family: 'Inter', sans-serif;
-      font-size: 9px;
+
+    /* Person card */
+    .lp-mock-person {
+      background: #f6f8fb;
+      border: 1px solid #eef1f4;
+      border-radius: 6px;
+      padding: 7px 9px;
+    }
+    .lp-mock-person-name {
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--green-dark);
-      margin-bottom: 4px;
+      color: #15212b;
+      margin-bottom: 2px;
     }
-    .lp-mock-card-line {
-      background: var(--navy);
-      height: 5px;
-      border-radius: 2px;
+    .lp-mock-person-meta {
+      font-size: 9px;
+      color: #5b6673;
+      line-height: 1.3;
+    }
+
+    /* Card base */
+    .lp-mock-bb {
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .lp-mock-bb-sent {
+      background: #f6f8fb;
+      border: 1px solid #eef1f4;
+    }
+    .lp-mock-bb-response {
+      background: #fff;
+      border: 1px solid #dfe4ea;
+      border-left: 3px solid #2d7ab8;
+    }
+    .lp-mock-bb-blurb {
+      background: #f5fbf8;
+      border-left: 3px solid #1EB683;
+    }
+    .lp-mock-bb-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       margin-bottom: 3px;
-      opacity: 0.65;
     }
-    .lp-mock-card-line:nth-child(2) { width: 90%; }
-    .lp-mock-card-line:nth-child(3) { width: 78%; }
-    .lp-mock-card-line:nth-child(4) { width: 50%; margin-bottom: 0; }
-    .lp-mock-pill {
-      display: inline-block;
-      background: var(--green);
-      color: #fff;
-      font-family: 'Inter', sans-serif;
+    .lp-mock-bb-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #5b6673;
+    }
+    .lp-mock-bb-body {
+      font-size: 10px;
+      color: #15212b;
+      line-height: 1.4;
+    }
+    .lp-mock-bb-copy {
+      background: #fff;
+      border: 1px solid #dfe4ea;
+      border-radius: 8px;
       font-size: 8px;
       font-weight: 700;
-      padding: 3px 8px;
-      border-radius: var(--r-pill);
+      padding: 2px 7px;
+      color: #5b6673;
+    }
+    .lp-mock-bb-status {
+      font-size: 9px;
+      font-weight: 600;
+      color: #107a3e;
       margin-top: 4px;
     }
-    /* "Blurb ready" callout label. Positioned inside the visual frame
-       (left: 12px) so the leading "B" never clips on viewports that
-       crop the page edge. Arrow points right toward the suggested
-       reply card. */
-    .lp-mock-callout {
-      position: absolute;
-      bottom: 12%;
-      left: 12px;
-      background: var(--navy);
-      color: #fff;
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
+
+    /* Collapsed "Edit reply instructions" drawer */
+    .lp-mock-edit {
+      background: #f6f8fb;
+      border: 1px solid #eef1f4;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 9px;
       font-weight: 600;
-      padding: 7px 14px;
-      border-radius: var(--r-pill);
-      box-shadow: var(--shadow-md);
-      animation: fadeUp 0.6s ease 0.2s both;
+      color: #5b6673;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .lp-mock-edit-caret {
+      color: #15212b;
+      font-size: 8px;
+    }
+
+    /* Sentiment pills */
+    .lp-mock-pills {
+      display: flex;
+      gap: 4px;
+    }
+    .lp-mock-pill {
+      flex: 1;
+      border: 1.5px solid #dfe4ea;
+      border-radius: 5px;
+      padding: 4px;
+      font-size: 8.5px;
+      font-weight: 600;
+      text-align: center;
+      background: #fff;
+      color: #5b6673;
+    }
+    .lp-mock-pill-pos {
+      border-color: #1EB683;
+      color: #1EB683;
+    }
+    .lp-mock-pill-pos.active {
+      background: #1EB683;
+      color: #fff;
+    }
+    .lp-mock-pill-neu { border-color: #f59e0b; color: #f59e0b; }
+    .lp-mock-pill-neg { border-color: #E04848; color: #E04848; }
+
+    /* Status line ("interested" / etc) */
+    .lp-mock-aistatus {
+      font-size: 9px;
+      color: #2d7ab8;
+      font-weight: 500;
+    }
+
+    /* Log Response button */
+    .lp-mock-log {
+      background: #163a52;
+      color: #fff;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 8px;
+      border-radius: 5px;
     }
 
     /* ── Sections ─────────────────────────────────────────────────── */
@@ -845,27 +989,60 @@
             <div class="lp-mock-msg"></div>
           </div>
         </div>
-        <div class="lp-mock-sidebar">
-          <div class="lp-mock-sidebar-header">
-            <span style="font-family:'Montserrat';font-weight:800;">U</span>
-            Reply Buddy
-          </div>
-          <div class="lp-mock-sidebar-tabs">
-            <div class="lp-mock-tab active">Reply Buddy</div>
-            <div class="lp-mock-tab">Follow-ups</div>
-          </div>
-          <div class="lp-mock-sidebar-card">
-            <div class="lp-mock-card">
-              <div class="lp-mock-card-label">Suggested Reply</div>
-              <div class="lp-mock-card-line"></div>
-              <div class="lp-mock-card-line"></div>
-              <div class="lp-mock-card-line"></div>
-              <span class="lp-mock-pill">Copy</span>
+        <div class="lp-mock-sb">
+          <div class="lp-mock-sb-header">
+            <div class="lp-mock-sb-brand">
+              <span class="lp-mock-sb-logo">Up</span>
+              <span class="lp-mock-sb-chip">Test Client</span>
             </div>
+            <div class="lp-mock-sb-right">
+              <span class="lp-mock-sb-domain">uptown.com</span>
+              <span class="lp-mock-sb-x">×</span>
+            </div>
+          </div>
+          <div class="lp-mock-sb-tabs">
+            <div class="lp-mock-sb-tab active">Reply Buddy</div>
+            <div class="lp-mock-sb-tab">Follow-ups</div>
+          </div>
+          <div class="lp-mock-sb-body">
+            <div class="lp-mock-person">
+              <div class="lp-mock-person-name">Tyler Eagan</div>
+              <div class="lp-mock-person-meta">Enterprise Execution Manager · Vertex Software</div>
+            </div>
+            <div class="lp-mock-bb lp-mock-bb-sent">
+              <div class="lp-mock-bb-head">
+                <span class="lp-mock-bb-label">Message Sent</span>
+              </div>
+              <div class="lp-mock-bb-body">Appreciate the update - any sense of timing on the rollout?</div>
+            </div>
+            <div class="lp-mock-bb lp-mock-bb-response">
+              <div class="lp-mock-bb-head">
+                <span class="lp-mock-bb-label">LinkedIn Response</span>
+              </div>
+              <div class="lp-mock-bb-body">No problem, glad it lined up. We're looking at end of Q3 to start moving on it.</div>
+            </div>
+            <div class="lp-mock-edit">
+              <span class="lp-mock-edit-caret">▸</span>
+              Edit reply instructions
+            </div>
+            <div class="lp-mock-bb lp-mock-bb-blurb">
+              <div class="lp-mock-bb-head">
+                <span class="lp-mock-bb-label">Suggested Reply</span>
+                <span class="lp-mock-bb-copy">Copy</span>
+              </div>
+              <div class="lp-mock-bb-body">Thanks for letting me know. What's the best way to stay in touch as things firm up on your end?</div>
+              <div class="lp-mock-bb-status">Blurb ready.</div>
+            </div>
+            <div class="lp-mock-pills">
+              <div class="lp-mock-pill lp-mock-pill-pos active">Positive</div>
+              <div class="lp-mock-pill lp-mock-pill-neu">Neutral</div>
+              <div class="lp-mock-pill lp-mock-pill-neg">Negative</div>
+            </div>
+            <div class="lp-mock-aistatus">Interested</div>
+            <div class="lp-mock-log">Log Response</div>
           </div>
         </div>
       </div>
-      <div class="lp-mock-callout">Blurb ready in 800ms</div>
     </div>
   </section>
 
