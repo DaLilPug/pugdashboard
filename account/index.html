@@ -328,6 +328,23 @@
            prospects already mid-cadence keep getting their next
            steps (snapshot-at-anchor model, see
            add_cadence_toggles.sql). -->
+
+      <!-- Client-wide "skip weekends" rule that governs BOTH cadences
+           below. ON = step day numbers count business days only (Mon-Fri).
+           OFF = original calendar-day math. Defaults ON. See
+           add_skip_weekends_in_cadence.sql for the view-level wiring. -->
+      <div class="cad-skip-weekends-row">
+        <label class="cad-toggle" title="When ON, cadence step days count business days only (Mon-Fri). When OFF, calendar days as before.">
+          <input id="cad-skip-weekends" class="cad-toggle-input" type="checkbox" checked />
+          <span class="cad-toggle-track" aria-hidden="true"><span class="cad-toggle-thumb"></span></span>
+          <span class="cad-toggle-label">On</span>
+        </label>
+        <div class="cad-skip-weekends-text">
+          <strong>Skip weekends</strong>
+          <span class="cad-skip-weekends-sub">Cadence step days count business days only. Applies to both cadences below.</span>
+        </div>
+      </div>
+
       <div class="cad-grid">
         <div class="cad-editor">
           <div class="cad-head">
@@ -627,7 +644,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,templates,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -6094,6 +6111,11 @@
       // ================= CADENCE ======================================
 
       function initCadence() {
+        // Single client-wide "skip weekends" toggle that governs BOTH
+        // cadences below. Wired here so it sits above the two editors
+        // and gets initialized off the same client fetch the editors use.
+        mountSkipWeekendsToggle();
+
         // Two independent editors: regular follow-up cadence (kicked
         // off by the initial 'message' event) and positive response
         // cadence (kicked off by a positive response). Same UI, same
@@ -6120,6 +6142,45 @@
           tplCol:     "positive_cadence_templates",
           enabledCol: "positive_cadence_enabled",
         });
+      }
+
+      function mountSkipWeekendsToggle() {
+        // Single client-wide toggle. PATCHes clients.skip_weekends_in_cadence
+        // immediately on flip - the side effect (followups_due view's due_at
+        // recomputes) is instant for both cadences, so an explicit Save would
+        // be redundant. Same pattern as the per-cadence enabled toggles.
+        const el = document.getElementById("cad-skip-weekends");
+        if (!el) return;
+        // Default to true if missing - matches the DB default. Existing rows
+        // created before the migration get NOT NULL DEFAULT true so this
+        // branch is only hit if the select column was added without the
+        // migration running (defensive).
+        const initial = client.skip_weekends_in_cadence !== false;
+        el.checked = initial;
+        updateLabel();
+        el.addEventListener("change", async () => {
+          const v = el.checked;
+          updateLabel();
+          try {
+            await sb.sbFetch(
+              `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+              {
+                method:  "PATCH",
+                body:    JSON.stringify({ skip_weekends_in_cadence: v }),
+                headers: { Prefer: "return=minimal" },
+              }
+            );
+            client.skip_weekends_in_cadence = v;
+          } catch (err) {
+            el.checked = !v;
+            updateLabel();
+            alert(`Couldn't ${v ? "enable" : "disable"} skip weekends: ${err.message || err}`);
+          }
+        });
+        function updateLabel() {
+          const lbl = el.closest(".cad-toggle")?.querySelector(".cad-toggle-label");
+          if (lbl) lbl.textContent = el.checked ? "On" : "Off";
+        }
       }
 
       function mountCadenceEditor(cfg) {
