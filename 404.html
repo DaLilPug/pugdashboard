@@ -4,7 +4,38 @@
   <meta charset="UTF-8" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Not found — Uptown Dashboard</title>
+  <!-- Legacy redirect during the app.uptown.com / dashboard.uptown.com
+       swap. Before the swap, dashboard.uptown.com served this Tracker
+       app and app.uptown.com served the puglab client-reports site.
+       Post-swap: app.uptown.com serves Tracker, dashboard.uptown.com
+       serves puglab.
+
+       Old links of the form app.uptown.com/<client-slug> were puglab
+       URLs. They now need to land at dashboard.uptown.com/<slug>.
+       When such a path hits a 404 here (because the Tracker doesn't
+       have that route), forward it to its new home.
+
+       Only fires when:
+         (1) host is exactly app.uptown.com, and
+         (2) the path is a single slug-shaped segment (lowercase
+             letters / digits / hyphens, must not start with a hyphen,
+             no dot, no nested slash).
+       Real Tracker users typing typos (uppercase, dots, /sub/path/)
+       just see the normal 404 below. -->
+  <script>
+    (function () {
+      try {
+        var host = window.location.hostname.toLowerCase();
+        if (host !== 'app.uptown.com') return;
+        var raw = window.location.pathname.replace(/^\/+|\/+$/g, '');
+        if (!raw) return;
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(raw)) return;
+        var qs = window.location.search || '';
+        window.location.replace('https://dashboard.uptown.com/' + raw + qs);
+      } catch (e) {}
+    })();
+  </script>
+  <title>Not found — Uptown Tracker</title>
   <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
