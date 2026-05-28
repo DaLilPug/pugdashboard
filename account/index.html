@@ -3589,26 +3589,42 @@
         }
 
         // ---- Auto-enrich queue processor ----------------------------
-        // Called after loadAll. Pulls up to N queued prospect_ids
-        // (RPC marks them in-flight server-side), then fires
-        // enrich-prospect for each. Fire-and-forget — the dashboard
-        // will see the results next time loadAll runs (or via the
-        // per-row refresh inside handleEnrichProspect for manual calls).
+        // Called after loadAll. Drains the queue in batches: claim up
+        // to N prospect_ids (RPC marks them in-flight server-side),
+        // await all N concurrent enrich-prospect calls, then claim
+        // again until the queue is empty. The batch size (5) caps
+        // Apollo concurrency at any given moment; awaiting each batch
+        // before claiming the next keeps that ceiling intact even
+        // when the queue is large.
+        //
+        // Failures inside enrichOne are swallowed (.catch) so one
+        // bad row can't stall the loop. Apollo successes /
+        // hard-failures clear themselves from the queue server-side;
+        // transient failures sit out a 2-minute cooldown (see
+        // claim_queued_enrichments WHERE clause) before the next
+        // page-load picks them up.
         async function processEnrichmentQueue() {
           if (!state.enrichmentAdmin || !state.enrichmentConnected) return;
-          let claimed;
-          try {
-            claimed = await sb.sbFetch("/rest/v1/rpc/claim_queued_enrichments", {
-              method: "POST",
-              body:   JSON.stringify({ p_client_id: clientId, p_limit: 5 }),
-            });
-          } catch {
-            return;  // silent — queue processing is best-effort
+          const BATCH = 5;
+          // Safety stop: bound iterations so an unexpected server
+          // bug (claim always returning the same rows) can't spin
+          // the page forever. 400 prospects / batch-of-5 = 80 rounds;
+          // 100 is a comfortable ceiling for any realistic queue.
+          for (let round = 0; round < 100; round++) {
+            let claimed;
+            try {
+              claimed = await sb.sbFetch("/rest/v1/rpc/claim_queued_enrichments", {
+                method: "POST",
+                body:   JSON.stringify({ p_client_id: clientId, p_limit: BATCH }),
+              });
+            } catch {
+              return;  // silent — queue processing is best-effort
+            }
+            if (!Array.isArray(claimed) || !claimed.length) return;
+            await Promise.all(
+              claimed.map(row => enrichOne(row.prospect_id, "auto_acceptance").catch(() => {}))
+            );
           }
-          if (!Array.isArray(claimed) || !claimed.length) return;
-          claimed.forEach(row => {
-            enrichOne(row.prospect_id, "auto_acceptance").catch(() => {});
-          });
         }
 
         async function handleLogMeeting(btn, prospect) {
