@@ -473,6 +473,141 @@
       color: var(--gray-600);
     }
 
+    /* ── Personalize section ──────────────────────────────────────── */
+    .lp-personalize {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 56px;
+      align-items: center;
+    }
+    @media (max-width: 880px) {
+      .lp-personalize { grid-template-columns: 1fr; gap: 32px; }
+    }
+    .lp-personalize h2 {
+      font-family: 'Montserrat', sans-serif;
+      font-size: clamp(26px, 3.6vw, 36px);
+      font-weight: 700;
+      line-height: 1.18;
+      color: var(--navy);
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
+    .lp-personalize p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--gray-600);
+      margin-bottom: 14px;
+    }
+    .lp-personalize-list {
+      list-style: none;
+      padding: 0;
+      margin: 16px 0 0;
+    }
+    .lp-personalize-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 6px 0;
+      font-size: 15px;
+      color: var(--navy);
+    }
+    .lp-personalize-list li::before {
+      content: "";
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      margin-top: 9px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+    .lp-personalize-visual {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-md);
+    }
+    .lp-personalize-mock-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+    .lp-personalize-mock-caret {
+      transform: rotate(90deg);
+      color: var(--navy);
+    }
+    .lp-personalize-mock-text {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: var(--navy);
+      min-height: 130px;
+    }
+    .lp-personalize-mock-text strong {
+      color: var(--green-dark);
+      font-weight: 600;
+    }
+    .lp-personalize-mock-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .lp-personalize-mock-status {
+      font-size: 12px;
+      color: #107a3e;
+      font-weight: 600;
+    }
+    .lp-personalize-mock-save {
+      background: var(--navy);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: var(--r);
+      display: inline-block;
+    }
+
+    /* ── Mini FAQ ─────────────────────────────────────────────────── */
+    .lp-faq {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 700px) {
+      .lp-faq { grid-template-columns: 1fr; }
+    }
+    .lp-faq-item {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 22px 24px;
+    }
+    .lp-faq-q {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 15.5px;
+      font-weight: 700;
+      color: var(--navy);
+      margin-bottom: 8px;
+    }
+    .lp-faq-a {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--gray-600);
+    }
+
     /* ── Power-user (Tracker) section ─────────────────────────────── */
     .lp-tracker {
       background: linear-gradient(135deg, var(--navy) 0%, var(--navy-dark) 100%);
@@ -808,6 +943,92 @@
         <div>
           <h3>Reads the tone of replies</h3>
           <p>Inbound responses get an instant sentiment read - positive, neutral, negative - so you can prioritize who to write back to first.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="lp-section-alt-wrap">
+    <section class="lp-section">
+      <div class="lp-personalize">
+        <div>
+          <div class="lp-section-eyebrow">Personalize</div>
+          <h2>Tune the AI to sound like you - right inside the chat.</h2>
+          <p>
+            Every account has a "Reply Instructions" drawer in the Reply Buddy
+            sidebar. Tell the AI how you write - tone, length, signature,
+            words to avoid - and the next blurb obeys.
+          </p>
+          <p>
+            No prompt engineering, no template editor in a separate tab. Open
+            the drawer, edit the textarea, click Save. The next inbound that
+            lands picks up the new instructions.
+          </p>
+          <ul class="lp-personalize-list">
+            <li>Drafts in your voice, not a generic AI tone</li>
+            <li>Edit on the fly when a reply feels off</li>
+            <li>Settings are per-account, so you can run multiple personas</li>
+          </ul>
+        </div>
+        <div class="lp-personalize-visual" aria-hidden="true">
+          <div class="lp-personalize-mock-header">
+            <svg class="lp-personalize-mock-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 2 7 5 3 8"/></svg>
+            Edit reply instructions
+          </div>
+          <div class="lp-personalize-mock-text">
+            Keep replies under 40 words. Friendly but not chatty - never use
+            "Hope you're doing well." Always sign off with <strong>"Best,
+            Austin"</strong>. If they ask for a call, share my Calendly link.
+          </div>
+          <div class="lp-personalize-mock-foot">
+            <span class="lp-personalize-mock-status">Saved</span>
+            <span class="lp-personalize-mock-save">Save</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="lp-section">
+    <div class="lp-section-head">
+      <div class="lp-section-eyebrow">Quick answers</div>
+      <h2>The stuff people ask before installing.</h2>
+    </div>
+    <div class="lp-faq">
+      <div class="lp-faq-item">
+        <div class="lp-faq-q">Will LinkedIn flag my account?</div>
+        <div class="lp-faq-a">
+          Reply Buddy reads what's on the page and drafts text into a sidebar
+          you control. It doesn't auto-send messages, doesn't scrape profiles
+          you haven't opened, and doesn't simulate clicks. The reply is yours
+          to send (or not).
+        </div>
+      </div>
+      <div class="lp-faq-item">
+        <div class="lp-faq-q">Do you train AI on my messages?</div>
+        <div class="lp-faq-a">
+          No. Your threads are sent to Anthropic at draft time to generate a
+          blurb, then discarded. We don't keep a corpus of your conversations
+          and nothing you write is used to train models.
+        </div>
+      </div>
+      <div class="lp-faq-item">
+        <div class="lp-faq-q">What does it cost?</div>
+        <div class="lp-faq-a">
+          The Chrome extension is free to install. Reply Buddy works for
+          anyone signed in. Tracker (the dashboard, cadences, follow-up
+          automation) is $15 per seat per month - one seat per LinkedIn
+          account you're tracking. You can run Reply Buddy without ever
+          opening the Tracker side.
+        </div>
+      </div>
+      <div class="lp-faq-item">
+        <div class="lp-faq-q">Do I need Sales Navigator?</div>
+        <div class="lp-faq-a">
+          For Reply Buddy, no. It works on every LinkedIn surface, including
+          the free tier. Sales Navigator only matters if you want to layer on
+          Tracker workflows (bulk-logging, saved-search pipelines, cadence
+          automation).
         </div>
       </div>
     </div>
