@@ -3558,14 +3558,22 @@
         async function enrichOne(prospectId, triggeredBy) {
           // Calls the enrich-prospect edge function. Returns the
           // parsed { ok, fields_returned } body on success.
+          //
+          // Use ensureFreshSession (not raw getSession) so the JWT
+          // gets refreshed if the operator left the dashboard open
+          // past the access token's 1-hour expiry. Bare getSession
+          // returns whatever's in localStorage which can be stale,
+          // and the previous fallback to anonKey caused the edge
+          // function to fail with "invalid JWT" instead of giving a
+          // useful "not signed in" error.
+          const session = await sb.ensureFreshSession();
+          if (!session?.access_token) throw new Error("Not signed in");
           const url = `${window.SUPABASE_CONFIG.url}/functions/v1/enrich-prospect`;
-          const session = sb.getSession();
-          const token = session?.access_token || window.SUPABASE_CONFIG.anonKey;
           const resp = await fetch(url, {
             method:  "POST",
             headers: {
               "Content-Type":  "application/json",
-              "Authorization": `Bearer ${token}`,
+              "Authorization": `Bearer ${session.access_token}`,
               "apikey":        window.SUPABASE_CONFIG.anonKey,
             },
             body: JSON.stringify({
