@@ -477,6 +477,214 @@
       border-radius: 5px;
     }
 
+    /* Tony Stark conversation rendered as a LinkedIn-style chat thread
+       on the left side. Three bubbles: you -> Tony -> your draft. The
+       sidebar mirrors this same thread as labeled cards. */
+    .lp-mock-page-convo {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      box-shadow: var(--shadow-xs);
+    }
+    .lp-mock-page-convo-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #eef1f4;
+    }
+    .lp-mock-page-convo-avatar {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffd166 0%, #ef476f 100%);
+      flex-shrink: 0;
+    }
+    .lp-mock-page-convo-name {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #15212b;
+    }
+    .lp-mock-page-msgs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .lp-mock-page-msg {
+      font-size: 8.5px;
+      line-height: 1.4;
+      padding: 5px 8px;
+      border-radius: 8px;
+      max-width: 88%;
+    }
+    .lp-mock-page-msg-you {
+      background: #2d7ab8;
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+    .lp-mock-page-msg-them {
+      background: #eef1f4;
+      color: #15212b;
+      align-self: flex-start;
+      border-bottom-left-radius: 2px;
+    }
+    .lp-mock-page-msg-draft {
+      opacity: 0.85;
+      border: 1px dashed rgba(255,255,255,0.55);
+    }
+
+    /* Tab interactivity: hover + pulse on the inactive tab so users
+       discover that the mock is actually clickable. Pulse intentionally
+       a touch louder than typical so the eye is drawn. */
+    .lp-mock-sb-tab {
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .lp-mock-sb-tab:hover {
+      background: #f6f8fb;
+      color: var(--navy);
+    }
+    .lp-mock-sb-tab:not(.active) {
+      animation: lp-mock-tab-pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes lp-mock-tab-pulse {
+      0%, 100% { background: transparent; color: var(--gray-500); }
+      50% { background: rgba(30, 182, 131, 0.18); color: var(--navy); }
+    }
+    /* Stop pulsing once the user has clicked - one nudge is enough. */
+    .lp-hero-visual.lp-mock-clicked .lp-mock-sb-tab:not(.active) {
+      animation: none;
+    }
+
+    /* Two stacked panels inside the sidebar body. Only one is visible
+       at a time; the tab handler flips the .active class. */
+    .lp-mock-panel {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      overflow: hidden;
+    }
+    .lp-mock-panel.active {
+      display: flex;
+    }
+
+    /* ── Follow-ups view ──────────────────────────────────────────── */
+    .lp-mock-fu-pills {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .lp-mock-fu-pill {
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f0f3f6;
+      color: #5b6673;
+      letter-spacing: 0.02em;
+    }
+    .lp-mock-fu-pill.active {
+      background: var(--navy);
+      color: #fff;
+    }
+    .lp-mock-fu-row {
+      background: #fff;
+      border: 1px solid #eef1f4;
+      border-radius: 6px;
+      padding: 7px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .lp-mock-fu-row-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .lp-mock-fu-row-name {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #15212b;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+    }
+    .lp-mock-fu-badge {
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .lp-mock-fu-badge-pos {
+      background: #d6f3e3;
+      color: #107a3e;
+    }
+    .lp-mock-fu-badge-manual {
+      background: #e5dbff;
+      color: #5b3aa6;
+    }
+    .lp-mock-fu-row-due {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: #c2410c;
+      flex-shrink: 0;
+    }
+    .lp-mock-fu-row-due.tomorrow {
+      color: #5b6673;
+    }
+    .lp-mock-fu-row-meta {
+      font-size: 8.5px;
+      color: #5b6673;
+      line-height: 1.3;
+    }
+    .lp-mock-fu-row-step {
+      font-size: 8px;
+      color: #8892a0;
+      font-weight: 600;
+    }
+    .lp-mock-fu-row-draft {
+      background: #f6f8fb;
+      border: 1px solid #eef1f4;
+      border-radius: 4px;
+      padding: 5px 7px;
+      font-size: 9px;
+      color: #2d3744;
+      line-height: 1.35;
+    }
+    .lp-mock-fu-row-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .lp-mock-fu-btn {
+      flex: 1;
+      text-align: center;
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 4px 4px;
+      border-radius: 4px;
+      background: #fff;
+      border: 1px solid #dfe4ea;
+      color: #5b6673;
+    }
+    .lp-mock-fu-btn.primary {
+      background: #163a52;
+      color: #fff;
+      border-color: #163a52;
+    }
+    .lp-mock-fu-btn.success {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+    }
+
     /* ── Sections ─────────────────────────────────────────────────── */
     .lp-section {
       max-width: 1180px;
@@ -979,6 +1187,17 @@
       </div>
       <div class="lp-mock-body">
         <div class="lp-mock-page">
+          <div class="lp-mock-page-convo">
+            <div class="lp-mock-page-convo-head">
+              <span class="lp-mock-page-convo-avatar"></span>
+              <span class="lp-mock-page-convo-name">Tony Stark</span>
+            </div>
+            <div class="lp-mock-page-msgs">
+              <div class="lp-mock-page-msg lp-mock-page-msg-you">Tony - the new arc reactor demo is unreal. How does the team iterate that fast without burning out?</div>
+              <div class="lp-mock-page-msg lp-mock-page-msg-them">Mostly espresso and unreasonable deadlines. Why - what are you working on?</div>
+              <div class="lp-mock-page-msg lp-mock-page-msg-you lp-mock-page-msg-draft">Ha - same problem on my side. I help R&amp;D teams compress prototype cycles without losing their best engineers. Open to a quick chat?</div>
+            </div>
+          </div>
           <div class="lp-mock-page-thread">
             <div class="lp-mock-msg"></div>
             <div class="lp-mock-msg"></div>
@@ -1000,41 +1219,95 @@
             </div>
           </div>
           <div class="lp-mock-sb-tabs">
-            <div class="lp-mock-sb-tab active">Reply Buddy</div>
-            <div class="lp-mock-sb-tab">Follow-ups</div>
+            <div class="lp-mock-sb-tab active" data-panel="reply">Reply Buddy</div>
+            <div class="lp-mock-sb-tab" data-panel="fu">Follow-ups</div>
           </div>
           <div class="lp-mock-sb-body">
-            <div class="lp-mock-person">
-              <div class="lp-mock-person-name">Tony Stark</div>
-              <div class="lp-mock-person-meta">CEO · Stark Industries</div>
-            </div>
-            <div class="lp-mock-bb lp-mock-bb-sent">
-              <div class="lp-mock-bb-head">
-                <span class="lp-mock-bb-label">Message Sent</span>
+            <div class="lp-mock-panel active" data-panel="reply">
+              <div class="lp-mock-person">
+                <div class="lp-mock-person-name">Tony Stark</div>
+                <div class="lp-mock-person-meta">CEO · Stark Industries</div>
               </div>
-              <div class="lp-mock-bb-body">Tony - the new arc reactor demo is unreal. How does the team iterate that fast without burning out?</div>
-            </div>
-            <div class="lp-mock-bb lp-mock-bb-response">
-              <div class="lp-mock-bb-head">
-                <span class="lp-mock-bb-label">LinkedIn Response</span>
+              <div class="lp-mock-bb lp-mock-bb-sent">
+                <div class="lp-mock-bb-head">
+                  <span class="lp-mock-bb-label">Message Sent</span>
+                </div>
+                <div class="lp-mock-bb-body">Tony - the new arc reactor demo is unreal. How does the team iterate that fast without burning out?</div>
               </div>
-              <div class="lp-mock-bb-body">Mostly espresso and unreasonable deadlines. Why - what are you working on?</div>
-            </div>
-            <div class="lp-mock-bb lp-mock-bb-blurb">
-              <div class="lp-mock-bb-head">
-                <span class="lp-mock-bb-label">Suggested Reply</span>
-                <span class="lp-mock-bb-copy">Copy</span>
+              <div class="lp-mock-bb lp-mock-bb-response">
+                <div class="lp-mock-bb-head">
+                  <span class="lp-mock-bb-label">LinkedIn Response</span>
+                </div>
+                <div class="lp-mock-bb-body">Mostly espresso and unreasonable deadlines. Why - what are you working on?</div>
               </div>
-              <div class="lp-mock-bb-body">Ha - same problem on my side. I help R&amp;D teams compress prototype cycles without losing their best engineers. Open to a quick chat?</div>
-              <div class="lp-mock-bb-status">Blurb ready.</div>
+              <div class="lp-mock-bb lp-mock-bb-blurb">
+                <div class="lp-mock-bb-head">
+                  <span class="lp-mock-bb-label">Suggested Reply</span>
+                  <span class="lp-mock-bb-copy">Copy</span>
+                </div>
+                <div class="lp-mock-bb-body">Ha - same problem on my side. I help R&amp;D teams compress prototype cycles without losing their best engineers. Open to a quick chat?</div>
+                <div class="lp-mock-bb-status">Blurb ready.</div>
+              </div>
+              <div class="lp-mock-pills">
+                <div class="lp-mock-pill lp-mock-pill-pos active">Positive</div>
+                <div class="lp-mock-pill lp-mock-pill-neu">Neutral</div>
+                <div class="lp-mock-pill lp-mock-pill-neg">Negative</div>
+              </div>
+              <div class="lp-mock-aistatus">Interested</div>
+              <div class="lp-mock-log">Log Response</div>
             </div>
-            <div class="lp-mock-pills">
-              <div class="lp-mock-pill lp-mock-pill-pos active">Positive</div>
-              <div class="lp-mock-pill lp-mock-pill-neu">Neutral</div>
-              <div class="lp-mock-pill lp-mock-pill-neg">Negative</div>
+            <div class="lp-mock-panel" data-panel="fu">
+              <div class="lp-mock-fu-pills">
+                <span class="lp-mock-fu-pill active">All 3</span>
+                <span class="lp-mock-fu-pill">Positive 1</span>
+                <span class="lp-mock-fu-pill">Manual</span>
+              </div>
+              <div class="lp-mock-fu-row">
+                <div class="lp-mock-fu-row-head">
+                  <span class="lp-mock-fu-row-name">Peter Parker</span>
+                  <span class="lp-mock-fu-row-due">Due today</span>
+                </div>
+                <div class="lp-mock-fu-row-meta">Photographer · The Daily Bugle</div>
+                <div class="lp-mock-fu-row-step">Step 3 · day 14</div>
+                <div class="lp-mock-fu-row-draft">Hey Peter - any chance JJJ greenlit the angle yet? Happy to send another draft if it helps.</div>
+                <div class="lp-mock-fu-row-actions">
+                  <span class="lp-mock-fu-btn primary">Open</span>
+                  <span class="lp-mock-fu-btn">Copy</span>
+                  <span class="lp-mock-fu-btn success">Mark sent</span>
+                </div>
+              </div>
+              <div class="lp-mock-fu-row">
+                <div class="lp-mock-fu-row-head">
+                  <span class="lp-mock-fu-row-name">
+                    Bruce Banner
+                    <span class="lp-mock-fu-badge lp-mock-fu-badge-pos">Positive</span>
+                  </span>
+                  <span class="lp-mock-fu-row-due">Due today</span>
+                </div>
+                <div class="lp-mock-fu-row-meta">Head of R&amp;D · Avengers Tower</div>
+                <div class="lp-mock-fu-row-step">Positive · step 1 · day 1</div>
+                <div class="lp-mock-fu-row-draft">Bruce - want to make sure my last note didn't get buried. Still keen to compare notes on keeping the team calm under deadline.</div>
+                <div class="lp-mock-fu-row-actions">
+                  <span class="lp-mock-fu-btn primary">Open</span>
+                  <span class="lp-mock-fu-btn">Copy</span>
+                  <span class="lp-mock-fu-btn success">Mark sent</span>
+                </div>
+              </div>
+              <div class="lp-mock-fu-row">
+                <div class="lp-mock-fu-row-head">
+                  <span class="lp-mock-fu-row-name">Pepper Potts</span>
+                  <span class="lp-mock-fu-row-due tomorrow">Due tomorrow</span>
+                </div>
+                <div class="lp-mock-fu-row-meta">COO · Stark Industries</div>
+                <div class="lp-mock-fu-row-step">Step 2 · day 7</div>
+                <div class="lp-mock-fu-row-draft">Pepper - circling back. Worth a quick intro to the team handling your R&amp;D throughput?</div>
+                <div class="lp-mock-fu-row-actions">
+                  <span class="lp-mock-fu-btn primary">Open</span>
+                  <span class="lp-mock-fu-btn">Copy</span>
+                  <span class="lp-mock-fu-btn success">Mark sent</span>
+                </div>
+              </div>
             </div>
-            <div class="lp-mock-aistatus">Interested</div>
-            <div class="lp-mock-log">Log Response</div>
           </div>
         </div>
       </div>
@@ -1280,6 +1553,24 @@
         }
       }
       document.getElementById("lp-year").textContent = new Date().getFullYear();
+    })();
+
+    // Make the hero mock's tabs actually toggle between Reply Buddy and
+    // Follow-ups panels. The mock is decorative (aria-hidden) so this is
+    // just for discoverability / "see what's inside" on the landing page.
+    (function () {
+      const visual = document.querySelector(".lp-hero-visual");
+      if (!visual) return;
+      const tabs = visual.querySelectorAll(".lp-mock-sb-tab");
+      const panels = visual.querySelectorAll(".lp-mock-panel");
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const target = tab.dataset.panel;
+          tabs.forEach((t) => t.classList.toggle("active", t.dataset.panel === target));
+          panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === target));
+          visual.classList.add("lp-mock-clicked"); // kills the pulse after first interaction
+        });
+      });
     })();
   </script>
 </body>
