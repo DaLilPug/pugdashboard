@@ -138,7 +138,7 @@
 
           <div class="ub-modal-body">
             ${isFirstPurchase ? `
-              <p class="ub-modal-intro">Start with a <strong>7-day free trial</strong>. We'll save your card and charge after the trial ends.</p>
+              <p class="ub-modal-intro">Start with a <strong>7-day free trial</strong>. We'll save your card and charge after the trial ends. You can cancel anytime during trial.</p>
 
               <div class="ub-interval-toggle" role="radiogroup" aria-label="Billing interval">
                 <label class="ub-interval-opt">
