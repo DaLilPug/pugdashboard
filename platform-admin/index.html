@@ -335,6 +335,10 @@
             <td>${fmtDateTime(org.created_at)}</td>
             <td class="col-actions">
               <a class="btn-row-action btn-drill-in" href="/dashboard/?as_org=${encodeURIComponent(org.id)}" title="Open the dashboard scoped to this organization">View as org</a>
+              <button type="button" class="btn-row-action btn-delete-org"
+                      data-org-id="${esc(org.id)}"
+                      data-org-name="${esc(org.name)}"
+                      title="Delete this organization permanently. Requires zero members, zero clients (including archived), and no active subscription.">Delete org</button>
             </td>
           </tr>
         `;
@@ -466,6 +470,60 @@
               if (ev.key === "Enter")  { ev.preventDefault(); input.blur(); }
               if (ev.key === "Escape") { ev.preventDefault(); cancel(); input.blur(); }
             });
+          });
+        });
+
+        // Delete-org button: routes through platform_admin_delete_org
+        // which gates on members=0, clients=0 (incl. archived), and no
+        // active Stripe subscription. Each rejection comes back with a
+        // status field we translate to a clear English message so the
+        // admin knows exactly what to clean up first.
+        tbodyEl.querySelectorAll(".btn-delete-org").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const orgId   = btn.dataset.orgId;
+            const orgName = btn.dataset.orgName || "this organization";
+            if (!confirm(
+              `Delete "${orgName}"?\n\n` +
+              `This permanently removes the organization row and its ` +
+              `audit log + pending invites. Requires zero members, ` +
+              `zero clients (including archived), and no active ` +
+              `subscription. This cannot be undone.`
+            )) return;
+
+            const prev = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "Deleting…";
+            try {
+              const resp = await sb.sbFetch("/rest/v1/rpc/platform_admin_delete_org", {
+                method: "POST",
+                body:   JSON.stringify({ p_org_id: orgId }),
+              });
+              const status = resp && resp.status;
+              if (status === "deleted") {
+                await load();
+                return;
+              }
+              if (status === "has_members") {
+                const n = Number(resp.member_count) || 0;
+                alert(`This org still has ${n} member${n === 1 ? "" : "s"}. Use "View as org" → Team to remove them first.`);
+              } else if (status === "has_clients") {
+                const n = Number(resp.client_count) || 0;
+                alert(`This org still has ${n} client${n === 1 ? "" : "s"} (including archived). Use "View as org" to delete or transfer them first.`);
+              } else if (status === "has_subscription") {
+                alert(`This org has an active, trialing, or past-due Stripe subscription. Cancel it via the Stripe dashboard before deleting.`);
+              } else if (status === "not_found") {
+                alert(`That org no longer exists. The table may be stale - refreshing.`);
+                await load();
+                return;
+              } else {
+                alert(`Unexpected response: ${JSON.stringify(resp)}`);
+              }
+            } catch (err) {
+              alert(`Couldn't delete org: ${err.message || err}`);
+            } finally {
+              btn.disabled = false;
+              btn.textContent = prev;
+            }
           });
         });
       }
