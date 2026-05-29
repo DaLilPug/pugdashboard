@@ -18,6 +18,9 @@
     mode; otherwise the card renders as sign-in. The toggle at the
     bottom swaps modes in-place without a page reload so the URL
     params (email pre-fill, in particular) don't get stripped.
+
+    A successful signup hides this form and shows the #confirm-panel
+    sibling below so the "check your inbox" step is unmissable.
   -->
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
@@ -67,6 +70,35 @@
       By signing in, you agree to our <a href="/terms/">Terms</a> and <a href="/privacy/">Privacy Policy</a>.
     </div>
   </form>
+
+  <!--
+    Post-signup confirmation card. Replaces the form so the
+    "check your email" step is the only thing on screen - no
+    confusion about whether the form submission worked. The Resend
+    button hits sb.signUp again; if Supabase rate-limits (default
+    60s between sends), we translate the cryptic security-purposes
+    error into a clear "we already sent it" message.
+  -->
+  <div id="confirm-panel" class="login-card" hidden>
+    <div class="login-brand">
+      <img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" />
+    </div>
+    <div class="login-title">Check your email</div>
+    <p class="login-confirm-body">
+      We sent a verification link to <strong id="confirm-email"></strong>.
+      Click the link in that email to finish setting up your account.
+    </p>
+    <p class="login-confirm-note">
+      Don't see it? Check your spam folder, or resend below.
+    </p>
+    <button id="resend-btn" class="login-submit" type="button">Resend verification email</button>
+    <div id="resend-info" class="login-info"></div>
+    <div id="resend-error" class="login-error"></div>
+    <div class="login-switch">
+      <span>Already confirmed?</span>
+      <a id="confirm-signin-link" href="#" role="button">Sign in</a>
+    </div>
+  </div>
 
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
@@ -198,11 +230,11 @@
           if (result.needsConfirmation) {
             // Confirm-email mode (Supabase project setting). The trigger
             // chain only fires once the user clicks the confirmation
-            // email, so we can't drop them on the dashboard yet.
-            infoEl.textContent =
-              "Check your inbox to confirm your email, then sign in.";
-            submitBtn.disabled    = false;
-            submitBtn.textContent = prevLabel;
+            // email, so we can't drop them on the dashboard yet. Swap
+            // the form out for the confirmation panel so the "check
+            // your email" step is the entire visible UI - not a small
+            // info line that's easy to miss.
+            showConfirmPanel(emailEl.value.trim());
             return;
           }
           // Auto-confirm mode: trigger chain has already created the
@@ -215,11 +247,87 @@
         await sb.signIn(emailEl.value.trim(), pwEl.value);
         window.location.replace("/dashboard/");
       } catch (err) {
-        errorEl.textContent   = err.message
+        errorEl.textContent   = friendlySignupError(err, mode)
           || ((mode === "signup") ? "Sign-up failed" : "Sign-in failed");
         submitBtn.disabled    = false;
         submitBtn.textContent = prevLabel;
       }
+    });
+
+    // ---- Confirmation panel ----------------------------------------
+    const confirmPanel   = document.getElementById("confirm-panel");
+    const confirmEmailEl = document.getElementById("confirm-email");
+    const resendBtn      = document.getElementById("resend-btn");
+    const resendInfo     = document.getElementById("resend-info");
+    const resendError    = document.getElementById("resend-error");
+    const confirmSigninLink = document.getElementById("confirm-signin-link");
+
+    // Email + password that were used on the original signup attempt.
+    // Resend re-calls sb.signUp with the same args; supabase-js treats
+    // it as "send the verification email again" when the user is in
+    // pending-confirmation state. The password isn't actually changed.
+    let pendingSignupEmail = "";
+    let pendingSignupPassword = "";
+    let pendingSignupName = "";
+
+    function showConfirmPanel(email) {
+      pendingSignupEmail    = email;
+      pendingSignupPassword = pwEl.value;
+      pendingSignupName     = nameEl.value.trim();
+      confirmEmailEl.textContent = email;
+      form.hidden = true;
+      confirmPanel.hidden = false;
+      resendInfo.textContent  = "";
+      resendError.textContent = "";
+    }
+
+    // Translate a few cryptic Supabase auth errors into actionable
+    // English. The most common one in this flow is the 60-second
+    // resend rate-limit ("For security purposes, you can only request
+    // this after N seconds.") which the operator hits if they
+    // re-click Create Account thinking the first click didn't work.
+    function friendlySignupError(err, mode) {
+      const raw = (err && err.message) ? String(err.message) : "";
+      const low = raw.toLowerCase();
+      if (low.includes("security purposes") || low.includes("rate limit")) {
+        if (mode === "signup") {
+          return "We already sent a verification email - check your inbox (and spam folder). You can try again in a minute.";
+        }
+        return "Too many attempts. Wait a minute and try again.";
+      }
+      if (low.includes("user already registered")) {
+        return "An account with this email already exists. Try signing in instead, or use Forgot password.";
+      }
+      return raw;
+    }
+
+    resendBtn.addEventListener("click", async () => {
+      resendInfo.textContent  = "";
+      resendError.textContent = "";
+      const prev = resendBtn.textContent;
+      resendBtn.disabled = true;
+      resendBtn.textContent = "Resending…";
+      try {
+        await sb.signUp(pendingSignupEmail, pendingSignupPassword, { name: pendingSignupName });
+        resendInfo.textContent = "Sent. Check your inbox.";
+      } catch (err) {
+        resendError.textContent = friendlySignupError(err, "signup");
+      } finally {
+        resendBtn.disabled = false;
+        resendBtn.textContent = prev;
+      }
+    });
+
+    confirmSigninLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      // Swap back to the form in sign-in mode with the email pre-filled.
+      confirmPanel.hidden = true;
+      form.hidden = false;
+      mode = "signin";
+      applyMode();
+      emailEl.value = pendingSignupEmail;
+      pwEl.value = "";
+      pwEl.focus();
     });
   </script>
 </body>
