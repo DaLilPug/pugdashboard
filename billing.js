@@ -267,23 +267,42 @@
       try {
         if (isFirstPurchase) {
           const stripe = await getStripe();
-          // 1. Create subscription on the server (returns client_secret
-          //    of the pending SetupIntent — Stripe collects card without
-          //    charging during the 7-day trial).
-          const init = await callFn("stripe-billing-init", {
-            action: "first_seat",
-            qty,
-            interval,
-          });
-          if (!init?.client_secret) {
-            throw new Error(init?.error || "Couldn't initialize subscription");
+          // Two-step flow so the subscription only exists once a
+          // valid card has been collected:
+          //
+          //   1. stripe-billing-prepare: server ensures the Stripe
+          //      Customer exists and creates a SetupIntent. No
+          //      subscription yet.
+          //   2. stripe.confirmCardSetup: collect + attach the card
+          //      via Stripe Elements. If this fails or the user
+          //      bails, NOTHING is created on our side.
+          //   3. stripe-billing-finalize: hand the resulting
+          //      payment_method_id back to the server, which now
+          //      creates the subscription with the card pre-loaded
+          //      as default + a 7-day trial. The day-7 charge
+          //      can't fail "no payment method" because the card
+          //      was already validated in step 2.
+          const prep = await callFn("stripe-billing-prepare", { qty });
+          if (!prep?.client_secret) {
+            throw new Error(prep?.error || "Couldn't initialize subscription");
           }
-          // 2. Confirm card with Stripe Elements.
-          const result = await stripe.confirmCardSetup(init.client_secret, {
+          const result = await stripe.confirmCardSetup(prep.client_secret, {
             payment_method: { card: cardElement },
           });
           if (result.error) {
             throw new Error(result.error.message || "Card declined");
+          }
+          const pmId = result.setupIntent && result.setupIntent.payment_method;
+          if (!pmId) {
+            throw new Error("Card was collected but no payment method id returned by Stripe");
+          }
+          const finalize = await callFn("stripe-billing-finalize", {
+            payment_method_id: pmId,
+            qty,
+            interval,
+          });
+          if (!finalize?.ok) {
+            throw new Error(finalize?.error || "Couldn't start subscription after card");
           }
         } else {
           await callFn("stripe-billing-init", { action: "add_seat", qty });
