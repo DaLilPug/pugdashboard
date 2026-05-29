@@ -1094,8 +1094,13 @@
 <body class="lp-hidden">
   <!--
     Routing:
-    - Password recovery hash → forward to /reset/ (preserved from prior
-      router behavior; sometimes Supabase falls back to Site URL).
+    - Password recovery hash (type=recovery) → forward to /reset/ where
+      the set-new-password UI lives.
+    - Any other access_token hash (type=signup, invite, magiclink,
+      email_change) → that's Supabase bouncing back from a confirmation
+      email; parse the tokens, stash the session, send the user
+      straight to /dashboard/ so they don't have to type their
+      password again.
     - Signed-in users → /dashboard/ (skip the marketing page).
     - Everyone else → see this landing page.
 
@@ -1105,21 +1110,60 @@
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script>
-    if (location.hash && location.hash.includes("type=recovery")) {
-      window.location.replace("/reset/" + location.hash);
-    } else {
-      sb.ensureFreshSession()
-        .then(s => {
-          if (s) {
-            window.location.replace("/dashboard/");
-          } else {
-            document.body.classList.remove("lp-hidden");
-          }
-        })
-        .catch(() => {
-          document.body.classList.remove("lp-hidden");
-        });
-    }
+    (async function route() {
+      // 1. Password-recovery hash → /reset/.
+      if (location.hash && location.hash.includes("type=recovery")) {
+        window.location.replace("/reset/" + location.hash);
+        return;
+      }
+
+      // 2. Any other access_token hash (signup confirmation, invite,
+      //    magiclink, email-change). Parse + stash + redirect to
+      //    /dashboard/. Without this the user lands on the marketing
+      //    page with a session-bearing hash and has to manually go
+      //    sign in - silly because they just clicked an email link
+      //    that already authenticated them.
+      if (location.hash && location.hash.includes("access_token=")) {
+        const params        = new URLSearchParams(location.hash.slice(1));
+        const access_token  = params.get("access_token");
+        const refresh_token = params.get("refresh_token");
+        if (access_token && refresh_token) {
+          const expires_in = parseInt(params.get("expires_in") || "3600", 10);
+          // Fetch the user record up-front so session.user is populated.
+          // Mirrors the same fix we ship in /login/'s OAuth callback -
+          // downstream pages read session.user.id and would see
+          // undefined otherwise.
+          let user = null;
+          try {
+            const res = await fetch(`${window.SUPABASE_CONFIG.url}/auth/v1/user`, {
+              headers: {
+                apikey:        window.SUPABASE_CONFIG.anonKey,
+                Authorization: `Bearer ${access_token}`,
+              },
+            });
+            if (res.ok) user = await res.json();
+          } catch (_) { /* fall through */ }
+          // Strip the hash so a refresh doesn't reprocess stale tokens,
+          // then bounce to the dashboard.
+          history.replaceState(null, "", location.pathname + location.search);
+          sb.setSessionFromTokens({ access_token, refresh_token, expires_in, user });
+          window.location.replace("/dashboard/");
+          return;
+        }
+      }
+
+      // 3. Already signed in → /dashboard/.
+      try {
+        const s = await sb.ensureFreshSession();
+        if (s) {
+          window.location.replace("/dashboard/");
+          return;
+        }
+      } catch (_) { /* fall through to landing page */ }
+
+      // 4. Anonymous visitor → show the landing page.
+      document.body.classList.remove("lp-hidden");
+    })();
   </script>
 
   <nav class="lp-nav">
