@@ -2945,7 +2945,7 @@
             clickEvt.preventDefault();
             state.selected.clear();
             state.lastCheckedKey = null;
-            rerender();
+            syncSelectionUi();
             return;
           }
           if (action === "bulk-delete-prospects") {
@@ -3781,14 +3781,16 @@
           const visibleSelected = visibleKeys.filter(k => state.selected.has(k)).length;
           const allChecked = visibleSelected === visibleKeys.length;
           if (allChecked) {
-            // Deselect all visible (preserves any out-of-view selections —
-            // but rerender drops those anyway to avoid lying about counts).
             for (const k of visibleKeys) state.selected.delete(k);
           } else {
             for (const k of visibleKeys) state.selected.add(k);
           }
           state.lastCheckedKey = null;
-          rerender();
+          // syncSelectionUi rather than rerender — toggling 3,600 selected
+          // states doesn't change the table contents, only the .selected
+          // class + checkbox state per row + the bulk-bar count, which
+          // syncSelectionUi handles directly. Avoids a full table rebuild.
+          syncSelectionUi();
         }
 
         // Per-row checkbox click. Detects shift+click for range select
