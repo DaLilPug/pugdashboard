@@ -18,5 +18,5 @@ window.SUPABASE_CONFIG = {
   // string hides the "Get the Chrome extension" link in the
   // dashboard header. The dashboard's reveal-on-load JS reads this
   // and unhides #chrome-ext-link when it's non-empty.
-  chromeExtensionUrl: "https://chromewebstore.google.com/detail/uptown-tracker-linkedin/oiojmfjjdgpjpanoienjmnoigjpjlhlc",
+  chromeExtensionUrl: "https://chromewebstore.google.com/detail/uptown-reply-buddy-and-tr/oiojmfjjdgpjpanoienjmnoigjpjlhlc",
 };

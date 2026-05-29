@@ -1145,7 +1145,7 @@
         not minutes.
       </h1>
       <p class="lp-hero-sub">
-        Uptown Reply Buddy reads the thread, drafts your reply in your voice, and lines up the next follow-up. Open a chat, get a blurb, keep the conversation moving.
+        Uptown Reply Buddy reads the thread, drafts your reply in your voice, and pre-classifies whether the response is positive, neutral, or negative so you know how to pitch it. Open a chat, get a blurb, keep moving.
       </p>
       <div class="lp-hero-ctas">
         <a class="lp-btn lp-btn-primary lp-btn-lg" id="lp-hero-install" target="_blank" rel="noopener">
@@ -1349,7 +1349,7 @@
         </div>
         <div>
           <h3>Replies that sound like you</h3>
-          <p>Reply Buddy learns your voice from past threads - your closes, your style, your defaults. Drafts come out feeling written, not generated.</p>
+          <p>Set your tone, sign-off, and what to avoid in the sidebar's Reply Instructions drawer. The next blurb obeys, and drafts come out sounding written, not generated.</p>
         </div>
       </div>
       <div class="lp-feature">
@@ -1366,8 +1366,8 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div>
-          <h3>Follow-ups that show up</h3>
-          <p>One click after you send lines up the next nudge. Reply Buddy keeps the queue so you don't have to remember who's waiting on what.</p>
+          <h3>One-click logging</h3>
+          <p>Tap connection request, message, or meeting after you send - Reply Buddy logs it against the right prospect, no spreadsheet. If you've added Tracker, that same click queues the next follow-up automatically.</p>
         </div>
       </div>
       <div class="lp-feature">
@@ -1439,30 +1439,36 @@
         </div>
       </div>
       <div class="lp-faq-item">
-        <div class="lp-faq-q">Do you train AI on my messages?</div>
+        <div class="lp-faq-q">Can I edit Reply Buddy's drafts?</div>
         <div class="lp-faq-a">
-          No. Your threads are sent to Anthropic at draft time to generate a
-          blurb, then discarded. We don't keep a corpus of your conversations
-          and nothing you write is used to train models.
+          Always. Drafts appear in the sidebar, not in LinkedIn's reply box.
+          You copy, paste into LinkedIn, edit freely, and send when it
+          sounds right. The "Edit reply instructions" drawer in the sidebar
+          lets you teach the AI your tone - more formal, more casual,
+          specific sign-offs, anything - and saves it per account so future
+          drafts pick it up.
         </div>
       </div>
       <div class="lp-faq-item">
         <div class="lp-faq-q">What does it cost?</div>
         <div class="lp-faq-a">
-          The Chrome extension is free to install. Reply Buddy works for
-          anyone signed in. Tracker (the dashboard, cadences, follow-up
-          automation) is $15 per seat per month - one seat per LinkedIn
-          account you're tracking. You can run Reply Buddy without ever
-          opening the Tracker side.
+          Reply Buddy is free. Install the Chrome extension, sign in, done.
+          Tracker (the analytics dashboard, cadences, follow-up automation,
+          HubSpot/Zapier/Calendly integrations, Apollo enrichment) is $15
+          per seat per month or $120 per seat per year, with a 7-day free
+          trial. One seat per LinkedIn account you're managing.
         </div>
       </div>
       <div class="lp-faq-item">
         <div class="lp-faq-q">Do I need Sales Navigator?</div>
         <div class="lp-faq-a">
-          For Reply Buddy, no. It works on every LinkedIn surface, including
-          the free tier. Sales Navigator only matters if you want to layer on
-          Tracker workflows (bulk-logging, saved-search pipelines, cadence
-          automation).
+          No. Reply Buddy works on every LinkedIn surface including the
+          free tier, and Tracker's analytics + cadences + follow-up
+          automation all run off whatever you log via Reply Buddy. Sales
+          Navigator is purely about volume: its bulk-log bar lets you
+          process a whole saved-search list in one motion instead of one
+          prospect at a time. Worth it once you're past ~50 outreaches a
+          week.
         </div>
       </div>
     </div>
@@ -1476,29 +1482,58 @@
           <h2>Add the Uptown Tracker when you're ready to scale.</h2>
           <p>Reply Buddy keeps your inbox moving. Uptown Tracker is what you turn on when you're running outreach across a list, a team, or both.</p>
           <ul class="lp-tracker-list">
-            <li>Log every send from Sales Navigator in one click</li>
-            <li>See conversion at every stage - send to reply to meeting</li>
-            <li>Catch the patterns that work and the ones that don't</li>
-            <li>Run cadences across your whole team, not just your own threads</li>
+            <li>Per-LinkedIn-account analytics: acceptance, response, positive-response, and meeting rates - so you can see exactly which campaign converts and which one needs a rewrite</li>
+            <li>Bulk-log a whole Sales Navigator saved-search list in one motion - no clicking row by row</li>
+            <li>Follow-up cadences that run themselves: define the sequence once, Tracker queues each step on the right day for the right prospect (and skips weekends if you want)</li>
+            <li>HubSpot contact sync, Zapier triggers, Calendly auto-logging, and Apollo email enrichment - all wired in, no copy-paste between tools</li>
           </ul>
           <a class="lp-btn lp-btn-primary" href="/login/">Sign in to Uptown Tracker</a>
         </div>
         <div class="lp-tracker-visual">
+          <!--
+            Stat numbers are math-consistent and each metric is "slightly
+            above benchmark" per reference_benchmarking.md:
+              acceptance >= 30%  (here 33%)
+              response   >= 20%  (here 22%)
+              positive   >= 15%  (here 17%)
+              booking    >= 40%  (here 44%, meetings / positive responses)
+            Math:
+              1,284 requests * 33% acceptance ≈ 424 messages sent
+              424 messages * 22% response       ≈ 93 responses
+              93 responses * 17% positive       ≈ 16 positive responses
+              16 positive * 44% booking         ≈ 7 meetings
+          -->
           <div class="lp-tracker-stat">
             <span class="lp-tracker-stat-label">Connection requests sent</span>
             <span class="lp-tracker-stat-val">1,284</span>
           </div>
           <div class="lp-tracker-stat">
             <span class="lp-tracker-stat-label">Acceptance rate</span>
-            <span class="lp-tracker-stat-val">42%</span>
+            <span class="lp-tracker-stat-val">33%</span>
           </div>
           <div class="lp-tracker-stat">
-            <span class="lp-tracker-stat-label">Replies received</span>
-            <span class="lp-tracker-stat-val">218</span>
+            <span class="lp-tracker-stat-label">Messages sent</span>
+            <span class="lp-tracker-stat-val">424</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Responses</span>
+            <span class="lp-tracker-stat-val">93</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Response rate</span>
+            <span class="lp-tracker-stat-val">22%</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Positive responses</span>
+            <span class="lp-tracker-stat-val">16</span>
           </div>
           <div class="lp-tracker-stat">
             <span class="lp-tracker-stat-label">Meetings booked</span>
-            <span class="lp-tracker-stat-val">37</span>
+            <span class="lp-tracker-stat-val">7</span>
+          </div>
+          <div class="lp-tracker-stat">
+            <span class="lp-tracker-stat-label">Positive response rate</span>
+            <span class="lp-tracker-stat-val">17%</span>
           </div>
         </div>
       </div>
@@ -1507,7 +1542,7 @@
 
   <section class="lp-final">
     <h2>Install Reply Buddy and write your next message tomorrow morning.</h2>
-    <p>Free Chrome extension. Sign in optional. Install once and Reply Buddy lives in every LinkedIn tab.</p>
+    <p>Free Chrome extension. Quick sign-in with email or Google. Install once and Reply Buddy lives in every LinkedIn tab.</p>
     <a class="lp-btn lp-btn-primary lp-btn-lg" id="lp-final-install" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"/>
