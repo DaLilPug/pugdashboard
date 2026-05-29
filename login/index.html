@@ -165,6 +165,8 @@
     const switchPromptEl = document.getElementById("switch-prompt");
     const switchLinkEl   = document.getElementById("switch-link");
     const forgotLinkEl   = document.getElementById("forgot-link");
+    const googleBlock    = document.getElementById("google-block");
+    const googleBtn      = document.getElementById("google-btn");
 
     let mode = wantsSignup ? "signup" : "signin";
 
@@ -174,9 +176,6 @@
     if (emailFromUrl) emailEl.value = emailFromUrl;
 
     applyMode();
-
-    const googleBlock = document.getElementById("google-block");
-    const googleBtn   = document.getElementById("google-btn");
 
     function applyMode() {
       errorEl.textContent = "";
