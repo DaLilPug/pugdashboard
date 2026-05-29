@@ -150,13 +150,31 @@
   }
 
   // Returns a fresh session or null. Refreshes if access token expires
-  // within 60 seconds.
+  // within 60 seconds. Also backfills session.user if missing - this
+  // can happen for OAuth signups where the callback hash doesn't
+  // carry user data; downstream code that reads session.user.id
+  // (e.g. team page's admin-org probe) would otherwise see undefined.
   async function ensureFreshSession() {
     let s = getSession();
     if (!s) return null;
     if (Date.now() > (s.expires_at - 60_000)) {
       try { s = await refreshSession(); }
       catch (_) { return null; }
+    }
+    // Self-heal: backfill session.user if it's null (e.g. an older
+    // OAuth signup stored before the login page started fetching it
+    // up-front). One-shot lookup against /auth/v1/user; on success
+    // we persist so this fast-paths next call.
+    if (!s.user && s.access_token) {
+      try {
+        const res = await fetch(`${URL_BASE}/auth/v1/user`, {
+          headers: { apikey: ANON_KEY, Authorization: `Bearer ${s.access_token}` },
+        });
+        if (res.ok) {
+          s = { ...s, user: await res.json() };
+          setSession(s);
+        }
+      } catch (_) { /* leave session.user null; next call retries */ }
     }
     return s;
   }

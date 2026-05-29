@@ -125,16 +125,35 @@
     // (or any provider) round-trip, it bounces back here with
     // access_token + refresh_token in the URL hash. Stash the session
     // and forward to /dashboard/ before any UI even mounts.
-    (function handleOAuthCallback() {
+    //
+    // We also fetch the user record from /auth/v1/user before stashing,
+    // because the OAuth redirect hash doesn't include user data and
+    // downstream pages read session.user.id (e.g. team/index.html's
+    // admin-org check queries organization_members with operator_id
+    // = session.user.id - if user is null, that's "eq.undefined" and
+    // the user appears to have no admin orgs).
+    (async function handleOAuthCallback() {
       if (!location.hash || !location.hash.includes("access_token=")) return;
       const params = new URLSearchParams(location.hash.slice(1));
       const access_token  = params.get("access_token");
       const refresh_token = params.get("refresh_token");
       if (!access_token || !refresh_token) return;
       const expires_in = parseInt(params.get("expires_in") || "3600", 10);
+
+      let user = null;
+      try {
+        const res = await fetch(`${window.SUPABASE_CONFIG.url}/auth/v1/user`, {
+          headers: {
+            apikey:        window.SUPABASE_CONFIG.anonKey,
+            Authorization: `Bearer ${access_token}`,
+          },
+        });
+        if (res.ok) user = await res.json();
+      } catch (_) { /* fall through; downstream pages will refresh */ }
+
       // Strip the hash so a page refresh doesn't re-process stale tokens.
       history.replaceState(null, "", location.pathname + location.search);
-      sb.setSessionFromTokens({ access_token, refresh_token, expires_in });
+      sb.setSessionFromTokens({ access_token, refresh_token, expires_in, user });
       window.location.replace("/dashboard/");
     })();
 
