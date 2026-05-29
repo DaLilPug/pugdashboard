@@ -2763,11 +2763,35 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 .pr-table tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* Prospect rows are clickable; timeline rows are not. */
-.pr-row { cursor: pointer; transition: background .12s; }
+/* Prospect rows are clickable; timeline rows are not.
+
+   content-visibility: auto opts each row into browser-level
+   virtualization: when a row is far enough off-screen, the engine
+   skips its style/layout/paint passes entirely. On accounts with
+   thousands of prospects (John Kratz: ~3,600), this is the
+   difference between the browser painting every row on every
+   scroll frame and only painting the rows near the viewport.
+   contain-intrinsic-size gives the engine a height hint so the
+   scrollbar reflects the true table height before un-skipped rows
+   measure themselves. Supported in Chrome/Edge 85+, Firefox 125+,
+   Safari 18+. */
+.pr-row {
+  cursor: pointer;
+  transition: background .12s;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
+}
 .pr-row:hover    { background: var(--navy-light); }
 .pr-row.expanded { background: var(--navy-light); }
 .pr-row.expanded .pr-name-main { color: var(--navy); }
+
+/* Same trick for the timeline row, which stays hidden via the
+   .hidden class until expanded and otherwise renders a several-
+   hundred-px tall timeline view. */
+.pr-timeline-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 0px;
+}
 
 .pr-name-main {
   font-weight: 700;
