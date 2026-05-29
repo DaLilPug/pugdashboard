@@ -3871,6 +3871,57 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   line-height: 1.4;
 }
 
+/* "or" divider between password sign-in and OAuth providers.
+   Centered short text with horizontal lines on each side. */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-500);
+  margin: 16px 0 12px;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Google sign-in button. Neutral "white with subtle border + the
+   four-color G mark" treatment per Google's branding guidelines. */
+.login-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.login-google:hover {
+  background: var(--surface-2);
+  border-color: var(--gray-400);
+}
+.login-google:active {
+  background: var(--gray-200);
+}
+.login-google-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 /* Post-signup confirmation card. Sits in the same .login-card as
    the form replaces (hidden until showConfirmPanel runs). Body
    text larger than .login-info so the "check your email" step

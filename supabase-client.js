@@ -213,6 +213,7 @@
   // Stash a session that came from outside the normal sign-in flow (the
   // recovery URL Supabase redirects to has the access + refresh tokens
   // in the URL hash; the /reset/ page reads them and calls this).
+  // Also used by the OAuth callback on /login/.
   function setSessionFromTokens({ access_token, refresh_token, expires_in, user }) {
     const session = {
       access_token,
@@ -222,6 +223,19 @@
     };
     setSession(session);
     return session;
+  }
+
+  // Kick off an OAuth sign-in. Navigates the browser to Supabase's
+  // authorize endpoint; Supabase handles the round-trip with the
+  // provider (Google, etc.) and bounces back to `redirectTo` with
+  // tokens in the URL hash. The landing page (typically /login/)
+  // parses the hash and calls setSessionFromTokens.
+  function signInWithProvider(provider, redirectTo) {
+    const params = new URLSearchParams({
+      provider,
+      redirect_to: redirectTo || `${location.origin}/login/`,
+    });
+    window.location.href = `${URL_BASE}/auth/v1/authorize?${params.toString()}`;
   }
 
   async function signOut() {
@@ -347,6 +361,7 @@
     signIn,
     signUp,
     signOut,
+    signInWithProvider,
     resetPasswordForEmail,
     updatePassword,
     setSessionFromTokens,

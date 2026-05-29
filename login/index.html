@@ -57,6 +57,24 @@
     <div id="error-msg" class="login-error"></div>
     <div id="info-msg" class="login-info"></div>
 
+    <!-- Google sign-in path. Visible in signin + signup modes (Google
+         OAuth handles both new and existing users automatically);
+         hidden in reset mode. Button styling follows Google's
+         "neutral" branding: white background, subtle border, the
+         standard four-color "G" mark on the left. -->
+    <div id="google-block">
+      <div class="login-divider"><span>or</span></div>
+      <button id="google-btn" class="login-google" type="button">
+        <svg class="login-google-icon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.836.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+          <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+        </svg>
+        Continue with Google
+      </button>
+    </div>
+
     <div class="login-switch">
       <span id="switch-prompt">New to Uptown?</span>
       <a id="switch-link" href="#" role="button">Create an account</a>
@@ -103,6 +121,23 @@
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script>
+    // OAuth callback: when Supabase finishes a "Continue with Google"
+    // (or any provider) round-trip, it bounces back here with
+    // access_token + refresh_token in the URL hash. Stash the session
+    // and forward to /dashboard/ before any UI even mounts.
+    (function handleOAuthCallback() {
+      if (!location.hash || !location.hash.includes("access_token=")) return;
+      const params = new URLSearchParams(location.hash.slice(1));
+      const access_token  = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      if (!access_token || !refresh_token) return;
+      const expires_in = parseInt(params.get("expires_in") || "3600", 10);
+      // Strip the hash so a page refresh doesn't re-process stale tokens.
+      history.replaceState(null, "", location.pathname + location.search);
+      sb.setSessionFromTokens({ access_token, refresh_token, expires_in });
+      window.location.replace("/dashboard/");
+    })();
+
     // If the operator is already signed in, skip the form entirely.
     // Exception: if they arrived via a signup link (?signup=1 or ?email=),
     // staying here would be confusing — so we honor signup mode even for
@@ -140,6 +175,9 @@
 
     applyMode();
 
+    const googleBlock = document.getElementById("google-block");
+    const googleBtn   = document.getElementById("google-btn");
+
     function applyMode() {
       errorEl.textContent = "";
       infoEl.textContent  = "";
@@ -153,7 +191,8 @@
         submitBtn.textContent    = "Create account";
         switchPromptEl.textContent = "Already have an account?";
         switchLinkEl.textContent   = "Sign in";
-        document.title           = "Create account — Uptown Dashboard";
+        googleBlock.hidden       = false;
+        document.title           = "Create account - Uptown Tracker";
       } else if (mode === "reset") {
         titleEl.textContent      = "Reset your password";
         nameFieldEl.hidden       = true;
@@ -163,7 +202,10 @@
         submitBtn.textContent    = "Send reset link";
         switchPromptEl.textContent = "Remembered it?";
         switchLinkEl.textContent   = "Back to sign in";
-        document.title           = "Reset password — Uptown Dashboard";
+        // Reset is a password-specific flow. Hide the OAuth option
+        // here since it doesn't apply.
+        googleBlock.hidden       = true;
+        document.title           = "Reset password - Uptown Tracker";
       } else {
         titleEl.textContent      = "Sign in to continue";
         nameFieldEl.hidden       = true;
@@ -174,9 +216,18 @@
         submitBtn.textContent    = "Sign in";
         switchPromptEl.textContent = "New to Uptown?";
         switchLinkEl.textContent   = "Create an account";
-        document.title           = "Sign in — Uptown Dashboard";
+        googleBlock.hidden       = false;
+        document.title           = "Sign in - Uptown Tracker";
       }
     }
+
+    googleBtn.addEventListener("click", () => {
+      // Bounce to Supabase's OAuth authorize endpoint. Supabase
+      // handles the Google round-trip and redirects back to
+      // /login/ with tokens in the URL hash; the handleOAuthCallback
+      // IIFE at the top of this script catches them on return.
+      sb.signInWithProvider("google", `${location.origin}/login/`);
+    });
 
     switchLinkEl.addEventListener("click", (e) => {
       e.preventDefault();
