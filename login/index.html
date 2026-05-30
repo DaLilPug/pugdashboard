@@ -175,9 +175,21 @@
     // their ID added here or should sign in via the popup's
     // existing form for now.
     // ────────────────────────────────────────────────────────────────
-    const EXTENSION_ID = "oiojmfjjdgpjpanoienjmnoigjpjlhlc";
-    const fromExtension =
-      new URLSearchParams(location.search).get("from") === "extension";
+    // Published extension ID is the canonical handshake target.
+    // For local smoke-testing of an unpacked dev build (which Chrome
+    // assigns a different random ID each load), append
+    // ?dev-ext-id=<your-32-char-id> to this URL and the handshake will
+    // ALSO try that ID. The query-param path is intentionally
+    // explicit-opt-in - we don't read it from anywhere persistent, so
+    // a normal user can't be tricked into handing their session to a
+    // malicious extension via a phishing link with a bad ID.
+    const EXTENSION_IDS = ["oiojmfjjdgpjpanoienjmnoigjpjlhlc"];
+    const _params = new URLSearchParams(location.search);
+    const _devExtId = _params.get("dev-ext-id");
+    if (_devExtId && /^[a-p]{32}$/.test(_devExtId)) {
+      EXTENSION_IDS.push(_devExtId);
+    }
+    const fromExtension = _params.get("from") === "extension";
 
     // Called whenever auth has just resolved on this page. Either
     // hands the session to the extension (if ?from=extension), or
@@ -200,43 +212,51 @@
         });
         return;
       }
-      try {
-        chrome.runtime.sendMessage(
-          EXTENSION_ID,
-          {
-            type: "session_handshake",
-            session: {
-              access_token:  session.access_token,
-              refresh_token: session.refresh_token,
-              user:          session.user || null,
-              expires_in:    session.expires_in,
-              expires_at:    session.expires_at,
-            },
-          },
-          (response) => {
+
+      // Try each candidate ID in order. First one that returns ok:true
+      // wins. Errors are silently collected so the final fallback
+      // message can name the last failure if everything fails.
+      const payload = {
+        type: "session_handshake",
+        session: {
+          access_token:  session.access_token,
+          refresh_token: session.refresh_token,
+          user:          session.user || null,
+          expires_in:    session.expires_in,
+          expires_at:    session.expires_at,
+        },
+      };
+      let lastError = "no candidate extension ID responded";
+      let i = 0;
+      const tryNext = () => {
+        if (i >= EXTENSION_IDS.length) {
+          showLinkResult({
+            ok:      false,
+            message: "Couldn't reach the Uptown Chrome extension. Make sure it's installed in this browser. (" + lastError + ")",
+          });
+          return;
+        }
+        const id = EXTENSION_IDS[i++];
+        try {
+          chrome.runtime.sendMessage(id, payload, (response) => {
             if (chrome.runtime.lastError) {
-              showLinkResult({
-                ok:      false,
-                message: "Couldn't reach the Uptown Chrome extension. Make sure it's installed in this browser and try again. (" + chrome.runtime.lastError.message + ")",
-              });
+              lastError = chrome.runtime.lastError.message;
+              tryNext();
               return;
             }
             if (response && response.ok) {
               showLinkResult({ ok: true });
-            } else {
-              showLinkResult({
-                ok:      false,
-                message: "Extension declined the session: " + ((response && response.error) || "unknown error"),
-              });
+              return;
             }
-          },
-        );
-      } catch (err) {
-        showLinkResult({
-          ok:      false,
-          message: "Extension messaging error: " + (err && err.message || err),
-        });
-      }
+            lastError = (response && response.error) || "no response";
+            tryNext();
+          });
+        } catch (err) {
+          lastError = (err && err.message) || String(err);
+          tryNext();
+        }
+      };
+      tryNext();
     }
 
     // Renders a results card in place of the login form. Success state
