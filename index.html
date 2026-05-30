@@ -66,7 +66,12 @@
        375px viewport (logo + 3 actions adds up to ~550px). */
     .lp-nav-mobile-only { display: none; }
     @media (max-width: 700px) {
-      .lp-nav-inner { padding: 12px 16px; gap: 8px; }
+      /* Match .lp-hero horizontal padding (18px on mobile) so the
+         logo + actions sit at the exact same left/right gutters as
+         the hero text below — otherwise the header reads as
+         narrower than the body, even though the underline border
+         spans full width. */
+      .lp-nav-inner { padding: 12px 18px; gap: 8px; }
       .lp-nav-logo img { height: 28px; }
       .lp-nav-actions { gap: 6px; }
       .lp-nav-hide-on-mobile { display: none; }
@@ -183,10 +188,17 @@
          the Reply Buddy sidebar fill the entire mock width. The
          sidebar is what shows the actual product surface; the chat
          panel was decorative context that doesn't add value at phone
-         widths. Adjust aspect ratio to portrait so the sidebar's
-         stacked content (header, tabs, message+response, suggested
-         reply, sentiment, log button) has vertical room to breathe. */
-      .lp-hero-visual { aspect-ratio: 3 / 4; }
+         widths. Aspect ratio is set tall (3:5) so the stacked sidebar
+         content (header, tabs, person card, message sent, linkedin
+         response, edit-instructions toggle, SUGGESTED REPLY card,
+         sentiment pills, Log Response button) is fully visible
+         without the bottom (where the actual value-prop lives) being
+         clipped by overflow:hidden. A min-height backstop ensures
+         narrow viewports (iPhone SE at 320px) still show everything. */
+      .lp-hero-visual {
+        aspect-ratio: 3 / 5;
+        min-height: 540px;
+      }
       .lp-mock-body { grid-template-columns: 1fr; }
       .lp-mock-page { display: none; }
     }
