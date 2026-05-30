@@ -306,6 +306,13 @@
         row-gap: 8px;
         font-size: 13px;
       }
+      /* Hero mock on phones: taller aspect ratio so the sidebar's
+         full vertical content (Suggested Reply card + sentiment
+         pills + Log Response button at the bottom) shows without
+         clipping. Default 4:3.4 gives ~300px height at 354px mock
+         width — sidebar content needs ~430px vertically. 3:4 gives
+         ~472px which fits comfortably. */
+      .lp-hero-visual { aspect-ratio: 3 / 4; }
     }
 
     /* ── Hero visual (mock screenshot of the Reply Buddy sidebar) ──── */
@@ -351,18 +358,16 @@
       border-radius: 50%;
     }
     /* Body: left = faux LinkedIn page hint, right = Reply Buddy
-       sidebar. Grid tracks use minmax(...) so the mock can never
-       require more than 50px (conversation min) + 0px (sidebar
-       can shrink) regardless of inner content's min-content size.
-       Without this, default `1fr 300px` tracks let CSS grid
-       compute mock min-width = (1fr min-content) + 300px = ~500px
-       which on phone viewports forced horizontal page overflow,
-       triggered Safari shrink-to-fit, and broke every @media
-       breakpoint below 880px. Universal rule (no @media) so it
-       fires before any overflow can happen. */
+       sidebar. Proportional 40/60 split via `1fr 1.5fr` matches
+       Austin's desktop reference and scales cleanly to any
+       viewport width. minmax(0, ...) on both tracks prevents min-
+       content propagation from forcing the mock wider than its
+       parent — without that, `1fr 300px` (the previous default)
+       gave the mock an intrinsic min-width of ~450px which on
+       phone viewports forced horizontal page overflow. */
     .lp-mock-body {
       display: grid;
-      grid-template-columns: minmax(50px, 1fr) minmax(0, 300px);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
       height: calc(100% - 26px);
     }
     .lp-mock-page {
