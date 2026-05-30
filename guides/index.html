@@ -591,6 +591,15 @@
             <li><a href="#rb-account-chip">The account chip</a></li>
           </ol>
         </li>
+        <li><a href="#cadences">Follow-up cadences &amp; tasks</a>
+          <ol>
+            <li><a href="#cadence-types">The three kinds of follow-ups</a></li>
+            <li><a href="#cadence-regular">Regular Follow-up Cadence</a></li>
+            <li><a href="#cadence-positive">Positive Response Cadence</a></li>
+            <li><a href="#cadence-manual">Manual follow-up tasks</a></li>
+            <li><a href="#cadence-working">Working the queue</a></li>
+          </ol>
+        </li>
         <li><a href="#sales-nav">Sales Navigator: setup</a>
           <ol>
             <li><a href="#why-salesnav">Why Sales Navigator is required</a></li>
@@ -688,12 +697,14 @@
         <div class="callout-title">Running outreach as a pipeline?</div>
         <p>
           Reply Buddy is still your starting point - the same extension handles
-          both modes. From there, layer on Sales Navigator setup
-          (<a href="#sales-nav">section 3</a>), lead lists
-          (<a href="#lead-lists">section 4</a>), saved searches
-          (<a href="#saved-searches">section 5</a>), the daily workflow
-          (<a href="#daily-workflow">section 6</a>), and the dashboard
-          (<a href="#dashboard">section 7</a>). That's how the Tracker side of
+          both modes. Read <a href="#cadences">Follow-up cadences &amp; tasks</a>
+          (section 3) right after Reply Buddy if you want the system to nudge
+          you on who to follow up with and when. From there, layer on Sales
+          Navigator setup (<a href="#sales-nav">section 4</a>), lead lists
+          (<a href="#lead-lists">section 5</a>), saved searches
+          (<a href="#saved-searches">section 6</a>), the daily workflow
+          (<a href="#daily-workflow">section 7</a>), and the dashboard
+          (<a href="#dashboard">section 8</a>). That's how the Tracker side of
           Uptown gives you a real funnel.
         </p>
       </div>
@@ -733,17 +744,17 @@
         <li><strong>Install the Chrome extension and sign in</strong>
             (<a href="#rb-install">Reply Buddy install</a>) - same extension
             powers both products.</li>
-        <li><strong>Activate LinkedIn Sales Navigator</strong> (<a href="#sales-nav">section 3</a>).</li>
-        <li><strong>Build your lead lists</strong> (<a href="#lead-lists">section 4</a>) -
+        <li><strong>Activate LinkedIn Sales Navigator</strong> (<a href="#sales-nav">section 4</a>).</li>
+        <li><strong>Build your lead lists</strong> (<a href="#lead-lists">section 5</a>) -
             12 monthly Connection Request lists, 12 monthly Messages Sent lists,
             plus Responded and InMails Sent. About 15 minutes once you know the
             naming convention.</li>
-        <li><strong>Build your four saved searches</strong> (<a href="#saved-searches">section 5</a>) -
+        <li><strong>Build your four saved searches</strong> (<a href="#saved-searches">section 6</a>) -
             Connection Requests, Send Message 1, InMail, Retargeting. The first
             one (Connection Requests) is where you'll spend most of your filter time;
             the others lean on the lead lists you just built.</li>
         <li><strong>Send your first 25 connection requests</strong>
-            (<a href="#daily-conn">section 6.1</a>) and log them with the Tracker bar.
+            (<a href="#daily-conn">section 7.1</a>) and log them with the Tracker bar.
             That's day one.</li>
       </ol>
 
@@ -917,15 +928,168 @@
       </p>
 
       <!-- ============================================================== -->
-      <h2 id="sales-nav"><span class="num">3.</span>Sales Navigator: setup</h2>
+      <h2 id="cadences"><span class="num">3.</span>Follow-up cadences &amp; tasks</h2>
+
+      <p>
+        Most LinkedIn responses don't come from the first message - they
+        come from the second, third, or fourth. Reply Buddy makes the
+        writing fast; <strong>cadences make sure you actually send the
+        follow-ups</strong> instead of forgetting who you said you'd circle
+        back to.
+      </p>
+
+      <p>
+        Three kinds of follow-ups feed your daily queue. You don't have to
+        configure them to get started - both cadences are pre-set per
+        account and start working the moment you log your first message.
+      </p>
+
+      <h3 id="cadence-types">3.1 — The three kinds of follow-ups</h3>
+      <ul>
+        <li><strong>Regular Follow-up Cadence</strong> - your scheduled
+            "ping if they didn't reply" sequence. Triggered when you click
+            <em>New Message Sent</em> in Reply Buddy.</li>
+        <li><strong>Positive Response Cadence</strong> - a separate
+            sequence aimed at booking a meeting. Triggered when you log a
+            response with the <em>Positive</em> sentiment pill.</li>
+        <li><strong>Manual follow-up tasks</strong> - one-off reminders
+            you schedule on a thread by hand when a prospect says "circle
+            back next quarter" or similar.</li>
+      </ul>
+
+      <h3 id="cadence-regular">3.2 — Regular Follow-up Cadence</h3>
+      <p>
+        This is the cadence most operators use most. The day you send your
+        first outreach message and click the <strong>New Message Sent</strong>
+        icon in Reply Buddy, the prospect is enrolled.
+      </p>
+      <p>
+        From there, Tracker schedules each step on its configured day-offset.
+        A common starting sequence is <em>day 3, day 7, day 14, day 21</em> -
+        four chances to follow up over three weeks. Each step has its own
+        template that lives on the <a href="#dash-templates">Templates tab</a>;
+        edit both the schedule and the per-step templates on the
+        <a href="#dash-cadence">Cadence tab</a>.
+      </p>
+      <p>
+        The cadence <strong>stops automatically</strong> when:
+      </p>
+      <ul>
+        <li>The prospect responds (you log any sentiment in Reply Buddy).</li>
+        <li>You click <em>Log Meeting Booked</em> on the thread.</li>
+        <li>You cancel the cadence manually from the prospect's row in
+            <a href="#dash-prospects">Prospects</a> or from the follow-up
+            task itself.</li>
+      </ul>
+      <p>
+        Nobody gets all four follow-ups if they reply at step 2 - the
+        remaining steps drop out of your queue the moment you log the
+        response.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">Skip weekends</div>
+        <p>
+          There's a <em>Skip weekends</em> toggle on the Cadence tab. With
+          it on, a day-3 follow-up scheduled on a Friday lands the
+          following Wednesday (only Mon-Fri count toward the offset). Most
+          operators keep this on - weekend follow-ups don't get read.
+        </p>
+      </div>
+
+      <h3 id="cadence-positive">3.3 — Positive Response Cadence</h3>
+      <p>
+        When you log a response with the <strong>Positive</strong>
+        sentiment pill, the prospect exits the regular cadence and enters
+        the Positive Response Cadence. The goal of this one is different:
+        get the meeting booked.
+      </p>
+      <p>
+        The default sequence is shorter and more direct - often <em>day 2
+        and day 5</em> - with templates that nudge toward a specific time.
+        Edit both the schedule and the templates on the
+        <a href="#dash-cadence">Cadence tab</a>.
+      </p>
+      <p>
+        Stops on:
+      </p>
+      <ul>
+        <li><em>Log Meeting Booked</em> in Reply Buddy (the success state
+            this cadence is built around).</li>
+        <li>Manual cancellation.</li>
+      </ul>
+      <p>
+        A positive prospect who never books gets the full positive cadence
+        and then drops off your queue. They stay in the
+        <a href="#dash-prospects">Prospects</a> table with their full
+        sentiment history so you can retarget them later if it makes sense.
+      </p>
+
+      <h3 id="cadence-manual">3.4 — Manual follow-up tasks</h3>
+      <p>
+        Some follow-ups don't fit either cadence. A prospect says "we're
+        budgeting in Q3" - that's a "remind me in July" task, not a day-3
+        ping. Or you sent a custom proposal and want to follow up
+        specifically on that, not a generic template.
+      </p>
+      <p>
+        Schedule a manual task from a prospect's row on the
+        <a href="#dash-prospects">Prospects</a> page: pick the date, write
+        the message you want to send, done. The task shows up in your
+        Follow-ups queue on its scheduled day, alongside any active cadence
+        steps.
+      </p>
+      <p>
+        Manual tasks always co-exist with cadence tasks. If a prospect is
+        in the regular cadence and you also schedule a manual task for
+        them, both surface in your queue on their respective due dates.
+      </p>
+
+      <h3 id="cadence-working">3.5 — Working the queue</h3>
+      <p>
+        Due tasks surface in two places, same data, pick whichever fits
+        your flow:
+      </p>
+      <ul>
+        <li><strong>Reply Buddy → Follow-ups tab</strong> - the second tab
+            at the top of the sidebar. Always one click away while you're
+            on LinkedIn.</li>
+        <li><strong>Dashboard → <a href="#dash-followups">Follow-ups
+            tab</a></strong> - same data with more screen real estate and
+            per-type counts. Useful for working through a big queue first
+            thing in the morning.</li>
+      </ul>
+      <p>
+        Each task shows: prospect name, what kind of follow-up it is
+        (Regular / Positive / Manual), the day-offset within that
+        cadence, and the pre-filled message body. Click <em>Open
+        thread</em> on a task to jump to that prospect's LinkedIn DM -
+        copy the template, paste in LinkedIn, send. Then hit
+        <strong>Mark sent</strong> on the task; Tracker logs the message
+        and queues the next step (if any) on its scheduled date.
+      </p>
+
+      <div class="callout why">
+        <div class="callout-title">Why this is the part that pays</div>
+        <p>
+          A typical Message 1 gets a response rate around 20-25%. That
+          means 75-80% of the people you message <em>don't</em> reply on
+          the first try. If you don't follow up, you're throwing away
+          the bigger half of your funnel. The cadence makes the follow-up
+          automatic so you can't forget.
+        </p>
+      </div>
+
+      <!-- ============================================================== -->
+      <h2 id="sales-nav"><span class="num">4.</span>Sales Navigator: setup</h2>
 
       <div class="callout note">
         <div class="callout-title">Optional for Reply Buddy</div>
         <p>
-          Everything from here through <a href="#dashboard">section 7</a> is
+          Everything from here through <a href="#dashboard">section 8</a> is
           for operators running outreach as a pipeline (the Tracker side of
-          Uptown). If you're just using Reply Buddy, you can skip ahead to
-          <a href="#benchmarks">Benchmarks</a> or
+          Uptown). If you're just using Reply Buddy with cadences, you can skip
+          ahead to <a href="#benchmarks">Benchmarks</a> or
           <a href="#faq">FAQ</a>.
         </p>
       </div>
@@ -975,7 +1139,7 @@
       </div>
 
       <!-- ============================================================== -->
-      <h2 id="lead-lists"><span class="num">4.</span>Building your Lead Lists</h2>
+      <h2 id="lead-lists"><span class="num">5.</span>Building your Lead Lists</h2>
 
       <p>
         Lead lists are how you keep Sales Navigator organized over time. We use
@@ -1079,7 +1243,7 @@
       </ol>
 
       <!-- ============================================================== -->
-      <h2 id="saved-searches"><span class="num">5.</span>Saved Searches as a pipeline</h2>
+      <h2 id="saved-searches"><span class="num">6.</span>Saved Searches as a pipeline</h2>
 
       <p>
         With lead lists in place, saved searches turn Sales Navigator into a
@@ -1232,14 +1396,14 @@
       </div>
 
       <!-- ============================================================== -->
-      <h2 id="daily-workflow"><span class="num">6.</span>The daily outreach workflow</h2>
+      <h2 id="daily-workflow"><span class="num">7.</span>The daily outreach workflow</h2>
 
       <p>
         Once your lists and saved searches are in place, the day-to-day flow is
         small and repeatable. Here's the order of operations.
       </p>
 
-      <h3 id="daily-conn">6.1 — Send connection requests</h3>
+      <h3 id="daily-conn">7.1 — Send connection requests</h3>
       <p>
         <strong>Volume target:</strong> 25–50 per day, 100–200 per week.
         LinkedIn enforces a weekly cap (varies but ~200 is the practical ceiling).
@@ -1288,7 +1452,7 @@
             do 1–2 pages of 25 per day.</li>
       </ol>
 
-      <h3 id="daily-msg1">6.2 — Send the initial message ("Message 1")</h3>
+      <h3 id="daily-msg1">7.2 — Send the initial message ("Message 1")</h3>
       <p>
         The <em>Send Message 1</em> saved search auto-populates whenever a
         connection request is accepted. These are the people who said "yes" to
@@ -1330,7 +1494,7 @@
         </p>
       </div>
 
-      <h3 id="daily-inbox">6.3 — Inbox management</h3>
+      <h3 id="daily-inbox">7.3 — Inbox management</h3>
       <p>
         Every reply needs to be logged with the tracker. Logging a reply ends any
         existing follow-up cadence on that prospect, so they don't keep getting
@@ -1381,7 +1545,7 @@
         </p>
       </div>
 
-      <h3 id="daily-followups">6.4 — Completing follow-ups</h3>
+      <h3 id="daily-followups">7.4 — Completing follow-ups</h3>
       <p>
         Each day the dashboard and the extension queue up follow-up tasks that
         are due. There are two flavors:
@@ -1432,10 +1596,10 @@
         </p>
       </div>
 
-      <h3 id="daily-retarget">6.5 — Monthly retargeting</h3>
+      <h3 id="daily-retarget">7.5 — Monthly retargeting</h3>
       <p>
         Once a month, kick off a retargeting batch. Build a fresh saved search
-        as described in <a href="#search-retarget">section 5.4</a>, name it for
+        as described in <a href="#search-retarget">section 6.4</a>, name it for
         today's date, and send a retargeting message to everyone in it.
       </p>
 
@@ -1450,7 +1614,7 @@
       </ol>
 
       <!-- ============================================================== -->
-      <h2 id="dashboard"><span class="num">7.</span>The Dashboard, tab by tab</h2>
+      <h2 id="dashboard"><span class="num">8.</span>The Dashboard, tab by tab</h2>
 
       <p>
         The dashboard is at <a href="https://app.uptown.com">app.uptown.com</a>.
@@ -1458,14 +1622,14 @@
         deep per-account drill-in.
       </p>
 
-      <h3 id="dash-login">7.1 — Logging in</h3>
+      <h3 id="dash-login">8.1 — Logging in</h3>
       <p>
         First-time users land here from an email invite. After that, sign in with
         the email and password you set up. If you forget your password, click
         <em>Forgot password</em> on the login screen.
       </p>
 
-      <h3 id="dash-toplevel">7.2 — Top-level Account dashboard</h3>
+      <h3 id="dash-toplevel">8.2 — Top-level Account dashboard</h3>
       <p>
         After logging in you see a sortable table of every account you have
         access to. Each row is one account; columns show the funnel for the
@@ -1525,7 +1689,7 @@
         and seeded with default templates and cadence steps.
       </p>
 
-      <h3 id="dash-summary">7.3 — Per-account: Summary</h3>
+      <h3 id="dash-summary">8.3 — Per-account: Summary</h3>
       <p>
         Click any row to land on the per-account view. The account name shows
         as the page heading with a small ✎ pencil to its right; admins click
@@ -1558,7 +1722,7 @@
         </p>
       </div>
 
-      <h3 id="dash-prospects">7.4 — Per-account: Prospects</h3>
+      <h3 id="dash-prospects">8.4 — Per-account: Prospects</h3>
       <p>
         The Prospects tab is a spreadsheet view of every distinct person this
         account has touched, auto-clustered across name / LinkedIn ID / email /
@@ -1668,13 +1832,13 @@
         prospect's status moves into Messaged, Responded, or Meeting.
       </p>
       <p>
-        See <a href="#dash-enrichment-section">6.12 — Enrichment</a> for the
+        See <a href="#dash-enrichment-section">8.12 — Enrichment</a> for the
         full setup walkthrough (getting an Apollo account, finding your API
         key, wiring it up on the Team page) plus details on cost, match
         rates, and the auto-enrich behavior.
       </p>
 
-      <h3 id="dash-followups">7.5 — Per-account: Follow-ups</h3>
+      <h3 id="dash-followups">8.5 — Per-account: Follow-ups</h3>
       <p>
         The Follow-ups tab is the per-account version of the daily queue. It
         shows all follow-up tasks across all three sources (regular cadence,
@@ -1694,7 +1858,7 @@
         <li>Reschedule a task to a different date.</li>
       </ul>
 
-      <h3 id="dash-templates">7.6 — Per-account: Templates</h3>
+      <h3 id="dash-templates">8.6 — Per-account: Templates</h3>
       <p>
         Templates are your one-off message library — Message 1, retargeting copy,
         and any other paste-ready text you reuse. Up to 10 per account.
@@ -1720,7 +1884,7 @@
         </p>
       </div>
 
-      <h3 id="dash-replyinst">7.7 — Per-account: Reply Instructions</h3>
+      <h3 id="dash-replyinst">8.7 — Per-account: Reply Instructions</h3>
       <p>
         A free-form text box that becomes the system prompt for the AI suggested-reply
         feature in the extension sidebar. The AI reads this instruction plus the
@@ -1735,7 +1899,7 @@
         <li><em>"If the response is a clear no, draft a polite acknowledgement and offer to circle back in 6 months."</em></li>
       </ul>
 
-      <h3 id="dash-cadence">7.8 — Per-account: Cadence</h3>
+      <h3 id="dash-cadence">8.8 — Per-account: Cadence</h3>
       <p>
         Cadence controls automated follow-up timing. There are <strong>two
         independent sequences</strong> per account:
@@ -1766,7 +1930,7 @@
         won't enroll.
       </p>
 
-      <h3 id="dash-meeting">7.9 — Per-account: Meeting Links</h3>
+      <h3 id="dash-meeting">8.9 — Per-account: Meeting Links</h3>
       <p>
         Per-account meeting links you can copy into LinkedIn DMs. Two flavors:
       </p>
@@ -1799,7 +1963,7 @@
             match strings.</li>
       </ol>
 
-      <h3 id="dash-team">7.10 — Team page (admins + members)</h3>
+      <h3 id="dash-team">8.10 — Team page (admins + members)</h3>
       <p>
         Admins see a <strong>Team</strong> link in the top-right header.
         The page heading shows the organization name with a ✎ pencil next to
@@ -1823,7 +1987,7 @@
             transferred/merged, seat-cap changes, outreach edits and deletions).</li>
         <li><strong>Billing card</strong> (admin-only, near the bottom) —
             add seat / remove seat / switch monthly↔annual / manage payment
-            &amp; invoices. See <a href="#dash-billing">6.11</a>.</li>
+            &amp; invoices. See <a href="#dash-billing">8.11</a>.</li>
         <li><strong>Leave organization</strong> (anyone) — at the very bottom.
             Members can always leave; admins can leave only if at least one
             other admin remains, or — if they're the last person — only after
@@ -1832,7 +1996,7 @@
             <a href="#faq">leaving an org to join another</a>.</li>
       </ul>
 
-      <h3 id="dash-billing">7.11 — Billing</h3>
+      <h3 id="dash-billing">8.11 — Billing</h3>
       <p>
         Uptown Tracker bills <strong>$15 per seat per month</strong> or
         <strong>$120 per seat per year</strong> (33% off when billed annually).
@@ -1868,7 +2032,7 @@
         </p>
       </div>
 
-      <h3 id="dash-enrichment-section">7.12 — Enrichment</h3>
+      <h3 id="dash-enrichment-section">8.12 — Enrichment</h3>
       <p>
         Uptown Tracker integrates with <strong>Apollo</strong> to enrich
         prospect emails directly inside the Prospects tab. Connection requests
@@ -2006,7 +2170,7 @@
         column on the table.
       </p>
 
-      <h3 id="dash-integrations">7.13 - Per-account: Integrations (API keys + Zapier)</h3>
+      <h3 id="dash-integrations">8.13 - Per-account: Integrations (API keys + Zapier)</h3>
       <p>
         Per-account credentials for plugging Uptown Tracker into outside tools.
         Anyone with access to the account (admins always; members only when
@@ -2350,7 +2514,7 @@
         </tbody>
       </table>
 
-      <h3 id="dash-hubspot-sync">7.14 - Per-account: Native HubSpot sync</h3>
+      <h3 id="dash-hubspot-sync">8.14 - Per-account: Native HubSpot sync</h3>
       <p>
         On the same Integrations tab, a separate card lets you connect HubSpot
         natively - no Zapier in the middle. Outreach events push out to HubSpot
@@ -2513,7 +2677,7 @@
       </div>
 
       <!-- ============================================================== -->
-      <h2 id="extension"><span class="num">8.</span>Extension reference (Tracker UI)</h2>
+      <h2 id="extension"><span class="num">9.</span>Extension reference (Tracker UI)</h2>
 
       <p>
         Beyond Reply Buddy (covered in <a href="#reply-buddy">section 2</a>),
@@ -2523,7 +2687,7 @@
         for those.
       </p>
 
-      <h3 id="ext-popup">8.1 — The toolbar popup</h3>
+      <h3 id="ext-popup">9.1 — The toolbar popup</h3>
       <p>
         Clicking the Uptown icon in your Chrome toolbar opens the popup. From
         here you can:
@@ -2549,7 +2713,7 @@
             this page.</li>
       </ul>
 
-      <h3 id="ext-streak">8.2 — The streak panel</h3>
+      <h3 id="ext-streak">9.2 — The streak panel</h3>
       <p>
         Sandwiched between the account picker and the drawer stack, the streak
         panel shows two cells:
@@ -2573,7 +2737,7 @@
             is a hard ceiling LinkedIn enforces, not a stretch goal.</li>
       </ul>
 
-      <h3 id="ext-tracker">8.3 — The Tracker bulk-log bar (Sales Navigator)</h3>
+      <h3 id="ext-tracker">9.3 — The Tracker bulk-log bar (Sales Navigator)</h3>
       <p>
         On Sales Navigator search pages and lead lists, the extension flips
         into bulk-log mode and shows a Tracker bar at the top of the results
@@ -2605,7 +2769,7 @@
         <a href="#reply-buddy">section 2</a>.
       </p>
 
-      <h3 id="ext-followups">8.4 — Follow-ups in the extension</h3>
+      <h3 id="ext-followups">9.4 — Follow-ups in the extension</h3>
       <p>
         The Follow-ups view in the sidebar mirrors the dashboard tab, but it's
         always one click away from inside any LinkedIn page. Clicking
@@ -2615,7 +2779,7 @@
       </p>
 
       <!-- ============================================================== -->
-      <h2 id="benchmarks"><span class="num">9.</span>Benchmarks &amp; what good looks like</h2>
+      <h2 id="benchmarks"><span class="num">10.</span>Benchmarks &amp; what good looks like</h2>
 
       <p>
         Uptown Tracker's benchmark targets are based on hundreds of cohorts across our
@@ -2778,7 +2942,7 @@
       </ul>
 
       <!-- ============================================================== -->
-      <h2 id="faq"><span class="num">10.</span>FAQ &amp; troubleshooting</h2>
+      <h2 id="faq"><span class="num">11.</span>FAQ &amp; troubleshooting</h2>
 
       <details class="collapsible">
         <summary>I just want Reply Buddy. Do I need Sales Navigator, lead lists, cadences?</summary>
