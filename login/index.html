@@ -259,10 +259,16 @@
       tryNext();
     }
 
-    // Renders a results card in place of the login form. Success state
-    // auto-closes the tab so the user is shoved back to LinkedIn /
-    // wherever they came from with the extension now signed in.
+    // Success: silent redirect to /dashboard/ - no transitional UI,
+    // user just lands in the dashboard with the extension also signed
+    // in. Failure: keep the error card so the user knows the handshake
+    // didn't reach the extension (and can still get to the dashboard
+    // via the "Open dashboard anyway" link).
     function showLinkResult({ ok, message }) {
+      if (ok) {
+        window.location.replace("/dashboard/");
+        return;
+      }
       const formEl    = document.getElementById("login-form");
       const confirmEl = document.getElementById("confirm-panel");
       if (formEl)    formEl.hidden    = true;
@@ -276,19 +282,11 @@
         document.body.appendChild(resultEl);
       }
       resultEl.hidden = false;
-      if (ok) {
-        resultEl.innerHTML =
-          '<div class="login-brand"><img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" /></div>' +
-          '<div class="login-title">Extension linked</div>' +
-          '<p class="lp-confirm-body">Your Chrome extension is signed in as the same account. You can close this tab and return to LinkedIn.</p>';
-        setTimeout(() => { try { window.close(); } catch (_) {} }, 2500);
-      } else {
-        resultEl.innerHTML =
-          '<div class="login-brand"><img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" /></div>' +
-          '<div class="login-title">Could not link the extension</div>' +
-          '<p class="lp-confirm-body">' + message + '</p>' +
-          '<a class="login-submit" href="/dashboard/" style="margin-top:14px;display:block;text-align:center;">Open the dashboard anyway</a>';
-      }
+      resultEl.innerHTML =
+        '<div class="login-brand"><img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" /></div>' +
+        '<div class="login-title">Could not link the extension</div>' +
+        '<p class="lp-confirm-body">' + message + '</p>' +
+        '<a class="login-submit" href="/dashboard/" style="margin-top:14px;display:block;text-align:center;">Open the dashboard anyway</a>';
     }
 
     // If the operator is already signed in, skip the form entirely.
