@@ -80,6 +80,31 @@
       .lp-nav-link { font-size: 13px; padding: 7px 10px; }
       .lp-nav-actions .lp-btn { font-size: 13px; padding: 9px 14px; }
       .lp-nav-actions .lp-btn svg { width: 16px; height: 16px; }
+
+      /* MOCK FIX — must live at 700px (not 600px). The mock body's
+         `1fr 300px` grid keeps a fixed 300px column plus the
+         conversation panel's min-content - that totals to a mock
+         min-width of ~450-500px, wider than any phone viewport.
+         When the page overflows horizontally, Safari fires shrink-
+         to-fit and reports CSS viewport as ~650px, which is why
+         the 600px breakpoint silently never fires (and trust
+         items, CTA stacking, etc. don't apply). Putting the fix
+         here at 700px guarantees it fires - we know nav rules
+         above this point apply correctly. Once the mock is sized
+         to fit, the page reports actual device width, and the
+         600px rules fire as designed. The fix itself takes Austin's
+         "tall not wide" suggestion: hide the conversation panel
+         (decorative, not load-bearing) and let the Reply Buddy
+         sidebar fill the full mock width, with a 3:5 aspect ratio
+         + 520px min-height so the sidebar's stacked content
+         (header → tabs → person → message → response → suggested
+         reply → sentiment → log button) has vertical room. */
+      .lp-mock-body { grid-template-columns: 1fr; }
+      .lp-mock-page { display: none; }
+      .lp-hero-visual {
+        aspect-ratio: 3 / 5;
+        min-height: 520px;
+      }
     }
 
     /* ── Buttons ──────────────────────────────────────────────────── */
@@ -184,19 +209,10 @@
         row-gap: 8px;
         font-size: 13px;
       }
-      /* Hero mock: the mock body's grid is `1fr 300px` - that fixed
-         300px right column plus the conversation panel's min-content
-         on the left gives the whole mock an intrinsic min-width of
-         ~500-600px. On a phone viewport that overflows horizontally,
-         Safari fires its shrink-to-fit zoom-out behavior, and all the
-         OTHER mobile breakpoints on this page silently stop firing
-         (the page is rendering as if at desktop width, just visually
-         shrunk to fit the screen). Fix: CSS `zoom` scales the entire
-         mock proportionally - including its layout footprint, not
-         just rendering - so it fits the phone column without forcing
-         page-wide overflow. Internal layout, aspect ratio, and both
-         panels are left untouched. */
-      .lp-hero-visual { zoom: 0.5; }
+      /* (Mock-mobile fix moved up to the 700px block — see comment
+         there. The 600px breakpoint can't be used for mock fixes
+         because it doesn't fire while the mock is still overflowing
+         the page width.) */
     }
     .lp-hero-eyebrow {
       display: inline-flex;
