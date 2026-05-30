@@ -156,6 +156,19 @@
     @media (max-width: 880px) {
       .lp-hero { grid-template-columns: 1fr; gap: 40px; padding: 48px 24px 40px; }
     }
+
+    /* MOCK SCALING WRAPPER ────────────────────────────────────────
+       Default rule — desktop fills the visual normally. Mobile
+       override (inside the @media (max-width: 600px) block below)
+       pins this to desktop natural dimensions and transform-scales
+       it to fit the phone column. Default MUST be defined before
+       the @media block or source-order tiebreak kills the mobile
+       rule. */
+    .lp-mock-inner {
+      width: 100%;
+      height: 100%;
+    }
+
     /* (Phone-specific @media block for hero elements is positioned
        LATER in this file, after all the .lp-hero-eyebrow/.lp-hero h1
        /.lp-hero-sub/.lp-hero-trust/.lp-hero-promo unconditional
@@ -195,7 +208,11 @@
       color: var(--navy);
       margin-bottom: 18px;
     }
-    .lp-hero h1 .accent { color: var(--green); }
+    /* Keep the green "in seconds," phrase as one unbreakable unit
+       so on narrow viewports it wraps as a group ("Reply on LinkedIn"
+       / "in seconds," / "not minutes.") rather than orphaning "in"
+       at the end of the first line. */
+    .lp-hero h1 .accent { color: var(--green); white-space: nowrap; }
     .lp-hero-sub {
       font-size: 18px;
       line-height: 1.55;
@@ -372,16 +389,12 @@
       height: 8px;
       border-radius: 50%;
     }
-    /* .lp-mock-inner is a sizing wrapper added to make the whole
-       mock scale-able on mobile. On desktop it just fills the
-       visual; on mobile (see @media block earlier in this file)
-       it's pinned to the desktop natural dimensions (600px wide)
-       and transform-scaled to fit the column - so the entire mock
-       renders at the SAME proportions as desktop, just smaller. */
-    .lp-mock-inner {
-      width: 100%;
-      height: 100%;
-    }
+    /* (Default .lp-mock-inner rule moved EARLIER in the file, before
+       the @media (max-width: 600px) block that overrides it for
+       mobile. Same cascade-order pattern as the @media bug we hit
+       earlier on this same page - if the default rule comes after
+       the @media rule it silently wins by source order, even on
+       mobile. Search for "MOCK SCALING WRAPPER" above.) */
     /* Body: left = faux LinkedIn page hint, right = Reply Buddy
        sidebar. Standard desktop grid (1fr 300px) - mobile uses the
        same grid because the entire mock wrapper is scale-transformed
