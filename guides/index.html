@@ -686,10 +686,13 @@
       <div class="callout why">
         <div class="callout-title">Just here to write better replies on LinkedIn?</div>
         <p>
-          Read <a href="#reply-buddy">Reply Buddy</a> (next section) and stop.
-          You'll have the AI drafting your replies in about 90 seconds: install
-          the extension, sign in, open a LinkedIn chat. Everything else in this
-          guide is optional power-user stuff.
+          Read <a href="#reply-buddy">Reply Buddy</a> (section 2). Then,
+          when you're ready for the system to remind you which prospects
+          to follow up with and when, read
+          <a href="#cadences">Follow-up cadences &amp; tasks</a> (section
+          3). That's the whole low-friction path. Everything past section
+          3 is the pipeline-operator playbook - skip it unless you're
+          running outreach at volume.
         </p>
       </div>
 
@@ -711,18 +714,33 @@
 
       <h3 id="how-it-fits">How the pieces fit together</h3>
       <ul>
-        <li><strong>Uptown Reply Buddy</strong> is the in-page sidebar that drafts
-            replies, classifies inbound sentiment, and offers one-click "Connection
-            Request Sent" / "Message Sent" / "Meeting Booked" buttons. Works on
-            every LinkedIn surface: the inbox, individual profile pages
-            (<code>/in/&lt;slug&gt;</code>), the home feed when a chat overlay is
-            open, AND Sales Navigator.</li>
-        <li><strong>Uptown Tracker</strong> is the same extension's bulk-log mode
-            (only relevant on Sales Navigator list pages) plus the dashboard at
-            <a href="https://app.uptown.com">app.uptown.com</a>. This
-            is where consistent volume, funnel rates, and cadence automation live.</li>
-        <li><strong>Sales Navigator</strong> only matters if you want to run
-            Tracker workflows. Reply Buddy doesn't need it.</li>
+        <li><strong>Uptown Reply Buddy</strong> is the in-page sidebar that
+            drafts replies, classifies inbound sentiment, and offers
+            one-click <em>Connection Request Sent</em> /
+            <em>New Message Sent</em> / <em>Log Meeting Booked</em> buttons.
+            Works on every LinkedIn surface: the inbox, individual profile
+            pages (<code>/in/&lt;slug&gt;</code>), the home feed when a
+            chat overlay is open, and Sales Navigator.</li>
+        <li><strong>Follow-up cadences &amp; tasks</strong> are the part
+            most Reply Buddy users reach for next - automatic reminders
+            that surface who to follow up with and when. Configured per
+            account on the dashboard, then surfaced in Reply Buddy's
+            Follow-ups tab so you don't have to leave LinkedIn to work
+            them.</li>
+        <li><strong>Uptown Tracker</strong> is the same extension's
+            bulk-log mode (only relevant on Sales Navigator list pages)
+            plus the dashboard at
+            <a href="https://app.uptown.com">app.uptown.com</a>. This is
+            where pipeline volume, funnel rates, prospect history, and
+            integrations live.</li>
+        <li><strong>Sales Navigator</strong> only matters if you want to
+            run Tracker workflows. Reply Buddy and cadences don't need
+            it.</li>
+        <li><strong>Pricing.</strong> $15/seat/month after a 7-day trial,
+            or $120/seat/year. During the launch window the first 100
+            signups get a free seat with no credit card. One "seat" =
+            one LinkedIn handle (one Uptown account). The Chrome
+            extension itself is always free to install.</li>
       </ul>
 
       <div class="callout note">
@@ -765,28 +783,57 @@
         Reply Buddy lives inside LinkedIn as a sidebar pinned to the right edge
         of every page. Open a conversation - whether it's an inbox thread, a
         profile-page message, or a floating chat overlay on the home feed -
-        and Reply Buddy reads the thread, drafts a reply in your voice (a
+        and Reply Buddy reads the thread, drafts a reply following your
+        <a href="#dash-replyinst">reply instructions</a> (a
         "<strong>Blurb</strong>"), classifies the inbound's sentiment, and lets
         you log the outcome with one click. No new tab. No copy-paste.
       </p>
 
       <h3 id="rb-install">2.1 — Install &amp; sign in</h3>
+
+      <p>
+        Two pieces have to be in place before the extension can do
+        anything: an Uptown account (with one LinkedIn handle added) and
+        the Chrome extension itself signed into that account. Here's the
+        order that works:
+      </p>
+
       <ol class="steps">
-        <li>Install from the
+        <li><strong>Sign up at
+            <a href="https://app.uptown.com">app.uptown.com</a></strong> if
+            you don't already have an account. Signup creates a personal
+            Uptown organization for you automatically. During the launch
+            window the first 100 signups get a free seat with no credit
+            card; after that, adding your first LinkedIn account starts a
+            7-day trial.</li>
+        <li><strong>Add a LinkedIn account</strong> from the dashboard with
+            the <em>+ Add new account</em> button in the top right. One
+            Uptown "account" maps to one LinkedIn handle you'll be running
+            outreach for. Name it after whoever owns that handle
+            (e.g. <code>jane-doe</code>) so the dropdown is readable
+            later.</li>
+        <li><strong>Optional but recommended: set your reply
+            instructions.</strong> Dashboard's
+            <a href="#dash-replyinst">Reply Instructions tab</a> is where
+            the AI gets its voice from. Even one paragraph about what you
+            sell, who you target, and how you sign off makes a real
+            difference in the quality of Blurbs.</li>
+        <li><strong>Install the Chrome extension</strong> from the
             <a href="https://chromewebstore.google.com/detail/uptown-reply-buddy-and-tr/oiojmfjjdgpjpanoienjmnoigjpjlhlc" target="_blank" rel="noopener">Chrome Web Store</a>
-            (the link is also at the top of the dashboard once you have access,
-            shown as <em>Get the Chrome extension ↗</em>).</li>
-        <li>Pin the Uptown icon in your Chrome toolbar so it's one click away.</li>
-        <li>Click the icon. The popup opens with a sign-in form. Use the same
-            email/password you set up on
-            <a href="https://app.uptown.com">app.uptown.com</a>.</li>
-        <li>If you don't have an account yet, head to the dashboard, click
-            <em>Sign in or Create Account</em>, and finish the signup flow.
-            Then come back to the popup.</li>
-        <li>Pick your active <strong>account</strong> from the dropdown.
-            Everything you log from here on tags to this account until you
+            and pin the Uptown icon in your toolbar so it's one click
+            away.</li>
+        <li><strong>Open the popup and sign in</strong> with the same
+            email/password you used on the dashboard. Google sign-in works
+            here too.</li>
+        <li><strong>Pick your active account</strong> from the dropdown.
+            Everything you log from here on tags to that account until you
             switch.</li>
       </ol>
+
+      <p>
+        Now open any LinkedIn conversation and the sidebar will appear on
+        the right with a Blurb drafted within a second.
+      </p>
 
       <h3 id="rb-surfaces">2.2 — Where Reply Buddy works</h3>
       <p>
@@ -1030,14 +1077,26 @@
         Some follow-ups don't fit either cadence. A prospect says "we're
         budgeting in Q3" - that's a "remind me in July" task, not a day-3
         ping. Or you sent a custom proposal and want to follow up
-        specifically on that, not a generic template.
+        specifically on that, not run a generic template.
       </p>
       <p>
-        Schedule a manual task from a prospect's row on the
-        <a href="#dash-prospects">Prospects</a> page: pick the date, write
-        the message you want to send, done. The task shows up in your
-        Follow-ups queue on its scheduled day, alongside any active cadence
-        steps.
+        Two ways to schedule one:
+      </p>
+      <ul>
+        <li><strong>From the conversation</strong> in Reply Buddy - hit
+            the <em>+</em> overflow next to <em>Log Response</em> and
+            pick <em>Schedule follow-up</em>. Set the date, type the
+            message you want to send.</li>
+        <li><strong>From the Prospects table</strong> - find the prospect
+            in <a href="#dash-prospects">Prospects</a> and use the
+            schedule-follow-up action on their row.</li>
+      </ul>
+      <p>
+        The task lands in your Follow-ups queue on its scheduled day,
+        alongside any active cadence steps. Manual tasks always co-exist
+        with cadence tasks - if a prospect is in the regular cadence and
+        you also schedule a manual one, both surface on their respective
+        due dates.
       </p>
       <p>
         Manual tasks always co-exist with cadence tasks. If a prospect is
