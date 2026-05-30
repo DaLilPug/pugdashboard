@@ -184,23 +184,19 @@
         row-gap: 8px;
         font-size: 13px;
       }
-      /* Hero mock: drop the conversation panel on the left and let
-         the Reply Buddy sidebar fill the entire mock width. The
-         sidebar is what shows the actual product surface; the chat
-         panel was decorative context that doesn't add value at phone
-         widths. Aspect ratio is set tall (3:5) so the stacked sidebar
-         content (header, tabs, person card, message sent, linkedin
-         response, edit-instructions toggle, SUGGESTED REPLY card,
-         sentiment pills, Log Response button) is fully visible
-         without the bottom (where the actual value-prop lives) being
-         clipped by overflow:hidden. A min-height backstop ensures
-         narrow viewports (iPhone SE at 320px) still show everything. */
-      .lp-hero-visual {
-        aspect-ratio: 3 / 5;
-        min-height: 540px;
-      }
-      .lp-mock-body { grid-template-columns: 1fr; }
-      .lp-mock-page { display: none; }
+      /* Hero mock: the mock body's grid is `1fr 300px` - that fixed
+         300px right column plus the conversation panel's min-content
+         on the left gives the whole mock an intrinsic min-width of
+         ~500-600px. On a phone viewport that overflows horizontally,
+         Safari fires its shrink-to-fit zoom-out behavior, and all the
+         OTHER mobile breakpoints on this page silently stop firing
+         (the page is rendering as if at desktop width, just visually
+         shrunk to fit the screen). Fix: CSS `zoom` scales the entire
+         mock proportionally - including its layout footprint, not
+         just rendering - so it fits the phone column without forcing
+         page-wide overflow. Internal layout, aspect ratio, and both
+         panels are left untouched. */
+      .lp-hero-visual { zoom: 0.5; }
     }
     .lp-hero-eyebrow {
       display: inline-flex;
