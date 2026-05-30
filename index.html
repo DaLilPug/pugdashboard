@@ -156,52 +156,13 @@
     @media (max-width: 880px) {
       .lp-hero { grid-template-columns: 1fr; gap: 40px; padding: 48px 24px 40px; }
     }
-    /* Phone-specific tightening. The 880px rule already stacks the
-       hero columns; this rule scales the inner type + buttons to
-       sit comfortably inside a ~320-420px viewport. */
-    @media (max-width: 600px) {
-      .lp-hero { padding: 32px 18px 28px; gap: 30px; }
-      .lp-hero h1 {
-        font-size: clamp(30px, 8vw, 40px);
-        margin-bottom: 14px;
-      }
-      .lp-hero-sub {
-        font-size: 16px;
-        line-height: 1.5;
-        margin-bottom: 22px;
-        max-width: none;
-      }
-      .lp-hero-ctas {
-        flex-direction: column;
-        gap: 10px;
-        align-items: stretch;
-        margin-bottom: 16px;
-      }
-      .lp-hero-ctas .lp-btn { width: 100%; }
-      .lp-hero-ctas .lp-btn-lg { padding: 14px 22px; font-size: 15px; }
-      /* Promo chip: allow the text to wrap to a second line on
-         narrow viewports rather than overflowing the container. */
-      .lp-hero-promo {
-        font-size: 13px;
-        padding: 8px 12px;
-        max-width: 100%;
-        align-items: flex-start;
-        margin-bottom: 18px;
-      }
-      .lp-hero-promo-icon { padding-top: 1px; }
-      .lp-hero-promo-text { line-height: 1.4; }
-      /* 4 trust items, one per line on phones so each is fully
-         readable without competing for horizontal space. */
-      .lp-hero-trust {
-        grid-template-columns: 1fr;
-        row-gap: 8px;
-        font-size: 13px;
-      }
-      /* (Mock-mobile fix moved up to the 700px block — see comment
-         there. The 600px breakpoint can't be used for mock fixes
-         because it doesn't fire while the mock is still overflowing
-         the page width.) */
-    }
+    /* (Phone-specific @media block for hero elements is positioned
+       LATER in this file, after all the .lp-hero-eyebrow/.lp-hero h1
+       /.lp-hero-sub/.lp-hero-trust/.lp-hero-promo unconditional
+       rules. CSS cascade — same-specificity rules resolve by source
+       order, and putting the @media block BEFORE those rules let
+       them silently override the mobile sizes. Search for "PHONE
+       OVERRIDES" below.) */
     .lp-hero-eyebrow {
       display: inline-flex;
       align-items: center;
@@ -300,6 +261,51 @@
       font-weight: 800;
       color: var(--green);
       font-variant-numeric: tabular-nums;
+    }
+
+    /* ── PHONE OVERRIDES (≤600px) ──────────────────────────────────
+       MUST live after the unconditional .lp-hero h1 / .lp-hero-sub
+       / .lp-hero-trust / .lp-hero-promo / .lp-hero-ctas rules above,
+       otherwise CSS source order makes the desktop rules win even
+       on phone viewports. (Bug that ate the day: this block was
+       originally placed up near the .lp-hero rule itself, before the
+       element-level rules. Mobile @media WAS firing — its rules were
+       just getting overridden by the desktop rules that came later
+       in the cascade.) */
+    @media (max-width: 600px) {
+      .lp-hero { padding: 32px 18px 28px; gap: 30px; }
+      .lp-hero h1 {
+        font-size: clamp(30px, 8vw, 40px);
+        margin-bottom: 14px;
+      }
+      .lp-hero-sub {
+        font-size: 16px;
+        line-height: 1.5;
+        margin-bottom: 22px;
+        max-width: none;
+      }
+      .lp-hero-ctas {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+        margin-bottom: 16px;
+      }
+      .lp-hero-ctas .lp-btn { width: 100%; }
+      .lp-hero-ctas .lp-btn-lg { padding: 14px 22px; font-size: 15px; }
+      .lp-hero-promo {
+        font-size: 13px;
+        padding: 8px 12px;
+        max-width: 100%;
+        align-items: flex-start;
+        margin-bottom: 18px;
+      }
+      .lp-hero-promo-icon { padding-top: 1px; }
+      .lp-hero-promo-text { line-height: 1.4; }
+      .lp-hero-trust {
+        grid-template-columns: 1fr;
+        row-gap: 8px;
+        font-size: 13px;
+      }
     }
 
     /* ── Hero visual (mock screenshot of the Reply Buddy sidebar) ──── */
