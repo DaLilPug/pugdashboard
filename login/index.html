@@ -154,8 +154,122 @@
       // Strip the hash so a page refresh doesn't re-process stale tokens.
       history.replaceState(null, "", location.pathname + location.search);
       sb.setSessionFromTokens({ access_token, refresh_token, expires_in, user });
-      window.location.replace("/dashboard/");
+      finishSignIn({ access_token, refresh_token, user, expires_in });
     })();
+
+    // ────────────────────────────────────────────────────────────────
+    // Extension SSO handshake.
+    //
+    // The Chrome extension's "Sign in or Create Account" button opens
+    // this page with `?from=extension`. After auth resolves on this
+    // page (via any path - existing session, password sign-in, signup,
+    // or Google/LinkedIn OAuth callback) we hand the session to the
+    // extension via chrome.runtime.sendMessage and show a "linked!"
+    // confirmation instead of redirecting to /dashboard/. This way the
+    // extension has one source of truth for auth (the dashboard) and
+    // doesn't need to host its own forms or OAuth flows.
+    //
+    // The extension's published ID is hard-coded; if you're running an
+    // unpacked dev build, the chrome.runtime.sendMessage call will
+    // succeed only against the matching ID, so dev builds either need
+    // their ID added here or should sign in via the popup's
+    // existing form for now.
+    // ────────────────────────────────────────────────────────────────
+    const EXTENSION_ID = "oiojmfjjdgpjpanoienjmnoigjpjlhlc";
+    const fromExtension =
+      new URLSearchParams(location.search).get("from") === "extension";
+
+    // Called whenever auth has just resolved on this page. Either
+    // hands the session to the extension (if ?from=extension), or
+    // redirects to /dashboard/ like before.
+    function finishSignIn(session) {
+      if (!fromExtension) {
+        window.location.replace("/dashboard/");
+        return;
+      }
+      handOffToExtension(session);
+    }
+
+    function handOffToExtension(session) {
+      if (typeof chrome === "undefined"
+          || !chrome.runtime
+          || !chrome.runtime.sendMessage) {
+        showLinkResult({
+          ok:      false,
+          message: "Couldn't reach the Uptown Chrome extension - make sure it's installed in this browser, then refresh.",
+        });
+        return;
+      }
+      try {
+        chrome.runtime.sendMessage(
+          EXTENSION_ID,
+          {
+            type: "session_handshake",
+            session: {
+              access_token:  session.access_token,
+              refresh_token: session.refresh_token,
+              user:          session.user || null,
+              expires_in:    session.expires_in,
+              expires_at:    session.expires_at,
+            },
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              showLinkResult({
+                ok:      false,
+                message: "Couldn't reach the Uptown Chrome extension. Make sure it's installed in this browser and try again. (" + chrome.runtime.lastError.message + ")",
+              });
+              return;
+            }
+            if (response && response.ok) {
+              showLinkResult({ ok: true });
+            } else {
+              showLinkResult({
+                ok:      false,
+                message: "Extension declined the session: " + ((response && response.error) || "unknown error"),
+              });
+            }
+          },
+        );
+      } catch (err) {
+        showLinkResult({
+          ok:      false,
+          message: "Extension messaging error: " + (err && err.message || err),
+        });
+      }
+    }
+
+    // Renders a results card in place of the login form. Success state
+    // auto-closes the tab so the user is shoved back to LinkedIn /
+    // wherever they came from with the extension now signed in.
+    function showLinkResult({ ok, message }) {
+      const formEl    = document.getElementById("login-form");
+      const confirmEl = document.getElementById("confirm-panel");
+      if (formEl)    formEl.hidden    = true;
+      if (confirmEl) confirmEl.hidden = true;
+
+      let resultEl = document.getElementById("ext-link-panel");
+      if (!resultEl) {
+        resultEl = document.createElement("div");
+        resultEl.id        = "ext-link-panel";
+        resultEl.className = "login-card";
+        document.body.appendChild(resultEl);
+      }
+      resultEl.hidden = false;
+      if (ok) {
+        resultEl.innerHTML =
+          '<div class="login-brand"><img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" /></div>' +
+          '<div class="login-title">Extension linked</div>' +
+          '<p class="lp-confirm-body">Your Chrome extension is signed in as the same account. You can close this tab and return to LinkedIn.</p>';
+        setTimeout(() => { try { window.close(); } catch (_) {} }, 2500);
+      } else {
+        resultEl.innerHTML =
+          '<div class="login-brand"><img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" /></div>' +
+          '<div class="login-title">Could not link the extension</div>' +
+          '<p class="lp-confirm-body">' + message + '</p>' +
+          '<a class="login-submit" href="/dashboard/" style="margin-top:14px;display:block;text-align:center;">Open the dashboard anyway</a>';
+      }
+    }
 
     // If the operator is already signed in, skip the form entirely.
     // Exception: if they arrived via a signup link (?signup=1 or ?email=),
@@ -167,7 +281,7 @@
 
     if (!wantsSignup) {
       sb.ensureFreshSession().then(session => {
-        if (session) window.location.replace("/dashboard/");
+        if (session) finishSignIn(session);
       });
     }
 
@@ -244,7 +358,13 @@
       // handles the Google round-trip and redirects back to
       // /login/ with tokens in the URL hash; the handleOAuthCallback
       // IIFE at the top of this script catches them on return.
-      sb.signInWithProvider("google", `${location.origin}/login/`);
+      //
+      // Preserve `?from=extension` through the redirect so the
+      // OAuth-callback path knows to hand the session to the
+      // extension instead of sending the user to /dashboard/.
+      const returnTo = location.origin + "/login/"
+        + (fromExtension ? "?from=extension" : "");
+      sb.signInWithProvider("google", returnTo);
     });
 
     switchLinkEl.addEventListener("click", (e) => {
@@ -307,14 +427,17 @@
             return;
           }
           // Auto-confirm mode: trigger chain has already created the
-          // operators row and claimed any pending invites. Dashboard is
-          // ready.
-          window.location.replace("/dashboard/");
+          // operators row and claimed any pending invites. Pull the
+          // fresh session and either redirect to /dashboard/ or hand
+          // it to the extension (if ?from=extension).
+          const session = await sb.ensureFreshSession();
+          finishSignIn(session);
           return;
         }
 
         await sb.signIn(emailEl.value.trim(), pwEl.value);
-        window.location.replace("/dashboard/");
+        const session = await sb.ensureFreshSession();
+        finishSignIn(session);
       } catch (err) {
         errorEl.textContent   = friendlySignupError(err, mode)
           || ((mode === "signup") ? "Sign-up failed" : "Sign-in failed");
