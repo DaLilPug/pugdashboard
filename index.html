@@ -187,6 +187,40 @@
       color: var(--green);
     }
 
+    /* ── Launch promo chip ─────────────────────────────────────────── */
+    /* Shows under the hero subhead. Pulls live state from the
+       get_launch_promotion_status RPC (granted to anon). Hidden by
+       default until the fetch resolves; degrades silently if the
+       fetch fails. */
+    .lp-hero-promo {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(241, 196, 15, 0.14);
+      border: 1px solid rgba(241, 196, 15, 0.55);
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      margin: 0 0 22px;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .lp-hero-promo.is-ended {
+      background: rgba(120, 130, 145, 0.08);
+      border-color: rgba(120, 130, 145, 0.35);
+      color: var(--gray-600);
+    }
+    .lp-hero-promo-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+    .lp-hero-promo-count {
+      font-weight: 800;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+    }
+
     /* ── Hero visual (mock screenshot of the Reply Buddy sidebar) ──── */
     /* Mirrors the actual extension layout: navy header w/ logo +
        Test Client chip + Uptown.com wordmark + X close, tab row
@@ -1191,6 +1225,19 @@
       <p class="lp-hero-sub">
         Uptown Reply Buddy reads the thread, drafts your reply in your voice, and pre-classifies whether the response is positive, neutral, or negative so you know how to pitch it. Open a chat, get a blurb, keep moving.
       </p>
+
+      <!--
+        Launch promo chip. Hidden by default; the loadHeroPromo() IIFE
+        at the bottom of the page fetches get_launch_promotion_status
+        (granted to anon) and reveals + populates this. If the fetch
+        fails or the promo is mis-configured, the chip stays hidden
+        and the page reads exactly as it did before this was added.
+      -->
+      <div class="lp-hero-promo" id="lp-hero-promo" hidden>
+        <span class="lp-hero-promo-icon" id="lp-hero-promo-icon">🎁</span>
+        <span class="lp-hero-promo-text" id="lp-hero-promo-text"></span>
+      </div>
+
       <div class="lp-hero-ctas">
         <a class="lp-btn lp-btn-primary lp-btn-lg" id="lp-hero-install" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1648,6 +1695,59 @@
           visual.classList.add("lp-mock-clicked"); // kills the pulse after first interaction
         });
       });
+    })();
+
+    // Launch promo chip in the hero. Fetches live state from
+    // get_launch_promotion_status (granted to anon so this works for
+    // unauthenticated landing-page visitors). Three render modes:
+    //   * active w/ remaining > 0  : "First 100 signups get a free seat.
+    //                                 <X> remaining."
+    //   * inactive (expired/cap-0) : "No free seats remaining, start with
+    //                                 a 7-day free trial instead."
+    //   * fetch failed / no config : chip stays hidden, page reads as it
+    //                                did before this was added.
+    (async function loadHeroPromo () {
+      const chip    = document.getElementById("lp-hero-promo");
+      const textEl  = document.getElementById("lp-hero-promo-text");
+      const iconEl  = document.getElementById("lp-hero-promo-icon");
+      if (!chip || !textEl) return;
+
+      const sc = window.SUPABASE_CONFIG;
+      if (!sc || !sc.url || !sc.anonKey) return;
+
+      let state;
+      try {
+        const res = await fetch(`${sc.url}/rest/v1/rpc/get_launch_promotion_status`, {
+          method:  "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey":       sc.anonKey,
+          },
+          body: "{}",
+        });
+        if (!res.ok) return;
+        state = await res.json();
+      } catch (_) {
+        return;
+      }
+      if (!state) return;
+
+      const remaining = Number(state.grants_remaining) || 0;
+      const active    = !!state.is_active && remaining > 0;
+
+      if (active) {
+        textEl.innerHTML =
+          `First 100 signups get a free seat. ` +
+          `<span class="lp-hero-promo-count">${remaining}</span> remaining.`;
+        chip.classList.remove("is-ended");
+        if (iconEl) iconEl.textContent = "🎁";
+      } else {
+        textEl.textContent =
+          "No free seats remaining, start with a 7-day free trial instead.";
+        chip.classList.add("is-ended");
+        if (iconEl) iconEl.textContent = "⏰";
+      }
+      chip.hidden = false;
     })();
   </script>
 </body>
