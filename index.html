@@ -306,13 +306,28 @@
         row-gap: 8px;
         font-size: 13px;
       }
-      /* Hero mock on phones: taller aspect ratio so the sidebar's
-         full vertical content (Suggested Reply card + sentiment
-         pills + Log Response button at the bottom) shows without
-         clipping. Default 4:3.4 gives ~300px height at 354px mock
-         width — sidebar content needs ~430px vertically. 3:4 gives
-         ~472px which fits comfortably. */
-      .lp-hero-visual { aspect-ratio: 3 / 4; }
+      /* Mock scales on mobile rather than re-laying-out. The mock's
+         desktop natural dimensions are 600x510 (the hero's
+         single-column width at the 880px stacked breakpoint, with
+         4:3.4 aspect ratio). On phone viewports the inner wrapper
+         is pinned to those natural dimensions and visually scaled
+         via transform: scale to fit the available column. Result:
+         desktop design preserved 1:1, just smaller. Internal grid
+         (1fr 300px), text sizes, paddings, sentiment pills, Log
+         Response button all keep their exact desktop look.
+
+         Scale math: (column-width) / 600. Column-width is
+         (100vw - 36px) since .lp-hero has 18px horizontal padding
+         on mobile. clamp() caps the scale at 1 (in case someone
+         lands on this @media at viewport=600px exactly) and at
+         0.45 (so the mock stays legible on iPhone SE / 320px
+         viewports). */
+      .lp-mock-inner {
+        width: 600px;
+        height: 510px;
+        transform-origin: top left;
+        transform: scale(clamp(0.45, calc((100vw - 36px) / 600px), 1));
+      }
     }
 
     /* ── Hero visual (mock screenshot of the Reply Buddy sidebar) ──── */
@@ -357,17 +372,23 @@
       height: 8px;
       border-radius: 50%;
     }
+    /* .lp-mock-inner is a sizing wrapper added to make the whole
+       mock scale-able on mobile. On desktop it just fills the
+       visual; on mobile (see @media block earlier in this file)
+       it's pinned to the desktop natural dimensions (600px wide)
+       and transform-scaled to fit the column - so the entire mock
+       renders at the SAME proportions as desktop, just smaller. */
+    .lp-mock-inner {
+      width: 100%;
+      height: 100%;
+    }
     /* Body: left = faux LinkedIn page hint, right = Reply Buddy
-       sidebar. Proportional 40/60 split via `1fr 1.5fr` matches
-       Austin's desktop reference and scales cleanly to any
-       viewport width. minmax(0, ...) on both tracks prevents min-
-       content propagation from forcing the mock wider than its
-       parent — without that, `1fr 300px` (the previous default)
-       gave the mock an intrinsic min-width of ~450px which on
-       phone viewports forced horizontal page overflow. */
+       sidebar. Standard desktop grid (1fr 300px) - mobile uses the
+       same grid because the entire mock wrapper is scale-transformed
+       rather than re-laid-out. */
     .lp-mock-body {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+      grid-template-columns: 1fr 300px;
       height: calc(100% - 26px);
     }
     .lp-mock-page {
@@ -1336,7 +1357,7 @@
         not minutes.
       </h1>
       <p class="lp-hero-sub">
-        Uptown Reply Buddy reads the thread, drafts your reply in your voice, and pre-classifies whether the response is positive, neutral, or negative so you know how to pitch it. Open a chat, get a blurb, keep moving.
+        Uptown Reply Buddy reads the thread, drafts your reply, and pre-classifies whether the response is positive, neutral, or negative. Open a chat, get a blurb, keep moving.
       </p>
 
       <!--
@@ -1383,12 +1404,20 @@
       </div>
     </div>
     <div class="lp-hero-visual" aria-hidden="true">
-      <div class="lp-mock-chrome">
-        <span class="lp-mock-dot" style="background:#e85b5b"></span>
-        <span class="lp-mock-dot" style="background:#f5b942"></span>
-        <span class="lp-mock-dot" style="background:#42c97f"></span>
-      </div>
-      <div class="lp-mock-body">
+      <!--
+        .lp-mock-inner is the sizing wrapper that lets us scale the
+        entire mock down on mobile while preserving the desktop
+        design 1:1. Desktop: it fills the visual. Mobile (in
+        @media max-width: 600px): pinned to 600x510 natural
+        dimensions, transform-scaled to fit the column.
+      -->
+      <div class="lp-mock-inner">
+        <div class="lp-mock-chrome">
+          <span class="lp-mock-dot" style="background:#e85b5b"></span>
+          <span class="lp-mock-dot" style="background:#f5b942"></span>
+          <span class="lp-mock-dot" style="background:#42c97f"></span>
+        </div>
+        <div class="lp-mock-body">
         <div class="lp-mock-page">
           <div class="lp-mock-page-convo">
             <div class="lp-mock-page-convo-head">
@@ -1512,6 +1541,7 @@
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   </section>
@@ -1854,7 +1884,7 @@
       if (active) {
         textEl.innerHTML =
           `First 100 signups get a free seat. ` +
-          `<span class="lp-hero-promo-count">${remaining}</span> remaining.`;
+          `<span class="lp-hero-promo-count">${remaining}</span> left.`;
         chip.classList.remove("is-ended");
         if (iconEl) iconEl.textContent = "🎁";
       } else {
