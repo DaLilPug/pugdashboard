@@ -172,12 +172,23 @@
       }
       .lp-hero-promo-icon { padding-top: 1px; }
       .lp-hero-promo-text { line-height: 1.4; }
-      /* 4 trust items wrap to two rows on phones; tighten gaps so
-         a 2x2 grid fits cleanly inside narrow widths. */
+      /* 4 trust items, one per line on phones so each is fully
+         readable without competing for horizontal space. */
       .lp-hero-trust {
-        gap: 8px 14px;
-        font-size: 12.5px;
+        grid-template-columns: 1fr;
+        row-gap: 8px;
+        font-size: 13px;
       }
+      /* Hero mock: drop the conversation panel on the left and let
+         the Reply Buddy sidebar fill the entire mock width. The
+         sidebar is what shows the actual product surface; the chat
+         panel was decorative context that doesn't add value at phone
+         widths. Adjust aspect ratio to portrait so the sidebar's
+         stacked content (header, tabs, message+response, suggested
+         reply, sentiment, log button) has vertical room to breathe. */
+      .lp-hero-visual { aspect-ratio: 3 / 4; }
+      .lp-mock-body { grid-template-columns: 1fr; }
+      .lp-mock-page { display: none; }
     }
     .lp-hero-eyebrow {
       display: inline-flex;
@@ -226,12 +237,12 @@
       margin-bottom: 18px;
     }
     .lp-hero-trust {
-      display: flex;
-      align-items: center;
-      gap: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, max-content);
+      column-gap: 28px;
+      row-gap: 10px;
       font-size: 13px;
       color: var(--gray-600);
-      flex-wrap: wrap;
     }
     .lp-hero-trust-item {
       display: inline-flex;
@@ -1310,7 +1321,6 @@
           </svg>
           Add to Chrome - it's free
         </a>
-        <a class="lp-btn lp-btn-ghost lp-btn-lg" href="#how">See how it works</a>
       </div>
       <div class="lp-hero-trust">
         <span class="lp-hero-trust-item">
@@ -1319,7 +1329,7 @@
         </span>
         <span class="lp-hero-trust-item">
           <svg class="lp-hero-trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Drafts from your reply instructions
+          Personalized reply instructions
         </span>
         <span class="lp-hero-trust-item">
           <svg class="lp-hero-trust-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
