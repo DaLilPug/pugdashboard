@@ -229,8 +229,8 @@
         const raw = prompt(
           "Set grants_remaining to:\n\n" +
           "Number of additional free seats to grant before the promotion ends. " +
-          "Setting to 0 pauses the promotion. Originally seeded at 500.",
-          "500"
+          "Setting to 0 pauses the promotion. Launch cap is 100.",
+          "100"
         );
         if (raw === null) return;
         const n = parseInt(raw.trim(), 10);
