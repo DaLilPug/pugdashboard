@@ -15,6 +15,12 @@
        etc.) live in app.css; everything below is layout for index.html. */
 
     body { background: var(--white); }
+    /* Hard ceiling on horizontal page width. If any element on the
+       page somehow ends up wider than the viewport (an image, a
+       long unbreakable string, a future bug), this clips it instead
+       of letting it widen the body and trigger Safari's shrink-to-
+       fit zoom-out (which silently breaks every @media breakpoint). */
+    html, body { overflow-x: hidden; max-width: 100vw; }
 
     /* ── Top bar ──────────────────────────────────────────────────── */
     .lp-nav {
@@ -81,30 +87,12 @@
       .lp-nav-actions .lp-btn { font-size: 13px; padding: 9px 14px; }
       .lp-nav-actions .lp-btn svg { width: 16px; height: 16px; }
 
-      /* MOCK FIX — must live at 700px (not 600px). The mock body's
-         `1fr 300px` grid keeps a fixed 300px column plus the
-         conversation panel's min-content - that totals to a mock
-         min-width of ~450-500px, wider than any phone viewport.
-         When the page overflows horizontally, Safari fires shrink-
-         to-fit and reports CSS viewport as ~650px, which is why
-         the 600px breakpoint silently never fires (and trust
-         items, CTA stacking, etc. don't apply). Putting the fix
-         here at 700px guarantees it fires - we know nav rules
-         above this point apply correctly. Once the mock is sized
-         to fit, the page reports actual device width, and the
-         600px rules fire as designed. The fix itself takes Austin's
-         "tall not wide" suggestion: hide the conversation panel
-         (decorative, not load-bearing) and let the Reply Buddy
-         sidebar fill the full mock width, with a 3:5 aspect ratio
-         + 520px min-height so the sidebar's stacked content
-         (header → tabs → person → message → response → suggested
-         reply → sentiment → log button) has vertical room. */
-      .lp-mock-body { grid-template-columns: 1fr; }
-      .lp-mock-page { display: none; }
-      .lp-hero-visual {
-        aspect-ratio: 3 / 5;
-        min-height: 520px;
-      }
+      /* (Mock layout no longer needs a @media rule - the
+         universal .lp-mock-body minmax(...) above handles all
+         widths. The conversation panel naturally becomes a thin
+         tall column on phones, the sidebar keeps its natural
+         300px wherever possible. No display:none needed - Austin
+         wants both panels visible.) */
     }
 
     /* ── Buttons ──────────────────────────────────────────────────── */
@@ -331,6 +319,15 @@
       box-shadow: var(--shadow-lg);
       overflow: hidden;
       border: 1px solid var(--border);
+      /* Belt-and-suspenders with the .lp-mock-body minmax rule:
+         min-width: 0 lets this visual shrink below its inner content's
+         min-content size when placed in a 1fr grid track (grid items
+         default to min-width: auto = min-content). max-width: 100%
+         caps the visual at its grid track width even if some inner
+         element ignores the minmax. Together these ensure the mock
+         can never widen the page. */
+      min-width: 0;
+      max-width: 100%;
     }
     /* Browser chrome strip at the top */
     .lp-mock-chrome {
@@ -347,10 +344,19 @@
       height: 8px;
       border-radius: 50%;
     }
-    /* Body: left = faux LinkedIn page hint, right = Reply Buddy sidebar */
+    /* Body: left = faux LinkedIn page hint, right = Reply Buddy
+       sidebar. Grid tracks use minmax(...) so the mock can never
+       require more than 50px (conversation min) + 0px (sidebar
+       can shrink) regardless of inner content's min-content size.
+       Without this, default `1fr 300px` tracks let CSS grid
+       compute mock min-width = (1fr min-content) + 300px = ~500px
+       which on phone viewports forced horizontal page overflow,
+       triggered Safari shrink-to-fit, and broke every @media
+       breakpoint below 880px. Universal rule (no @media) so it
+       fires before any overflow can happen. */
     .lp-mock-body {
       display: grid;
-      grid-template-columns: 1fr 300px;
+      grid-template-columns: minmax(50px, 1fr) minmax(0, 300px);
       height: calc(100% - 26px);
     }
     .lp-mock-page {
