@@ -60,6 +60,23 @@
     }
     .lp-nav-link:hover { background: var(--navy-mid); }
 
+    /* Phone-specific nav: strip "Guides" (still reachable from the
+       footer), shorten "Sign in or Create Account" to "Sign in", and
+       compact the install button. Without this the nav overflows a
+       375px viewport (logo + 3 actions adds up to ~550px). */
+    .lp-nav-mobile-only { display: none; }
+    @media (max-width: 700px) {
+      .lp-nav-inner { padding: 12px 16px; gap: 8px; }
+      .lp-nav-logo img { height: 28px; }
+      .lp-nav-actions { gap: 6px; }
+      .lp-nav-hide-on-mobile { display: none; }
+      .lp-nav-desktop-only { display: none; }
+      .lp-nav-mobile-only { display: inline; }
+      .lp-nav-link { font-size: 13px; padding: 7px 10px; }
+      .lp-nav-actions .lp-btn { font-size: 13px; padding: 9px 14px; }
+      .lp-nav-actions .lp-btn svg { width: 16px; height: 16px; }
+    }
+
     /* ── Buttons ──────────────────────────────────────────────────── */
     .lp-btn {
       display: inline-flex;
@@ -1247,8 +1264,11 @@
         <img src="/assets/logo-tracker-navy.png" alt="Uptown" />
       </a>
       <div class="lp-nav-actions">
-        <a class="lp-nav-link" href="/guides/">Guides</a>
-        <a class="lp-nav-link" href="/login/">Sign in or Create Account</a>
+        <a class="lp-nav-link lp-nav-hide-on-mobile" href="/guides/">Guides</a>
+        <a class="lp-nav-link" href="/login/">
+          <span class="lp-nav-desktop-only">Sign in or Create Account</span>
+          <span class="lp-nav-mobile-only">Sign in</span>
+        </a>
         <a class="lp-btn lp-btn-secondary" id="lp-nav-install" target="_blank" rel="noopener">
           Add to Chrome
         </a>
