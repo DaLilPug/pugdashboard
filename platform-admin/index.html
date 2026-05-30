@@ -157,6 +157,106 @@
       const USER_COLSPAN = 6;
       let allUsers = [];
 
+      // ============================================================
+      // Launch promotion banner — declared BEFORE the Promise.all so
+      // the const bindings are out of TDZ when loadLaunchPromo() runs.
+      // (Hoisted async function declaration is callable from the
+      // Promise.all line, but its body resumes after the await — and
+      // if the consts it references haven't been declared yet, it
+      // throws a silent ReferenceError that leaves the UI stuck on
+      // "Loading…". Same TDZ pattern as the users panel above.)
+      // ============================================================
+      const lpStatusText = document.getElementById("launch-promo-status-text");
+      const lpPauseBtn   = document.getElementById("launch-promo-pause");
+      const lpSetBtn     = document.getElementById("launch-promo-set");
+      const lpCutoffBtn  = document.getElementById("launch-promo-cutoff");
+
+      function renderLaunchPromo(state) {
+        if (!state) {
+          lpStatusText.textContent = "Promotion not configured.";
+          lpPauseBtn.disabled = true;
+          lpSetBtn.disabled   = true;
+          lpCutoffBtn.disabled= true;
+          return;
+        }
+        const remaining = Number(state.grants_remaining) || 0;
+        const cutoff    = state.cutoff_date || "?";
+        const active    = !!state.is_active;
+        const status    = active ? "ACTIVE" : "INACTIVE";
+        lpStatusText.innerHTML =
+          `<strong style="color:${active ? "#1f6f43" : "#a04040"};">${status}</strong> &nbsp;·&nbsp; ` +
+          `${remaining} grant${remaining === 1 ? "" : "s"} remaining &nbsp;·&nbsp; ` +
+          `cutoff <strong>${esc(String(cutoff))}</strong>`;
+        lpPauseBtn.disabled  = !active;
+        lpSetBtn.disabled    = false;
+        lpCutoffBtn.disabled = false;
+      }
+
+      async function loadLaunchPromo() {
+        try {
+          const state = await sb.sbFetch("/rest/v1/rpc/get_launch_promotion_status", {
+            method: "POST",
+            body:   JSON.stringify({}),
+          });
+          renderLaunchPromo(state);
+        } catch (err) {
+          lpStatusText.textContent = `Couldn't load: ${err.message || err}`;
+        }
+      }
+
+      async function callSetLaunchPromo(payload, opName) {
+        try {
+          const state = await sb.sbFetch("/rest/v1/rpc/set_launch_promotion", {
+            method: "POST",
+            body:   JSON.stringify(payload),
+          });
+          renderLaunchPromo(state);
+        } catch (err) {
+          alert(`Couldn't ${opName}: ${err.message || err}`);
+        }
+      }
+
+      lpPauseBtn.addEventListener("click", async () => {
+        if (!confirm(
+          "Pause the launch promotion?\n\n" +
+          "This sets grants_remaining to 0. New signups will stop receiving the free seat immediately. " +
+          "You can resume later by clicking \"Set grants\" and entering a new number."
+        )) return;
+        await callSetLaunchPromo({ p_grants_remaining: 0 }, "pause promotion");
+      });
+
+      lpSetBtn.addEventListener("click", async () => {
+        const raw = prompt(
+          "Set grants_remaining to:\n\n" +
+          "Number of additional free seats to grant before the promotion ends. " +
+          "Setting to 0 pauses the promotion. Originally seeded at 500.",
+          "500"
+        );
+        if (raw === null) return;
+        const n = parseInt(raw.trim(), 10);
+        if (!Number.isFinite(n) || n < 0) {
+          alert("Must be a non-negative whole number.");
+          return;
+        }
+        await callSetLaunchPromo({ p_grants_remaining: n }, "set grants");
+      });
+
+      lpCutoffBtn.addEventListener("click", async () => {
+        const raw = prompt(
+          "Set cutoff_date to (YYYY-MM-DD):\n\n" +
+          "After this date, no further grants are issued even if grants_remaining > 0. " +
+          "Originally seeded at 2026-06-15.",
+          "2026-06-15"
+        );
+        if (raw === null) return;
+        const trimmed = raw.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+          alert("Must be in YYYY-MM-DD format.");
+          return;
+        }
+        await callSetLaunchPromo({ p_cutoff_date: trimmed }, "set cutoff");
+      });
+
       await Promise.all([load(), loadUsers(), loadLaunchPromo()]);
 
       async function loadUsers() {
@@ -286,103 +386,6 @@
 
       // Search updates re-render in place (debounced lightly via input event).
       userSearchEl.addEventListener("input", renderUsers);
-
-      // ============================================================
-      // Launch promotion banner — read status, wire pause / set-grants
-      // / set-cutoff buttons. Designed for phone use: every action is
-      // either a single click or a single prompt(), no multi-step forms.
-      // RPCs defined in add_launch_promotion_grant.sql.
-      // ============================================================
-      const lpStatusText = document.getElementById("launch-promo-status-text");
-      const lpPauseBtn   = document.getElementById("launch-promo-pause");
-      const lpSetBtn     = document.getElementById("launch-promo-set");
-      const lpCutoffBtn  = document.getElementById("launch-promo-cutoff");
-
-      function renderLaunchPromo(state) {
-        if (!state) {
-          lpStatusText.textContent = "Promotion not configured.";
-          lpPauseBtn.disabled = true;
-          lpSetBtn.disabled   = true;
-          lpCutoffBtn.disabled= true;
-          return;
-        }
-        const remaining = Number(state.grants_remaining) || 0;
-        const cutoff    = state.cutoff_date || "?";
-        const active    = !!state.is_active;
-        const status    = active ? "ACTIVE" : "INACTIVE";
-        lpStatusText.innerHTML =
-          `<strong style="color:${active ? "#1f6f43" : "#a04040"};">${status}</strong> &nbsp;·&nbsp; ` +
-          `${remaining} grant${remaining === 1 ? "" : "s"} remaining &nbsp;·&nbsp; ` +
-          `cutoff <strong>${esc(String(cutoff))}</strong>`;
-        lpPauseBtn.disabled  = !active;
-        lpSetBtn.disabled    = false;
-        lpCutoffBtn.disabled = false;
-      }
-
-      async function loadLaunchPromo() {
-        try {
-          const state = await sb.sbFetch("/rest/v1/rpc/get_launch_promotion_status", {
-            method: "POST",
-            body:   JSON.stringify({}),
-          });
-          renderLaunchPromo(state);
-        } catch (err) {
-          lpStatusText.textContent = `Couldn't load: ${err.message || err}`;
-        }
-      }
-
-      async function callSetLaunchPromo(payload, opName) {
-        try {
-          const state = await sb.sbFetch("/rest/v1/rpc/set_launch_promotion", {
-            method: "POST",
-            body:   JSON.stringify(payload),
-          });
-          renderLaunchPromo(state);
-        } catch (err) {
-          alert(`Couldn't ${opName}: ${err.message || err}`);
-        }
-      }
-
-      lpPauseBtn.addEventListener("click", async () => {
-        if (!confirm(
-          "Pause the launch promotion?\n\n" +
-          "This sets grants_remaining to 0. New signups will stop receiving the free seat immediately. " +
-          "You can resume later by clicking \"Set grants\" and entering a new number."
-        )) return;
-        await callSetLaunchPromo({ p_grants_remaining: 0 }, "pause promotion");
-      });
-
-      lpSetBtn.addEventListener("click", async () => {
-        const raw = prompt(
-          "Set grants_remaining to:\n\n" +
-          "Number of additional free seats to grant before the promotion ends. " +
-          "Setting to 0 pauses the promotion. Originally seeded at 500.",
-          "500"
-        );
-        if (raw === null) return;
-        const n = parseInt(raw.trim(), 10);
-        if (!Number.isFinite(n) || n < 0) {
-          alert("Must be a non-negative whole number.");
-          return;
-        }
-        await callSetLaunchPromo({ p_grants_remaining: n }, "set grants");
-      });
-
-      lpCutoffBtn.addEventListener("click", async () => {
-        const raw = prompt(
-          "Set cutoff_date to (YYYY-MM-DD):\n\n" +
-          "After this date, no further grants are issued even if grants_remaining > 0. " +
-          "Originally seeded at 2026-06-15.",
-          "2026-06-15"
-        );
-        if (raw === null) return;
-        const trimmed = raw.trim();
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
-          alert("Must be in YYYY-MM-DD format.");
-          return;
-        }
-        await callSetLaunchPromo({ p_cutoff_date: trimmed }, "set cutoff");
-      });
 
       // Original org-loading function continues below.
       async function load() {
