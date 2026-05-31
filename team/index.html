@@ -376,8 +376,12 @@
       const orgEditBtn = document.getElementById("org-name-edit-btn");
       orgNameEl.textContent = org.name;
 
+      // Show the pencil for org admins AND for platform admins
+      // viewing-as-org. The rename_organization RPC already accepts
+      // both server-side; this is purely a UI reveal.
       const isAdminOfThisOrg = myAdminOrgIds.has(org.id);
-      if (isAdminOfThisOrg) {
+      const canRenameOrg     = isAdminOfThisOrg || (await isPlatformAdminPromise);
+      if (canRenameOrg) {
         orgEditBtn.classList.remove("hidden");
         orgEditBtn.addEventListener("click", () => startRenameOrg());
       }
