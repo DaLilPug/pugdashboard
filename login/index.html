@@ -169,25 +169,31 @@
     // extension has one source of truth for auth (the dashboard) and
     // doesn't need to host its own forms or OAuth flows.
     //
-    // The extension's published ID is hard-coded; if you're running an
-    // unpacked dev build, the chrome.runtime.sendMessage call will
-    // succeed only against the matching ID, so dev builds either need
-    // their ID added here or should sign in via the popup's
-    // existing form for now.
+    // The extension appends its OWN id as `ext-id` when it opens this page
+    // (see the extension's config.js → uptownLoginUrl). We hand the session
+    // to that id FIRST. In the published build that's the canonical store
+    // id; in an unpacked dev build it's Chrome's random per-load id, so the
+    // handshake reaches the dev build even when the store build is also
+    // installed (otherwise the store build would grab the session first and
+    // the dev build would stay logged out).
     // ────────────────────────────────────────────────────────────────
-    // Published extension ID is the canonical handshake target.
-    // For local smoke-testing of an unpacked dev build (which Chrome
-    // assigns a different random ID each load), append
-    // ?dev-ext-id=<your-32-char-id> to this URL and the handshake will
-    // ALSO try that ID. The query-param path is intentionally
-    // explicit-opt-in - we don't read it from anywhere persistent, so
-    // a normal user can't be tricked into handing their session to a
-    // malicious extension via a phishing link with a bad ID.
-    const EXTENSION_IDS = ["oiojmfjjdgpjpanoienjmnoigjpjlhlc"];
+    // The hard-coded store id stays as a fallback for older extension
+    // builds that open `?from=extension` without an `ext-id`. `dev-ext-id`
+    // is kept as a legacy alias. The id is validated against the extension
+    // id charset (a-p, 32 chars). This is explicit opt-in per request - we
+    // never read it from anywhere persistent, so a normal user can't be
+    // tricked into handing their session to a malicious extension via a
+    // phishing link with a bad id (they'd also have to install that
+    // extension and complete sign-in on this page).
+    const PROD_EXTENSION_ID = "oiojmfjjdgpjpanoienjmnoigjpjlhlc";
     const _params = new URLSearchParams(location.search);
-    const _devExtId = _params.get("dev-ext-id");
-    if (_devExtId && /^[a-p]{32}$/.test(_devExtId)) {
-      EXTENSION_IDS.push(_devExtId);
+    const _passedId = _params.get("ext-id") || _params.get("dev-ext-id");
+    const EXTENSION_IDS = [];
+    if (_passedId && /^[a-p]{32}$/.test(_passedId)) {
+      EXTENSION_IDS.push(_passedId);
+    }
+    if (!EXTENSION_IDS.includes(PROD_EXTENSION_ID)) {
+      EXTENSION_IDS.push(PROD_EXTENSION_ID);
     }
     const fromExtension = _params.get("from") === "extension";
 
