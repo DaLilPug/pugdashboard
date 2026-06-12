@@ -330,6 +330,12 @@
               <button type="button" class="btn-row-action btn-reset-pw"
                       data-email="${esc(u.email || "")}"
                       title="Send a password reset email to this user">Send password reset</button>
+              <button type="button" class="btn-row-action btn-ai-quota"
+                      data-operator-id="${esc(u.operator_id)}"
+                      data-exempt="${u.ai_quota_exempt ? "1" : "0"}"
+                      title="${u.ai_quota_exempt
+                        ? "AI cap removed (unlimited drafts). Click to re-apply the 200/day cap."
+                        : "200 AI drafts/day cap. Click to remove the cap for this operator."}">${u.ai_quota_exempt ? "AI: Unlimited" : "AI: Capped"}</button>
               ${deleteBtn}
             </td>
           </tr>
@@ -349,6 +355,27 @@
               setTimeout(() => { btn.disabled = false; btn.textContent = prev; }, 1800);
             } catch (err) {
               alert(`Couldn't send reset: ${err.message || err}`);
+              btn.disabled = false; btn.textContent = prev;
+            }
+          });
+        });
+
+        userTbody.querySelectorAll(".btn-ai-quota").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id   = btn.dataset.operatorId;
+            const next = btn.dataset.exempt !== "1"; // toggle
+            const prev = btn.textContent;
+            btn.disabled = true; btn.textContent = "Saving…";
+            try {
+              await sb.sbFetch("/rest/v1/rpc/set_ai_quota_exempt", {
+                method: "POST",
+                body:   JSON.stringify({ p_operator_id: id, p_exempt: next }),
+              });
+              const u = allUsers.find(x => x.operator_id === id);
+              if (u) u.ai_quota_exempt = next;
+              renderUsers(); // re-render reflects new label + title
+            } catch (err) {
+              alert(`Couldn't update AI quota: ${err.message || err}`);
               btn.disabled = false; btn.textContent = prev;
             }
           });
