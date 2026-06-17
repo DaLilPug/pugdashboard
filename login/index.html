@@ -118,6 +118,30 @@
     </div>
   </div>
 
+  <!--
+    Password-reset "check your email" card. Replaces the form after a
+    reset link is requested so the go-check-your-email step is unmissable
+    (the old inline one-liner got skipped, especially by less technical
+    users, and the email often lands in spam).
+  -->
+  <div id="reset-sent" class="login-card" hidden>
+    <div class="login-brand">
+      <img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" />
+    </div>
+    <div class="login-title">Check your email</div>
+    <p class="login-confirm-body">
+      If <strong id="reset-sent-email"></strong> is on file, a password
+      reset link is on its way.
+    </p>
+    <p class="login-confirm-note">
+      <strong>Be sure to check your spam or junk folder.</strong> The email
+      can take a minute to arrive, and these sometimes get filtered.
+    </p>
+    <div class="login-switch">
+      <a id="reset-sent-back" href="#" role="button">Back to sign in</a>
+    </div>
+  </div>
+
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script>
@@ -426,11 +450,15 @@
           );
           // Don't reveal whether the email matched a real user — Supabase
           // silently no-ops for unknown emails to prevent enumeration.
-          // Show the same "if it's on file, check your inbox" either way.
-          infoEl.textContent =
-            "If that email is on file, a reset link is on its way. Check your inbox.";
-          submitBtn.disabled    = false;
-          submitBtn.textContent = prevLabel;
+          // Swap the whole form for a prominent card so the
+          // check-your-email step is unmissable (the old inline line got
+          // skipped, especially by less technical users, and the email
+          // often lands in spam). Same "if it's on file" wording either
+          // way, so we still don't reveal whether the address exists.
+          document.getElementById("reset-sent-email").textContent =
+            emailEl.value.trim();
+          form.hidden = true;
+          document.getElementById("reset-sent").hidden = false;
           return;
         }
 
@@ -544,6 +572,15 @@
       emailEl.value = pendingSignupEmail;
       pwEl.value = "";
       pwEl.focus();
+    });
+
+    // "Back to sign in" from the reset-sent card.
+    document.getElementById("reset-sent-back").addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("reset-sent").hidden = true;
+      form.hidden = false;
+      mode = "signin";
+      applyMode();
     });
   </script>
 </body>
