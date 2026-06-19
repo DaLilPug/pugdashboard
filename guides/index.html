@@ -3067,6 +3067,30 @@
       </details>
 
       <details class="collapsible">
+        <summary>I logged the same activity twice, but it only counted once.</summary>
+        <div class="details-body">
+          <p>
+            That's by design. To keep your numbers clean, Uptown ignores a
+            duplicate of the <strong>same activity type for the same person
+            within 7 days</strong> - so an accidental double-click, a re-log
+            after going back to the list, a page reload, or a connected
+            integration sending the same event again won't inflate your counts.
+            The duplicate is dropped quietly, and you'll still see the normal
+            "Logged!" confirmation either way.
+          </p>
+          <p>
+            This guard covers the four activity types that should only happen
+            once per person: <strong>connection request, message (the first
+            "New Message Sent"), InMail, and retargeting</strong>. It does
+            <em>not</em> apply to <strong>follow-ups, responses, or booked
+            meetings</strong> - those can legitimately repeat, so every one is
+            kept. A genuine follow-up message is logged as a follow-up (through
+            your cadence), not as a new "message," so it always counts.
+          </p>
+        </div>
+      </details>
+
+      <details class="collapsible">
         <summary>I logged something to the wrong account. How do I fix it?</summary>
         <div class="details-body">
           <p>
