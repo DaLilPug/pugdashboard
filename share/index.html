@@ -70,11 +70,13 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.access_token) { showError(data.error); return; }
 
+        // ephemeral: keep the share session in this tab's sessionStorage so
+        // it doesn't clobber the operator's real (localStorage) session.
         window.sb.setSessionFromTokens({
           access_token:  data.access_token,
           refresh_token: data.refresh_token,
           expires_in:    data.expires_in,
-        });
+        }, { ephemeral: true });
         location.replace(`/account/?id=${encodeURIComponent(data.client_id)}`);
       } catch (_) {
         showError("Something went wrong opening this link. Please try again.");

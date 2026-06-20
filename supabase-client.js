@@ -14,9 +14,18 @@
 
   // --- session storage ----------------------------------------------
 
+  // A share-link tab keeps its (synthetic, single-account) session in
+  // sessionStorage so it never clobbers the operator's real session in
+  // localStorage - and a real session in another tab stays put. We prefer
+  // the per-tab session when present; with no sessionStorage session this
+  // is byte-for-byte the old localStorage behavior.
+  function sessionStore() {
+    return sessionStorage.getItem(STORAGE_KEY) ? sessionStorage : localStorage;
+  }
+
   function getSession() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = sessionStorage.getItem(STORAGE_KEY) || localStorage.getItem(STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (_) {
       return null;
@@ -24,11 +33,11 @@
   }
 
   function setSession(session) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    sessionStore().setItem(STORAGE_KEY, JSON.stringify(session));
   }
 
   function clearSession() {
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStore().removeItem(STORAGE_KEY);
   }
 
   // --- auth ---------------------------------------------------------
@@ -232,14 +241,17 @@
   // recovery URL Supabase redirects to has the access + refresh tokens
   // in the URL hash; the /reset/ page reads them and calls this).
   // Also used by the OAuth callback on /login/.
-  function setSessionFromTokens({ access_token, refresh_token, expires_in, user }) {
+  function setSessionFromTokens({ access_token, refresh_token, expires_in, user }, opts = {}) {
     const session = {
       access_token,
       refresh_token,
       user: user || null,
       expires_at: Date.now() + ((expires_in || 3600) * 1000),
     };
-    setSession(session);
+    // ephemeral -> store only in this tab's sessionStorage (share-link
+    // sessions), leaving the operator's real localStorage session intact.
+    if (opts.ephemeral) sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    else setSession(session);
     return session;
   }
 
@@ -487,4 +499,30 @@
     storageSignedUrl,
     storageRemove,
   };
+
+  // --- Share-link scope guard ---------------------------------------
+  // A share-link session is a synthetic single-account user. It should
+  // only ever see /share (the entry page) and /account (its one account).
+  // If such a session lands anywhere else - /dashboard, /team,
+  // /platform-admin, a stale bookmark - bounce it to its account. Normal
+  // sessions are untouched (the is_share_user check returns early).
+  (function shareScopeGuard() {
+    const path = location.pathname;
+    if (/^\/(share|account)(\/|$)/.test(path)) return; // allowed surfaces
+    (async () => {
+      let s;
+      try { s = await ensureFreshSession(); } catch (_) { return; }
+      if (!s) return;
+      const meta = s.user && s.user.user_metadata;
+      if (!meta || !meta.is_share_user) return; // only acts on share sessions
+      try {
+        const rows = await sbFetch("/rest/v1/clients?select=id&limit=1");
+        const id = Array.isArray(rows) && rows[0] && rows[0].id;
+        if (id) { location.replace("/account/?id=" + encodeURIComponent(id)); return; }
+      } catch (_) { /* fall through to sign-out */ }
+      // Share session with no reachable account (e.g. link revoked): sign out.
+      clearSession();
+      location.replace("/login/");
+    })();
+  })();
 })();
