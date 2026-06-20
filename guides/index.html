@@ -638,7 +638,7 @@
             <li><a href="#dash-summary">Summary</a></li>
             <li><a href="#dash-prospects">Prospects</a></li>
             <li><a href="#dash-followups">Follow-ups</a></li>
-            <li><a href="#dash-templates">Templates</a></li>
+            <li><a href="#dash-assets">Assets</a></li>
             <li><a href="#dash-replyinst">Reply Instructions</a></li>
             <li><a href="#dash-cadence">Cadence</a></li>
             <li><a href="#dash-meeting">Meeting Links</a></li>
@@ -647,6 +647,7 @@
             <li><a href="#dash-enrichment-section">Enrichment</a></li>
             <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
             <li><a href="#dash-hubspot-sync">Native HubSpot sync</a></li>
+            <li><a href="#dash-share">Sharing an account</a></li>
           </ol>
         </li>
         <li><a href="#extension">Extension reference (Tracker UI)</a>
@@ -1516,7 +1517,7 @@
       <ol class="steps">
         <li><strong>Open the <em>Send Message 1</em> saved search.</strong></li>
         <li><strong>For each new person on this saved search, send your initial message.</strong>
-            We recommend renaming your first saved template inside Uptown Tracker's <a href="#dash-templates">Templates tab</a>
+            We recommend renaming your first saved template inside Uptown Tracker's <a href="#dash-assets">Assets tab</a>
             to <code>Message 1</code> and copying it from the extension popup or
             the per-account dashboard so the wording stays consistent across the team.</li>
         <li><strong>Save them to the current month's Messages Sent list.</strong>
@@ -1912,26 +1913,37 @@
         <li>Reschedule a task to a different date.</li>
       </ul>
 
-      <h3 id="dash-templates">8.6 — Per-account: Templates</h3>
+      <h3 id="dash-assets">8.6 — Per-account: Assets</h3>
       <p>
-        Templates are your one-off message library — Message 1, retargeting copy,
-        and any other paste-ready text you reuse. Up to 10 per account.
+        Assets are the per-account library your team pastes from while working
+        outreach. Three kinds, each capped at 10 and reorderable with the ↑↓
+        controls:
       </p>
 
       <ul>
-        <li><strong>Add</strong>, <strong>rename</strong> inline, <strong>edit body</strong>,
-            <strong>copy</strong>, <strong>delete</strong>.</li>
-        <li>Templates support these variables, expanded automatically when the
-            extension copies them into a message: <code>{{first_name}}</code>,
+        <li><strong>Links</strong> - named URLs (a case study, a pricing page, a
+            booking link). Each row has <strong>Open</strong> and
+            <strong>Copy</strong>.</li>
+        <li><strong>Attachments</strong> - files you upload (up to 25 MB each),
+            stored privately per account. Use <strong>Download</strong> to grab one.</li>
+        <li><strong>Templates</strong> - your one-off message library (Message 1,
+            retargeting copy, any paste-ready text). Add, rename inline, edit
+            body, copy, delete. Templates support variables the extension expands
+            when it copies them into a message: <code>{{first_name}}</code>,
             <code>{{company}}</code>, <code>{{title}}</code>.</li>
-        <li>Templates are also available from the extension popup so you can copy
-            without leaving Sales Nav.</li>
       </ul>
+
+      <p>
+        All three are reachable from the extension popup too, so your team can
+        grab a link, file, or template without leaving LinkedIn. Links and
+        Attachments are created and edited on the dashboard; the popup is
+        read-and-copy.
+      </p>
 
       <div class="callout tip">
         <div class="callout-title">Naming your first template "Message 1"</div>
         <p>
-          We recommend renaming your first saved template to <code>Message 1</code>
+          We recommend renaming your first template to <code>Message 1</code>
           and writing your initial-message copy there. The naming consistency
           makes the daily workflow ("copy Message 1, send, log") clean across
           your team.
@@ -2320,6 +2332,23 @@
         <li><strong>outbound_message_text</strong> - on <em>response</em> triggers, the outbound message the prospect is replying to. On <em>meeting-booked</em> triggers, the outbound message that prompted the prior response, if one exists. Null on all other triggers (the extension logs the act of sending, not the message body, for CRs, first messages, InMails, and retargeting messages).</li>
         <li><strong>response_text</strong>, <strong>sentiment</strong>, <strong>sentiment_detail</strong> - populated on response triggers, and on meeting-booked rows that have a known prior response. Null on all other triggers.</li>
       </ul>
+
+      <h4>Actions: pushing activity in</h4>
+      <p>
+        The triggers above pull events <em>out</em> of an account. One action
+        writes <em>into</em> it: <strong>Create Activity</strong>. Pick the
+        account, choose a type (connection, message, InMail, retargeting,
+        response, or meeting booked), and pass the prospect's name plus any
+        optional details (company, title, email, profile URL, when it
+        happened). Uptown logs it against the matching prospect just like the
+        extension would.
+      </p>
+      <p>
+        The usual use is a meeting zap: when someone books through your calendar
+        tool, a <em>Create Activity</em> step logs a <code>meeting booked</code>
+        event on the right account, so your Summary and booking rate stay
+        current without anyone logging it by hand.
+      </p>
 
       <h4>Common zap recipes</h4>
       <ul>
@@ -2727,6 +2756,35 @@
           You can't have two parallel native-HubSpot integrations on the same
           account, but you can have a different HubSpot connected per account
           across your organization.
+        </p>
+      </div>
+
+      <h3 id="dash-share">8.15 — Sharing an account with a link</h3>
+      <p>
+        The <strong>Share</strong> button at the top-right of an account page
+        creates one public link to that account. Anyone you send it to gets
+        <strong>full edit access to that one account</strong> - no Uptown login,
+        no seat - and they can't see any of your other accounts or your team. It
+        opens like a standalone document: a shared link in its own tab doesn't
+        touch your own login.
+      </p>
+      <ol class="steps">
+        <li><strong>Create the link.</strong> Click <strong>Share</strong>, then
+            <strong>Create share link</strong>, then <strong>Copy</strong>.
+            There's one active link per account; re-opening Share shows the same
+            link.</li>
+        <li><strong>Send it</strong> to whoever needs to work or review the
+            account. They land directly on it and can use every tab.</li>
+        <li><strong>Stop sharing</strong> any time: open Share and click
+            <strong>Stop sharing</strong>. The link stops working immediately for
+            everyone, and any open session loses access on the spot.</li>
+      </ol>
+      <div class="callout note">
+        <div class="callout-title">Who should get a share link</div>
+        <p>
+          It's full edit access with no sign-in, so treat it like a document
+          you'd only hand to someone you trust with that account. Deleting the
+          account retires its link automatically.
         </p>
       </div>
 
