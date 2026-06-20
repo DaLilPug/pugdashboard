@@ -375,6 +375,77 @@
     return all;
   }
 
+  // --- Storage helpers ----------------------------------------------
+  //
+  // Used by the Assets tab's Attachments card. The client-attachments
+  // bucket is PRIVATE; access is gated by the same has_client_access()
+  // RLS operators (and scoped share-link users) already pass. Object
+  // paths are '<client_id>/<uuid>_<filename>'.
+
+  async function storageUpload(bucket, path, file) {
+    const s = await ensureFreshSession();
+    if (!s) throw new Error("Not signed in");
+    const res = await fetch(
+      `${URL_BASE}/storage/v1/object/${bucket}/${encodeURI(path)}`,
+      {
+        method: "POST",
+        headers: {
+          apikey:         ANON_KEY,
+          Authorization:  `Bearer ${s.access_token}`,
+          "Content-Type": file.type || "application/octet-stream",
+          "x-upsert":     "true",
+        },
+        body: file,
+      }
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      let payload; try { payload = JSON.parse(text); } catch (_) { payload = { message: text }; }
+      throw new Error(payload.message || payload.error || `Upload failed (HTTP ${res.status})`);
+    }
+    return res.json().catch(() => ({}));
+  }
+
+  // Short-lived signed URL for downloading a private object.
+  async function storageSignedUrl(bucket, path, expiresIn = 3600) {
+    const s = await ensureFreshSession();
+    if (!s) throw new Error("Not signed in");
+    const res = await fetch(
+      `${URL_BASE}/storage/v1/object/sign/${bucket}/${encodeURI(path)}`,
+      {
+        method: "POST",
+        headers: {
+          apikey:         ANON_KEY,
+          Authorization:  `Bearer ${s.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ expiresIn }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || "Couldn't sign download URL");
+    // data.signedURL is like "/object/sign/<bucket>/<path>?token=…"
+    return `${URL_BASE}/storage/v1${data.signedURL}`;
+  }
+
+  // Delete objects. Best-effort - a failed cleanup shouldn't block a save.
+  async function storageRemove(bucket, paths) {
+    const s = await ensureFreshSession();
+    if (!s) throw new Error("Not signed in");
+    try {
+      const res = await fetch(`${URL_BASE}/storage/v1/object/${bucket}`, {
+        method: "DELETE",
+        headers: {
+          apikey:         ANON_KEY,
+          Authorization:  `Bearer ${s.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prefixes: paths }),
+      });
+      return res.ok;
+    } catch (_) { return false; }
+  }
+
   window.sb = {
     signIn,
     signUp,
@@ -388,5 +459,8 @@
     ensureFreshSession,
     sbFetch,
     sbFetchAll,
+    storageUpload,
+    storageSignedUrl,
+    storageRemove,
   };
 })();
