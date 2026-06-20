@@ -2344,6 +2344,32 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   padding: 3px 2px 0;
 }
 
+/* Three asset cards side by side (Links / Attachments / Templates),
+   flowing to fewer columns as the viewport narrows. Mirrors the
+   .cad-grid > .cad-editor max-width override so each card fills its
+   column instead of stopping at the global 720px cap. */
+.assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.assets-grid > .cad-editor {
+  margin-top: 0;
+  max-width: none;
+}
+
+/* Link URL is a single-line field, not a tall template-style box. */
+.lnk-url-d {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 7px 10px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.lnk-url-d:focus { border-color: var(--accent); outline: none; }
+
 /* ---------- Reply Instructions tab ---------- */
 
 .rpl-text-d {

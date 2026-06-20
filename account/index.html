@@ -282,6 +282,7 @@
 
     <!-- =================== ASSETS ==================== -->
     <section id="panel-assets" class="sub-panel hidden">
+      <div class="assets-grid">
       <div class="cad-editor">
         <div class="cad-head">
           <h2>Links</h2>
@@ -333,6 +334,7 @@
           <button id="tmpl-save" class="cad-save" type="button" disabled>Save</button>
           <span   id="tmpl-feedback" class="cad-feedback"></span>
         </div>
+      </div>
       </div>
     </section>
 
@@ -6526,7 +6528,7 @@
               + '<button type="button" class="tmpl-copy-d lnk-open-d" data-idx="' + i + '">Open</button>'
               + '<button type="button" class="tmpl-copy-d lnk-copy-d" data-idx="' + i + '">Copy</button>'
               + '<button type="button" class="tmpl-remove-d" data-idx="' + i + '" title="Remove link">×</button>'
-              + '</div><input class="tmpl-body-d lnk-url-d" type="text" data-idx="' + i + '" value="' + esc(l.url || "") + '" placeholder="https://…" /></div>'
+              + '</div><input class="lnk-url-d" type="text" data-idx="' + i + '" value="' + esc(l.url || "") + '" placeholder="https://…" /></div>'
             ).join("");
           }
           addBtn.disabled = items.length >= ASSET_MAX;
