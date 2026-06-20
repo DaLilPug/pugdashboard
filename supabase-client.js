@@ -446,9 +446,33 @@
     } catch (_) { return false; }
   }
 
+  // --- Edge Functions ----------------------------------------------
+  //
+  // Invoke a Supabase Edge Function as the signed-in operator. Used by
+  // the account page's Share button (share-admin). share-login is NOT
+  // called through here - visitors have no session yet, so the /share/
+  // page calls it directly with just the anon key.
+  async function invokeFunction(name, body) {
+    const s = await ensureFreshSession();
+    if (!s) throw new Error("Not signed in");
+    const res = await fetch(`${URL_BASE}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        apikey:         ANON_KEY,
+        Authorization:  `Bearer ${s.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+    return data;
+  }
+
   window.sb = {
     signIn,
     signUp,
+    invokeFunction,
     signOut,
     signInWithProvider,
     resetPasswordForEmail,

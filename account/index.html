@@ -52,6 +52,38 @@
               type="button"
               aria-label="Rename account"
               title="Rename account">&#9998;</button>
+
+      <!-- Share: per-account public link. Floats to the right of the row
+           (margin-left:auto). Hidden until the account loads, and never
+           shown to share-link visitors. -->
+      <div id="share-wrap" class="share-wrap hidden">
+        <button id="share-btn" class="btn-share" type="button" aria-haspopup="dialog" aria-expanded="false" title="Share this account">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/>
+          </svg>
+          Share
+        </button>
+        <div id="share-pop" class="share-pop hidden" role="dialog" aria-label="Share this account">
+          <div class="share-pop-title">Share this account</div>
+          <p class="share-pop-blurb">
+            Anyone with this link gets full edit access to <strong>this account only</strong> -
+            no Uptown login needed. They can't see your other accounts or your team, and you can
+            stop sharing anytime.
+          </p>
+          <div id="share-none">
+            <button id="share-create" class="btn-primary share-pop-create" type="button">Create share link</button>
+          </div>
+          <div id="share-active" class="hidden">
+            <div class="share-link-row">
+              <input id="share-url" class="share-url" type="text" readonly aria-label="Share link" />
+              <button id="share-copy" class="btn-share-copy" type="button">Copy</button>
+            </div>
+            <button id="share-revoke" class="share-revoke" type="button">Stop sharing</button>
+          </div>
+          <div id="share-msg" class="share-msg" role="status"></div>
+        </div>
+      </div>
     </div>
     <div id="account-meta" class="account-meta"></div>
   </div>
@@ -712,6 +744,125 @@
       const editBtn = document.getElementById("account-name-edit-btn");
       editBtn.classList.remove("hidden");
       editBtn.addEventListener("click", () => startRenameAccount(client));
+
+      // ---- Share link ------------------------------------------------
+      // Per-account public share link. Operators with access can mint one
+      // link that grants full edit access to THIS account only (a scoped
+      // synthetic user; the existing RLS enforces the scope). Hidden from
+      // share-link visitors, who are themselves access-holders (share-admin
+      // also rejects them server-side).
+      initShare();
+      function initShare() {
+        const wrap = document.getElementById("share-wrap");
+        if (!wrap) return;
+
+        // Never show the Share control to a share-link visitor.
+        const sess = sb.getSession();
+        const meta = sess && sess.user && sess.user.user_metadata;
+        if (meta && meta.is_share_user) return;
+
+        wrap.classList.remove("hidden");
+
+        const btn      = document.getElementById("share-btn");
+        const pop      = document.getElementById("share-pop");
+        const noneEl   = document.getElementById("share-none");
+        const activeEl = document.getElementById("share-active");
+        const urlEl    = document.getElementById("share-url");
+        const msgEl    = document.getElementById("share-msg");
+        const createB  = document.getElementById("share-create");
+        const copyB    = document.getElementById("share-copy");
+        const revokeB  = document.getElementById("share-revoke");
+        let loadedOnce = false;
+
+        function setMsg(text, kind) {
+          msgEl.textContent = text || "";
+          msgEl.className = "share-msg" + (kind ? " " + kind : "");
+        }
+        function renderActive(url) {
+          urlEl.value = url;
+          noneEl.classList.add("hidden");
+          activeEl.classList.remove("hidden");
+        }
+        function renderNone() {
+          urlEl.value = "";
+          activeEl.classList.add("hidden");
+          noneEl.classList.remove("hidden");
+        }
+
+        async function loadState() {
+          setMsg("Loading…");
+          try {
+            const r = await sb.invokeFunction("share-admin", { action: "get", client_id: clientId });
+            if (r.link) renderActive(r.link.url); else renderNone();
+            setMsg("");
+          } catch (err) {
+            setMsg(err.message || "Couldn't load share status.", "error");
+          }
+        }
+
+        function openPop() {
+          pop.classList.remove("hidden");
+          btn.setAttribute("aria-expanded", "true");
+          if (!loadedOnce) { loadedOnce = true; loadState(); }
+        }
+        function closePop() {
+          pop.classList.add("hidden");
+          btn.setAttribute("aria-expanded", "false");
+        }
+
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (pop.classList.contains("hidden")) openPop(); else closePop();
+        });
+        pop.addEventListener("click", (e) => e.stopPropagation());
+        document.addEventListener("click", (e) => {
+          if (!pop.classList.contains("hidden") && !wrap.contains(e.target)) closePop();
+        });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && !pop.classList.contains("hidden")) closePop();
+        });
+
+        createB.addEventListener("click", async () => {
+          createB.disabled = true;
+          setMsg("Creating…");
+          try {
+            const r = await sb.invokeFunction("share-admin", { action: "create", client_id: clientId });
+            renderActive(r.link.url);
+            setMsg("Share link ready. Anyone with it can edit this account.", "ok");
+          } catch (err) {
+            setMsg(err.message || "Couldn't create the link.", "error");
+          } finally {
+            createB.disabled = false;
+          }
+        });
+
+        copyB.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(urlEl.value);
+            const prev = copyB.textContent;
+            copyB.textContent = "Copied";
+            setTimeout(() => { copyB.textContent = prev; }, 1400);
+          } catch (_) {
+            urlEl.select();
+            try { document.execCommand("copy"); } catch (_) {}
+          }
+        });
+
+        revokeB.addEventListener("click", async () => {
+          if (!confirm("Stop sharing this account? The link stops working immediately and anyone using it loses access.")) return;
+          revokeB.disabled = true;
+          setMsg("Stopping…");
+          try {
+            await sb.invokeFunction("share-admin", { action: "revoke", client_id: clientId });
+            renderNone();
+            setMsg("Sharing stopped. The old link no longer works.", "ok");
+          } catch (err) {
+            setMsg(err.message || "Couldn't stop sharing.", "error");
+          } finally {
+            revokeB.disabled = false;
+          }
+        });
+      }
 
       // Reveal the danger-zone panel if archived AND admin. Async,
       // doesn't block page render.

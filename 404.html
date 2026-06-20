@@ -25,6 +25,18 @@
   <script>
     (function () {
       try {
+        // Share links: /share/<slug> is a clean public URL with no file
+        // behind it on GitHub Pages, so it 404s here. Forward to the share
+        // page with the slug as a query param; that page exchanges it for a
+        // scoped session and bounces to the account. replace() so Back
+        // doesn't loop straight back into this redirect.
+        var shareMatch = window.location.pathname.match(/^\/share\/(.+)$/);
+        if (shareMatch) {
+          var slug = shareMatch[1].replace(/\/+$/, '');
+          window.location.replace('/share/?s=' + encodeURIComponent(slug));
+          return;
+        }
+
         var host = window.location.hostname.toLowerCase();
         if (host !== 'app.uptown.com') return;
         var raw = window.location.pathname.replace(/^\/+|\/+$/g, '');

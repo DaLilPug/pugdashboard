@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Public share-link landing page.
+
+       Reached two ways, both ending here with the slug as ?s=:
+         (1) someone opens app.uptown.com/share/<slug> — there's no file
+             there on GitHub Pages, so 404.html forwards it to
+             /share/?s=<slug>;
+         (2) directly via /share/?s=<slug>.
+
+       This page exchanges the slug for a scoped Supabase session via the
+       share-login Edge Function, stores it like any normal sign-in, then
+       bounces to the one account the link grants access to. From there the
+       dashboard runs exactly as it would for a signed-in user who only has
+       that one account; RLS does the scoping. -->
+  <title>Opening shared dashboard - Uptown Tracker</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+</head>
+<body class="login-body">
+  <div class="login-card" style="text-align:center;">
+    <div class="login-brand" style="justify-content:center;">
+      <img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" />
+    </div>
+
+    <div id="share-loading">
+      <div class="login-title">Opening shared dashboard…</div>
+      <p style="font-size:13px;color:var(--gray-600);margin-top:8px;">
+        One moment while we get things ready.
+      </p>
+    </div>
+
+    <div id="share-error" style="display:none;">
+      <div class="login-title">This link isn't active</div>
+      <p id="share-error-msg" style="font-size:13px;color:var(--gray-600);margin:10px 0 18px;">
+        This share link is no longer active. Ask whoever shared it for a new link.
+      </p>
+      <a href="https://uptown.com" class="btn-primary" style="justify-content:center;">Learn about Uptown</a>
+    </div>
+  </div>
+
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script>
+    (async function () {
+      const { url: URL_BASE, anonKey: ANON_KEY } = window.SUPABASE_CONFIG;
+      const slug = (new URLSearchParams(location.search).get("s") || "").trim();
+
+      function showError(msg) {
+        document.getElementById("share-loading").style.display = "none";
+        if (msg) document.getElementById("share-error-msg").textContent = msg;
+        document.getElementById("share-error").style.display = "";
+      }
+
+      if (!slug) { showError(); return; }
+
+      try {
+        const res = await fetch(`${URL_BASE}/functions/v1/share-login`, {
+          method: "POST",
+          headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ slug }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.access_token) { showError(data.error); return; }
+
+        window.sb.setSessionFromTokens({
+          access_token:  data.access_token,
+          refresh_token: data.refresh_token,
+          expires_in:    data.expires_in,
+        });
+        location.replace(`/account/?id=${encodeURIComponent(data.client_id)}`);
+      } catch (_) {
+        showError("Something went wrong opening this link. Please try again.");
+      }
+    })();
+  </script>
+</body>
+</html>

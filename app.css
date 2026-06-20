@@ -6138,6 +6138,106 @@ body.header-drawer-open { overflow: hidden; }
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* ---- Share link (account titlebar, top-right) ---------------------- */
+.share-wrap { position: relative; margin-left: auto; }
+.btn-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  background: var(--navy-light);
+  color: var(--navy);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r-pill);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-share:hover { background: #e3edf1; }
+.btn-share svg { width: 14px; height: 14px; }
+.share-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 340px;
+  max-width: 86vw;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  z-index: 60;
+  text-align: left;
+}
+.share-pop-title {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+.share-pop-blurb {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--gray-600);
+  margin: 0 0 14px;
+}
+.share-pop-create { width: 100%; justify-content: center; }
+.share-link-row { display: flex; gap: 8px; }
+.share-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--gray-600);
+  background: var(--surface-2);
+}
+.btn-share-copy {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 14px;
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.btn-share-copy:hover { background: var(--navy-dark); }
+.share-revoke {
+  margin-top: 12px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--red);
+  cursor: pointer;
+}
+.share-revoke:hover { text-decoration: underline; }
+.share-msg {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--gray-600);
+}
+.share-msg:empty { margin-top: 0; }
+.share-msg.error { color: var(--red); }
+.share-msg.ok { color: var(--green-dark); }
+
 .account-name-edit {
   background: none;
   border: 0;
