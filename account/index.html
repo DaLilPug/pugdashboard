@@ -21,7 +21,7 @@
         <img src="/assets/logo-tracker-white.png" alt="Uptown Tracker" />
       </div>
       <div class="header-pipe"></div>
-      <a href="/dashboard/" class="header-breadcrumb">← Dashboard</a>
+      <a id="dashboard-breadcrumb" href="/dashboard/" class="header-breadcrumb">← Dashboard</a>
     </div>
     <div class="header-right">
       <div id="user-email" class="header-user"></div>
@@ -753,13 +753,22 @@
       // also rejects them server-side).
       initShare();
       function initShare() {
-        const wrap = document.getElementById("share-wrap");
-        if (!wrap) return;
-
-        // Never show the Share control to a share-link visitor.
         const sess = sb.getSession();
         const meta = sess && sess.user && sess.user.user_metadata;
-        if (meta && meta.is_share_user) return;
+        const isShareUser = !!(meta && meta.is_share_user);
+
+        if (isShareUser) {
+          // Share-link visitor: strip nav chrome that's useless or confusing
+          // for a scoped guest - the Dashboard breadcrumb lands on an empty
+          // account list (they aren't an org member), and the header would
+          // otherwise show the synthetic share+… email.
+          document.getElementById("dashboard-breadcrumb")?.classList.add("hidden");
+          document.getElementById("user-email")?.classList.add("hidden");
+        }
+
+        // Never show the Share control to a share-link visitor.
+        const wrap = document.getElementById("share-wrap");
+        if (!wrap || isShareUser) return;
 
         wrap.classList.remove("hidden");
 
