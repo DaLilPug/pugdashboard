@@ -59,10 +59,10 @@
   <div class="sub-tabs" id="sub-tabs">
     <button class="sub-tab active" data-tab="summary"       type="button">Summary</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
+    <button class="sub-tab"        data-tab="assets"        type="button">Assets</button>
     <button class="sub-tab"        data-tab="followups"     type="button">Follow-ups</button>
-    <button class="sub-tab"        data-tab="templates"     type="button">Templates</button>
-    <button class="sub-tab"        data-tab="replyinst"     type="button">Reply Instructions</button>
     <button class="sub-tab"        data-tab="cadence"       type="button">Cadence</button>
+    <button class="sub-tab"        data-tab="replyinst"     type="button">Reply Instructions</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
     <button class="sub-tab"        data-tab="integrations"  type="button">Integrations</button>
   </div>
@@ -280,13 +280,48 @@
       </div>
     </section>
 
-    <!-- =================== TEMPLATES ==================== -->
-    <section id="panel-templates" class="sub-panel hidden">
+    <!-- =================== ASSETS ==================== -->
+    <section id="panel-assets" class="sub-panel hidden">
+      <div class="cad-editor">
+        <div class="cad-head">
+          <h2>Links</h2>
+          <p class="page-sub">
+            Saved links for this account - open, copy, or click the box to edit. Up to 10.
+          </p>
+        </div>
+        <div id="lnk-list" class="tmpl-list-d">
+          <div class="loading">Loading links…</div>
+        </div>
+        <button id="lnk-add" class="cad-add" type="button">+ Add link</button>
+        <div class="cad-actions">
+          <button id="lnk-save" class="cad-save" type="button" disabled>Save</button>
+          <span   id="lnk-feedback" class="cad-feedback"></span>
+        </div>
+      </div>
+
+      <div class="cad-editor">
+        <div class="cad-head">
+          <h2>Attachments</h2>
+          <p class="page-sub">
+            Files for this account (max 25&nbsp;MB each, up to 10). Use Download to grab one.
+          </p>
+        </div>
+        <div id="att-list" class="tmpl-list-d">
+          <div class="loading">Loading attachments…</div>
+        </div>
+        <input id="att-file" type="file" hidden />
+        <button id="att-add" class="cad-add" type="button">+ Add attachment</button>
+        <div class="cad-actions">
+          <button id="att-save" class="cad-save" type="button" disabled>Save</button>
+          <span   id="att-feedback" class="cad-feedback"></span>
+        </div>
+      </div>
+
       <div class="cad-editor">
         <div class="cad-head">
           <h2>Templates</h2>
           <p class="page-sub">
-            Reusable messages for initial outreach and retargeting — distinct from the follow-up cadence.
+            Reusable messages for initial outreach and retargeting - distinct from the follow-up cadence.
             Up to 10. Use Copy to paste into LinkedIn.
           </p>
         </div>
@@ -644,7 +679,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,links,attachments,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -682,7 +717,7 @@
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, prospects: false, followups: false, templates: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false };
+      const loaded = { summary: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false };
 
       tabs.addEventListener("click", (e) => {
         const btn = e.target.closest(".sub-tab");
@@ -705,7 +740,7 @@
           if      (name === "summary")   initSummary();
           else if (name === "prospects") initProspects();
           else if (name === "followups") initFollowups();
-          else if (name === "templates") initTemplates();
+          else if (name === "assets") initAssets();
           else if (name === "replyinst") initReplyInstructions();
           else if (name === "cadence")   initCadence();
           else if (name === "meeting-links") initMeetingLinks();
@@ -6388,8 +6423,199 @@
         }
       }
 
-      // ================= TEMPLATES ====================================
+      // ================= ASSETS (Links / Attachments / Templates) =====
       //
+      // Three independent cards, each a working-copy -> render -> PATCH
+      // loop (same shape as the templates editor below). Links/Attachments
+      // live on clients.links / clients.attachments; Templates on
+      // clients.templates (unchanged). All capped at 10, with up/down
+      // reordering. Attachment files live in the private
+      // 'client-attachments' Storage bucket.
+
+      const ASSET_MAX = 10;
+      const ATTACH_BUCKET = "client-attachments";
+      const ATTACH_MAX_BYTES = 25 * 1024 * 1024;
+
+      function initAssets() { initLinks(); initAttachments(); initTemplates(); }
+
+      function assetMove(arr, idx, dir) {
+        const j = idx + dir;
+        if (j < 0 || j >= arr.length) return false;
+        const t = arr[idx]; arr[idx] = arr[j]; arr[j] = t;
+        return true;
+      }
+      function assetMoveCtrls(i, n) {
+        return '<div class="asset-move-d">'
+          + '<button type="button" class="asset-up-d" data-idx="' + i + '" title="Move up" ' + (i === 0 ? "disabled" : "") + '>↑</button>'
+          + '<button type="button" class="asset-down-d" data-idx="' + i + '" title="Move down" ' + (i === n - 1 ? "disabled" : "") + '>↓</button>'
+          + '</div>';
+      }
+      function assetFlash(btn, text, ms) {
+        if (btn._label == null) btn._label = btn.textContent;
+        btn.textContent = text;
+        clearTimeout(btn._t);
+        btn._t = setTimeout(() => { btn.textContent = btn._label; }, ms || 1400);
+      }
+      function assetUrl(u) {
+        u = (u || "").trim();
+        return u && !/^https?:\/\//i.test(u) ? "https://" + u : u;
+      }
+      function assetRandomId() {
+        try { return crypto.randomUUID(); }
+        catch (_) { return "id" + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+      }
+      function assetSize(bytes) {
+        bytes = Number(bytes) || 0;
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1048576) return (bytes / 1024).toFixed(0) + " KB";
+        return (bytes / 1048576).toFixed(1) + " MB";
+      }
+
+      // ----- Links -----
+      function initLinks() {
+        const listEl = document.getElementById("lnk-list");
+        const addBtn = document.getElementById("lnk-add");
+        const saveBtn = document.getElementById("lnk-save");
+        const feedbackEl = document.getElementById("lnk-feedback");
+        let items = Array.isArray(client.links)
+          ? client.links.map(l => ({ name: typeof l?.name === "string" ? l.name : "", url: typeof l?.url === "string" ? l.url : "" })).slice(0, ASSET_MAX)
+          : [];
+        render();
+        addBtn.addEventListener("click", () => {
+          if (items.length >= ASSET_MAX) return;
+          items.push({ name: "Link " + (items.length + 1), url: "" });
+          setDirty(true); render();
+        });
+        listEl.addEventListener("click", async (e) => {
+          const mv = e.target.closest(".asset-up-d, .asset-down-d");
+          if (mv) { if (assetMove(items, Number(mv.dataset.idx), mv.classList.contains("asset-up-d") ? -1 : 1)) { setDirty(true); render(); } return; }
+          const rm = e.target.closest(".tmpl-remove-d");
+          if (rm) { items.splice(Number(rm.dataset.idx), 1); setDirty(true); render(); return; }
+          const open = e.target.closest(".lnk-open-d");
+          if (open) { const u = assetUrl(items[Number(open.dataset.idx)]?.url); if (u) window.open(u, "_blank", "noopener"); return; }
+          const copy = e.target.closest(".lnk-copy-d");
+          if (copy) { try { await navigator.clipboard.writeText(items[Number(copy.dataset.idx)]?.url || ""); assetFlash(copy, "Copied"); } catch (_) { assetFlash(copy, "Failed"); } }
+        });
+        listEl.addEventListener("input", (e) => {
+          const el = e.target, idx = Number(el.dataset.idx);
+          if (!Number.isInteger(idx) || !items[idx]) return;
+          if (el.classList.contains("lnk-name-d")) { items[idx].name = el.value; setDirty(true); }
+          else if (el.classList.contains("lnk-url-d")) { items[idx].url = el.value; setDirty(true); }
+        });
+        saveBtn.addEventListener("click", save);
+        async function save() {
+          const payload = items.slice(0, ASSET_MAX).map((l, i) => ({ name: (l.name || "").trim() || ("Link " + (i + 1)), url: (l.url || "").trim() }));
+          saveBtn.disabled = true; feedbackEl.className = "cad-feedback"; feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch("/rest/v1/clients?id=eq." + encodeURIComponent(clientId), { method: "PATCH", body: JSON.stringify({ links: payload }), headers: { Prefer: "return=minimal" } });
+            items = payload; client.links = payload; saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok"; feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+            render();
+          } catch (err) { saveBtn.disabled = false; feedbackEl.className = "cad-feedback err"; feedbackEl.textContent = err.message || "Save failed"; }
+        }
+        function setDirty(v) { saveBtn.disabled = !v; if (v) { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; } }
+        function render() {
+          if (!items.length) {
+            listEl.innerHTML = '<div class="placeholder" style="padding:20px;"><strong>No links yet</strong> Click <em>+ Add link</em> to create one.</div>';
+          } else {
+            listEl.innerHTML = items.map((l, i) =>
+              '<div class="tmpl-row-d"><div class="tmpl-row-head-d">'
+              + assetMoveCtrls(i, items.length)
+              + '<input class="tmpl-name-d lnk-name-d" type="text" data-idx="' + i + '" value="' + esc(l.name || "") + '" placeholder="Link name" />'
+              + '<button type="button" class="tmpl-copy-d lnk-open-d" data-idx="' + i + '">Open</button>'
+              + '<button type="button" class="tmpl-copy-d lnk-copy-d" data-idx="' + i + '">Copy</button>'
+              + '<button type="button" class="tmpl-remove-d" data-idx="' + i + '" title="Remove link">×</button>'
+              + '</div><input class="tmpl-body-d lnk-url-d" type="text" data-idx="' + i + '" value="' + esc(l.url || "") + '" placeholder="https://…" /></div>'
+            ).join("");
+          }
+          addBtn.disabled = items.length >= ASSET_MAX;
+          addBtn.textContent = items.length >= ASSET_MAX ? "+ Add link (" + ASSET_MAX + " max)" : "+ Add link";
+        }
+      }
+
+      // ----- Attachments -----
+      function initAttachments() {
+        const listEl = document.getElementById("att-list");
+        const addBtn = document.getElementById("att-add");
+        const fileInput = document.getElementById("att-file");
+        const saveBtn = document.getElementById("att-save");
+        const feedbackEl = document.getElementById("att-feedback");
+        let items = Array.isArray(client.attachments)
+          ? client.attachments.map(a => ({ name: typeof a?.name === "string" ? a.name : "", path: typeof a?.path === "string" ? a.path : "", size: Number(a?.size) || 0, type: typeof a?.type === "string" ? a.type : "" })).filter(a => a.path).slice(0, ASSET_MAX)
+          : [];
+        const originalPaths = new Set(items.map(a => a.path));
+        render();
+        addBtn.addEventListener("click", () => { if (items.length >= ASSET_MAX) return; fileInput.value = ""; fileInput.click(); });
+        fileInput.addEventListener("change", async () => {
+          const file = fileInput.files && fileInput.files[0];
+          if (!file || items.length >= ASSET_MAX) return;
+          if (file.size > ATTACH_MAX_BYTES) { feedbackEl.className = "cad-feedback err"; feedbackEl.textContent = '"' + file.name + '" is too large (max 25 MB).'; return; }
+          const safe = (file.name.replace(/[^A-Za-z0-9._-]+/g, "_") || "file").slice(-120);
+          const path = clientId + "/" + assetRandomId() + "_" + safe;
+          addBtn.disabled = true; feedbackEl.className = "cad-feedback"; feedbackEl.textContent = 'Uploading "' + file.name + '"…';
+          try {
+            await sb.storageUpload(ATTACH_BUCKET, path, file);
+            items.push({ name: file.name, path: path, size: file.size, type: file.type || "" });
+            setDirty(true); feedbackEl.textContent = ""; render();
+          } catch (err) { feedbackEl.className = "cad-feedback err"; feedbackEl.textContent = err.message || "Upload failed"; }
+          finally { addBtn.disabled = items.length >= ASSET_MAX; }
+        });
+        listEl.addEventListener("click", async (e) => {
+          const mv = e.target.closest(".asset-up-d, .asset-down-d");
+          if (mv) { if (assetMove(items, Number(mv.dataset.idx), mv.classList.contains("asset-up-d") ? -1 : 1)) { setDirty(true); render(); } return; }
+          const rm = e.target.closest(".tmpl-remove-d");
+          if (rm) { items.splice(Number(rm.dataset.idx), 1); setDirty(true); render(); return; }
+          const dl = e.target.closest(".att-download-d");
+          if (dl) {
+            const a = items[Number(dl.dataset.idx)];
+            if (!a?.path) return;
+            assetFlash(dl, "…", 5000);
+            try { const url = await sb.storageSignedUrl(ATTACH_BUCKET, a.path); window.open(url, "_blank", "noopener"); assetFlash(dl, "Download", 1); }
+            catch (err) { assetFlash(dl, "Download", 1); feedbackEl.className = "cad-feedback err"; feedbackEl.textContent = err.message || "Download failed"; }
+          }
+        });
+        listEl.addEventListener("input", (e) => {
+          const el = e.target, idx = Number(el.dataset.idx);
+          if (!Number.isInteger(idx) || !items[idx]) return;
+          if (el.classList.contains("att-name-d")) { items[idx].name = el.value; setDirty(true); }
+        });
+        saveBtn.addEventListener("click", save);
+        async function save() {
+          const payload = items.slice(0, ASSET_MAX).map((a, i) => ({ name: (a.name || "").trim() || ("Attachment " + (i + 1)), path: a.path, size: a.size, type: a.type }));
+          saveBtn.disabled = true; feedbackEl.className = "cad-feedback"; feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch("/rest/v1/clients?id=eq." + encodeURIComponent(clientId), { method: "PATCH", body: JSON.stringify({ attachments: payload }), headers: { Prefer: "return=minimal" } });
+            const keep = new Set(payload.map(a => a.path));
+            const orphans = Array.from(originalPaths).filter(p => !keep.has(p));
+            if (orphans.length) sb.storageRemove(ATTACH_BUCKET, orphans);
+            orphans.forEach(p => originalPaths.delete(p)); payload.forEach(a => originalPaths.add(a.path));
+            items = payload; client.attachments = payload; saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok"; feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+            render();
+          } catch (err) { saveBtn.disabled = false; feedbackEl.className = "cad-feedback err"; feedbackEl.textContent = err.message || "Save failed"; }
+        }
+        function setDirty(v) { saveBtn.disabled = !v; if (v) { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; } }
+        function render() {
+          if (!items.length) {
+            listEl.innerHTML = '<div class="placeholder" style="padding:20px;"><strong>No attachments yet</strong> Click <em>+ Add attachment</em> to upload a file.</div>';
+          } else {
+            listEl.innerHTML = items.map((a, i) =>
+              '<div class="tmpl-row-d"><div class="tmpl-row-head-d">'
+              + assetMoveCtrls(i, items.length)
+              + '<input class="tmpl-name-d att-name-d" type="text" data-idx="' + i + '" value="' + esc(a.name || "") + '" placeholder="Attachment name" />'
+              + '<button type="button" class="tmpl-copy-d att-download-d" data-idx="' + i + '">Download</button>'
+              + '<button type="button" class="tmpl-remove-d" data-idx="' + i + '" title="Remove attachment">×</button>'
+              + '</div><div class="att-meta-d">' + esc(assetSize(a.size)) + (a.type ? " · " + esc(a.type) : "") + '</div></div>'
+            ).join("");
+          }
+          addBtn.disabled = items.length >= ASSET_MAX;
+          addBtn.textContent = items.length >= ASSET_MAX ? "+ Add attachment (" + ASSET_MAX + " max)" : "+ Add attachment";
+        }
+      }
+
+      // ----- Templates -----
       // Mirror of the extension's templates drawer. client.templates is
       // a jsonb array of {name, body}; one PATCH rewrites the whole
       // array on save. UI is capped at 10 to match the popup.
@@ -6421,6 +6647,8 @@
         });
 
         listEl.addEventListener("click", async (e) => {
+          const mv = e.target.closest(".asset-up-d, .asset-down-d");
+          if (mv) { if (assetMove(items, Number(mv.dataset.idx), mv.classList.contains("asset-up-d") ? -1 : 1)) { setDirty(true); render(); } return; }
           const rm = e.target.closest(".tmpl-remove-d");
           if (rm) {
             const idx = Number(rm.dataset.idx);
@@ -6520,6 +6748,7 @@
             listEl.innerHTML = items.map((t, i) => `
               <div class="tmpl-row-d">
                 <div class="tmpl-row-head-d">
+                  ${assetMoveCtrls(i, items.length)}
                   <input class="tmpl-name-d" type="text" data-idx="${i}"
                          value="${esc(t.name || "")}" placeholder="Template name" />
                   <button type="button" class="tmpl-copy-d"   data-idx="${i}">Copy</button>

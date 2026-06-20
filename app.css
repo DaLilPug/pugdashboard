@@ -2311,6 +2311,39 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 .tmpl-body-d:focus { border-color: var(--accent); }
 
+/* ---------- Assets tab: reorder controls + attachment meta ---------- */
+
+.asset-move-d {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: 2px;
+}
+.asset-up-d, .asset-down-d {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  cursor: pointer;
+  color: var(--muted, #667);
+}
+.asset-up-d:hover:not(:disabled),
+.asset-down-d:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.asset-up-d:disabled, .asset-down-d:disabled {
+  opacity: .35;
+  cursor: default;
+}
+.att-meta-d {
+  font-size: 12px;
+  color: var(--muted, #667);
+  padding: 3px 2px 0;
+}
+
 /* ---------- Reply Instructions tab ---------- */
 
 .rpl-text-d {
