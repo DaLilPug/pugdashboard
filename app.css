@@ -6171,7 +6171,7 @@ body.header-drawer-open { overflow: hidden; }
   border-radius: var(--r);
   box-shadow: var(--shadow-sm);
   padding: 16px;
-  z-index: 60;
+  z-index: 200; /* above the sticky header (100) and sub-tabs (90) */
   text-align: left;
 }
 .share-pop-title {

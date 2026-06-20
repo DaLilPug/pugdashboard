@@ -915,6 +915,17 @@
       // otherwise summary. Note we run this BEFORE the eager
       // initSummary call below so we don't load summary twice when the
       // user lands on a non-summary tab.
+      //
+      // Asset-tab config consts live HERE (not down next to initAssets) so a
+      // hard refresh that lands directly on #assets - which runs
+      // selectTab('assets') -> initAssets() right below - doesn't reference
+      // them in the temporal dead zone. They used to sit by the asset code,
+      // which threw a ReferenceError and left the tab stuck on "Loading…"
+      // on every refresh. Don't move them back down.
+      const ASSET_MAX = 10;
+      const ATTACH_BUCKET = "client-attachments";
+      const ATTACH_MAX_BYTES = 25 * 1024 * 1024;
+
       const initialTab = (() => {
         const h = (location.hash || "").replace(/^#/, "").toLowerCase();
         return VALID_TABS.has(h) ? h : "summary";
@@ -6585,10 +6596,9 @@
       // reordering. Attachment files live in the private
       // 'client-attachments' Storage bucket.
 
-      const ASSET_MAX = 10;
-      const ATTACH_BUCKET = "client-attachments";
-      const ATTACH_MAX_BYTES = 25 * 1024 * 1024;
-
+      // ASSET_MAX / ATTACH_BUCKET / ATTACH_MAX_BYTES are declared earlier,
+      // before the initial selectTab() dispatch, so a refresh straight onto
+      // #assets doesn't reference them in the TDZ. Don't move them back here.
       function initAssets() { initLinks(); initAttachments(); initTemplates(); }
 
       function assetMove(arr, idx, dir) {
