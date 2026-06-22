@@ -139,6 +139,12 @@
         <button class="timeframe-pill" data-tf="1m" type="button">1M</button>
         <button class="timeframe-pill" data-tf="2m" type="button">2M</button>
         <button class="timeframe-pill" data-tf="3m" type="button">3M</button>
+        <!-- Calendar-anchored windows (this Sunday on / 1st of this month on),
+             distinct from the rolling 1W-3M above. "This Week" answers
+             "did this account do work THIS week" without last week bleeding
+             in like the rolling 1W does early in the week. -->
+        <button class="timeframe-pill" data-tf="tw" type="button">This Week</button>
+        <button class="timeframe-pill" data-tf="tm" type="button">This Month</button>
         <!-- "This Year" (Jan 1 of current year → today) is the default.
              Cuts dashboard load from the full outreach history down to
              the current year — the dominant cost when an org accumulates
@@ -1724,6 +1730,19 @@
         if (tf === "yr") {
           const jan1 = new Date(new Date().getFullYear(), 0, 1);
           return [jan1.toISOString(), null];
+        }
+        // "This Week" = most recent Sunday at local midnight (calendar week,
+        // not a rolling 7 days). "This Month" = the 1st of the current month
+        // at local midnight. Same local-time → UTC ISO convention as above.
+        if (tf === "tw") {
+          const d = new Date();
+          d.setHours(0, 0, 0, 0);
+          d.setDate(d.getDate() - d.getDay()); // getDay(): 0 = Sunday
+          return [d.toISOString(), null];
+        }
+        if (tf === "tm") {
+          const now = new Date();
+          return [new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), null];
         }
         const days = { '1w':7, '2w':14, '3w':21, '1m':30, '2m':60, '3m':90 }[tf];
         if (!days) return [null, null];
