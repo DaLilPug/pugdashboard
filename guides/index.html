@@ -638,9 +638,9 @@
             <li><a href="#dash-summary">Summary</a></li>
             <li><a href="#dash-prospects">Prospects</a></li>
             <li><a href="#dash-followups">Follow-ups</a></li>
-            <li><a href="#dash-assets">Assets</a></li>
-            <li><a href="#dash-replyinst">Reply Instructions</a></li>
             <li><a href="#dash-cadence">Cadence</a></li>
+            <li><a href="#dash-replyinst">Reply Instructions</a></li>
+            <li><a href="#dash-assets">Assets</a></li>
             <li><a href="#dash-meeting">Meeting Links</a></li>
             <li><a href="#dash-team">Team page</a></li>
             <li><a href="#dash-billing">Billing</a></li>
@@ -1913,7 +1913,53 @@
         <li>Reschedule a task to a different date.</li>
       </ul>
 
-      <h3 id="dash-assets">8.6 — Per-account: Assets</h3>
+      <h3 id="dash-cadence">8.6 — Per-account: Cadence</h3>
+      <p>
+        Cadence controls automated follow-up timing. There are <strong>two
+        independent sequences</strong> per account:
+      </p>
+
+      <h4>Follow-up Cadence</h4>
+      <p>
+        Anchored on a Message 1 send. Steps fire on the days you specify
+        (e.g. day 3, day 7, day 14) and stop when the prospect responds, books a
+        meeting, or you cancel. Each step has a template; templates support the
+        same <code>{{first_name}}</code> / <code>{{company}}</code> /
+        <code>{{title}}</code> variables.
+      </p>
+
+      <h4>Positive Response Cadence</h4>
+      <p>
+        Anchored on a positive-sentiment response. Goal is booking a meeting.
+        Steps fire on day-offsets after the positive response. Stops on
+        meeting booked or cancellation.
+      </p>
+
+      <h4>The On/Off toggle</h4>
+      <p>
+        The big switch at the top of each cadence panel disables enrolling
+        <strong>new</strong> prospects without affecting in-flight tasks. So if
+        you flip Follow-up Cadence off mid-month, the people already in the
+        sequence keep getting their scheduled tasks; only newly-messaged prospects
+        won't enroll.
+      </p>
+
+      <h3 id="dash-replyinst">8.7 — Per-account: Reply Instructions</h3>
+      <p>
+        A free-form text box that becomes the system prompt for the AI suggested-reply
+        feature in the extension sidebar. The AI reads this instruction plus the
+        message you sent and the prospect's reply when drafting a suggested
+        response.
+      </p>
+
+      <p>Good Reply Instructions are short, specific, and outcome-oriented. Examples:</p>
+      <ul>
+        <li><em>"Warm but brief. We help SaaS teams cut churn. If pricing comes up, pivot to a quick call. Never quote numbers."</em></li>
+        <li><em>"Tone: senior consultant, not salesy. Always end with a soft CTA toward a 15-minute call."</em></li>
+        <li><em>"If the response is a clear no, draft a polite acknowledgement and offer to circle back in 6 months."</em></li>
+      </ul>
+
+      <h3 id="dash-assets">8.8 — Per-account: Assets</h3>
       <p>
         Assets are the per-account library your team pastes from while working
         outreach. Three kinds, each capped at 10 and reorderable with the ↑↓
@@ -1949,52 +1995,6 @@
           your team.
         </p>
       </div>
-
-      <h3 id="dash-replyinst">8.7 — Per-account: Reply Instructions</h3>
-      <p>
-        A free-form text box that becomes the system prompt for the AI suggested-reply
-        feature in the extension sidebar. The AI reads this instruction plus the
-        message you sent and the prospect's reply when drafting a suggested
-        response.
-      </p>
-
-      <p>Good Reply Instructions are short, specific, and outcome-oriented. Examples:</p>
-      <ul>
-        <li><em>"Warm but brief. We help SaaS teams cut churn. If pricing comes up, pivot to a quick call. Never quote numbers."</em></li>
-        <li><em>"Tone: senior consultant, not salesy. Always end with a soft CTA toward a 15-minute call."</em></li>
-        <li><em>"If the response is a clear no, draft a polite acknowledgement and offer to circle back in 6 months."</em></li>
-      </ul>
-
-      <h3 id="dash-cadence">8.8 — Per-account: Cadence</h3>
-      <p>
-        Cadence controls automated follow-up timing. There are <strong>two
-        independent sequences</strong> per account:
-      </p>
-
-      <h4>Follow-up Cadence</h4>
-      <p>
-        Anchored on a Message 1 send. Steps fire on the days you specify
-        (e.g. day 3, day 7, day 14) and stop when the prospect responds, books a
-        meeting, or you cancel. Each step has a template; templates support the
-        same <code>{{first_name}}</code> / <code>{{company}}</code> /
-        <code>{{title}}</code> variables.
-      </p>
-
-      <h4>Positive Response Cadence</h4>
-      <p>
-        Anchored on a positive-sentiment response. Goal is booking a meeting.
-        Steps fire on day-offsets after the positive response. Stops on
-        meeting booked or cancellation.
-      </p>
-
-      <h4>The On/Off toggle</h4>
-      <p>
-        The big switch at the top of each cadence panel disables enrolling
-        <strong>new</strong> prospects without affecting in-flight tasks. So if
-        you flip Follow-up Cadence off mid-month, the people already in the
-        sequence keep getting their scheduled tasks; only newly-messaged prospects
-        won't enroll.
-      </p>
 
       <h3 id="dash-meeting">8.9 — Per-account: Meeting Links</h3>
       <p>
