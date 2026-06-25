@@ -1858,13 +1858,15 @@
 
     // Launch promo chip in the hero. Fetches live state from
     // get_launch_promotion_status (granted to anon so this works for
-    // unauthenticated landing-page visitors). Three render modes:
+    // unauthenticated landing-page visitors). Two render modes:
     //   * active w/ remaining > 0  : "First 100 signups get a free seat.
-    //                                 <X> remaining."
-    //   * inactive (expired/cap-0) : "No free seats remaining, start with
-    //                                 a 7-day free trial instead."
-    //   * fetch failed / no config : chip stays hidden, page reads as it
-    //                                did before this was added.
+    //                                 <X> left." (chip shown)
+    //   * inactive / fetch failed / no config : chip stays hidden. We do NOT
+    //                                show a "no free seats left" fallback - to a
+    //                                new visitor that reads as "you missed out,"
+    //                                and the hero CTA already carries the
+    //                                free-to-install offer (the 7-day trial
+    //                                lives in pricing/FAQ).
     (async function loadHeroPromo () {
       const chip    = document.getElementById("lp-hero-promo");
       const textEl  = document.getElementById("lp-hero-promo-text");
@@ -1894,18 +1896,16 @@
       const remaining = Number(state.grants_remaining) || 0;
       const active    = !!state.is_active && remaining > 0;
 
-      if (active) {
-        textEl.innerHTML =
-          `First 100 signups get a free seat. ` +
-          `<span class="lp-hero-promo-count">${remaining}</span> left.`;
-        chip.classList.remove("is-ended");
-        if (iconEl) iconEl.textContent = "🎁";
-      } else {
-        textEl.textContent =
-          "No free seats remaining, start with a 7-day free trial instead.";
-        chip.classList.add("is-ended");
-        if (iconEl) iconEl.textContent = "⏰";
-      }
+      // No active promo → leave the chip hidden (it defaults to hidden in the
+      // markup). We deliberately don't render a "no free seats left" fallback;
+      // that reads as "you missed out" to a new visitor.
+      if (!active) return;
+
+      textEl.innerHTML =
+        `First 100 signups get a free seat. ` +
+        `<span class="lp-hero-promo-count">${remaining}</span> left.`;
+      chip.classList.remove("is-ended");
+      if (iconEl) iconEl.textContent = "🎁";
       chip.hidden = false;
     })();
   </script>
