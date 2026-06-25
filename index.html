@@ -246,40 +246,6 @@
       color: var(--green);
     }
 
-    /* ── Launch promo chip ─────────────────────────────────────────── */
-    /* Shows under the hero subhead. Pulls live state from the
-       get_launch_promotion_status RPC (granted to anon). Hidden by
-       default until the fetch resolves; degrades silently if the
-       fetch fails. */
-    .lp-hero-promo {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      background: rgba(241, 196, 15, 0.14);
-      border: 1px solid rgba(241, 196, 15, 0.55);
-      border-radius: 999px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--ink);
-      margin: 0 0 22px;
-      transition: background 0.15s ease, border-color 0.15s ease;
-    }
-    .lp-hero-promo.is-ended {
-      background: rgba(120, 130, 145, 0.08);
-      border-color: rgba(120, 130, 145, 0.35);
-      color: var(--gray-600);
-    }
-    .lp-hero-promo-icon {
-      font-size: 16px;
-      line-height: 1;
-    }
-    .lp-hero-promo-count {
-      font-weight: 800;
-      color: var(--green);
-      font-variant-numeric: tabular-nums;
-    }
-
     /* ── PHONE OVERRIDES (≤600px) ──────────────────────────────────
        MUST live after the unconditional .lp-hero h1 / .lp-hero-sub
        / .lp-hero-trust / .lp-hero-promo / .lp-hero-ctas rules above,
@@ -309,15 +275,6 @@
       }
       .lp-hero-ctas .lp-btn { width: 100%; }
       .lp-hero-ctas .lp-btn-lg { padding: 14px 22px; font-size: 15px; }
-      .lp-hero-promo {
-        font-size: 13px;
-        padding: 8px 12px;
-        max-width: 100%;
-        align-items: flex-start;
-        margin-bottom: 18px;
-      }
-      .lp-hero-promo-icon { padding-top: 1px; }
-      .lp-hero-promo-text { line-height: 1.4; }
       .lp-hero-trust {
         grid-template-columns: 1fr;
         row-gap: 8px;
@@ -1373,18 +1330,6 @@
         Uptown Reply Buddy reads the thread, drafts your reply, and pre-classifies whether the response is positive, neutral, or negative. Open a chat, get a blurb, keep moving.
       </p>
 
-      <!--
-        Launch promo chip. Hidden by default; the loadHeroPromo() IIFE
-        at the bottom of the page fetches get_launch_promotion_status
-        (granted to anon) and reveals + populates this. If the fetch
-        fails or the promo is mis-configured, the chip stays hidden
-        and the page reads exactly as it did before this was added.
-      -->
-      <div class="lp-hero-promo" id="lp-hero-promo" hidden>
-        <span class="lp-hero-promo-icon" id="lp-hero-promo-icon">🎁</span>
-        <span class="lp-hero-promo-text" id="lp-hero-promo-text"></span>
-      </div>
-
       <div class="lp-hero-ctas">
         <a class="lp-btn lp-btn-primary lp-btn-lg" id="lp-hero-install" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1856,58 +1801,14 @@
       });
     })();
 
-    // Launch promo chip in the hero. Fetches live state from
-    // get_launch_promotion_status (granted to anon so this works for
-    // unauthenticated landing-page visitors). Two render modes:
-    //   * active w/ remaining > 0  : "First 100 signups get a free seat.
-    //                                 <X> left." (chip shown)
-    //   * inactive / fetch failed / no config : chip stays hidden. We do NOT
-    //                                show a "no free seats left" fallback - to a
-    //                                new visitor that reads as "you missed out,"
-    //                                and the hero CTA already carries the
-    //                                free-to-install offer (the 7-day trial
-    //                                lives in pricing/FAQ).
-    (async function loadHeroPromo () {
-      const chip    = document.getElementById("lp-hero-promo");
-      const textEl  = document.getElementById("lp-hero-promo-text");
-      const iconEl  = document.getElementById("lp-hero-promo-icon");
-      if (!chip || !textEl) return;
-
-      const sc = window.SUPABASE_CONFIG;
-      if (!sc || !sc.url || !sc.anonKey) return;
-
-      let state;
-      try {
-        const res = await fetch(`${sc.url}/rest/v1/rpc/get_launch_promotion_status`, {
-          method:  "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey":       sc.anonKey,
-          },
-          body: "{}",
-        });
-        if (!res.ok) return;
-        state = await res.json();
-      } catch (_) {
-        return;
-      }
-      if (!state) return;
-
-      const remaining = Number(state.grants_remaining) || 0;
-      const active    = !!state.is_active && remaining > 0;
-
-      // No active promo → leave the chip hidden (it defaults to hidden in the
-      // markup). We deliberately don't render a "no free seats left" fallback;
-      // that reads as "you missed out" to a new visitor.
-      if (!active) return;
-
-      textEl.innerHTML =
-        `First 100 signups get a free seat. ` +
-        `<span class="lp-hero-promo-count">${remaining}</span> left.`;
-      chip.classList.remove("is-ended");
-      if (iconEl) iconEl.textContent = "🎁";
-      chip.hidden = false;
-    })();
+    // The launch promo chip was removed from the hero on 2026-06-24 (product is
+    // internal-only for now). To bring it back, restore the .lp-hero-promo
+    // markup + CSS and the loadHeroPromo() IIFE from git history (see commit
+    // 42b5e40 and earlier), then re-enable the promo from the platform-admin
+    // promo banner. NOTE when restoring: the HTML `hidden` attribute does NOT
+    // hide .lp-hero-promo because its `display: inline-flex` rule outranks
+    // `[hidden]` - hide it with an explicit `display:none` / `.remove()` / a
+    // `[hidden]{display:none!important}` guard, not the bare attribute.
   </script>
 </body>
 </html>
