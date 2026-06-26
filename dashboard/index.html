@@ -212,11 +212,12 @@
               <th class="num sortable extra-col" data-sort="positiveFollowups">Positive FU<span class="sort-caret"></span></th>
               <th class="num sortable extra-col" data-sort="inmails">InMails<span class="sort-caret"></span></th>
               <th class="num sortable extra-col" data-sort="retargeting">Retargeting<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="taskOverdue">Open Tasks<span class="sort-caret"></span></th>
               <th class="col-actions" aria-label="Row actions"></th>
             </tr>
           </thead>
           <tbody id="client-tbody">
-            <tr><td colspan="21" class="loading">Loading…</td></tr>
+            <tr><td colspan="22" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -583,8 +584,13 @@
        //   10 Resp.rate, 11 Positives, 12 Pos.resp.rate, 13 Meetings,
        //   14 Pos.booking, 15 Trend, 16 Extras-toggle,
        //   17 RegularFU, 18 PositiveFU, 19 InMails, 20 Retargeting,
-       //   21 Actions.
-      const colspan    = 21;
+       //   21 OpenTasks, 22 Actions.
+      const colspan    = 22;
+
+      // Per-client open/overdue task counts, read from the cached
+      // client_task_counts table (pg_cron-refreshed every 20 min) in
+      // parallel with the summary RPC. Map: client_id -> {outstanding, overdue}.
+      let taskCountsById = new Map();
 
       // ---- persisted filter state ---------------------------------------
 
@@ -1075,14 +1081,26 @@
         // mode and is otherwise null.
         let summary = [];
         try {
-          summary = await sb.sbFetch("/rest/v1/rpc/account_dashboard_summary", {
-            method: "POST",
-            body: JSON.stringify({
-              p_org_id: orgIdForCache,
-              p_since:  since || null,
-              p_until:  until || null,
+          // Fetch the summary RPC and the cached per-client task counts in
+          // parallel, so the Open Tasks column adds no load latency. Task
+          // counts are current-state (not timeframe-scoped) and come from
+          // client_task_counts (pg_cron-refreshed every 20 min). A failure
+          // there is non-fatal - the column just shows 0.
+          const [summaryRes, taskRes] = await Promise.all([
+            sb.sbFetch("/rest/v1/rpc/account_dashboard_summary", {
+              method: "POST",
+              body: JSON.stringify({
+                p_org_id: orgIdForCache,
+                p_since:  since || null,
+                p_until:  until || null,
+              }),
             }),
-          });
+            sb.sbFetch("/rest/v1/client_task_counts?select=client_id,outstanding,overdue")
+              .catch(e => { console.warn("task counts fetch failed; Open Tasks shows 0:", e); return []; }),
+          ]);
+          summary = summaryRes;
+          taskCountsById = new Map((Array.isArray(taskRes) ? taskRes : [])
+            .map(r => [r.client_id, { outstanding: r.outstanding || 0, overdue: r.overdue || 0 }]));
         } catch (err) {
           // If we already painted from cache, leave it on screen and
           // just log; otherwise show the error state.
@@ -1110,10 +1128,13 @@
         // the value originated (DB row vs metricsFromRpcRow output).
         const today = new Date().toISOString().slice(0, 10);
         const enriched = clientsCache.map(c => {
-          const m = metricsFromRpcRow(summaryById.get(c.id));
+          const m  = metricsFromRpcRow(summaryById.get(c.id));
+          const tc = taskCountsById.get(c.id) || {};
           return {
             ...c,
             ...m,
+            taskOutstanding: tc.outstanding || 0,
+            taskOverdue:     tc.overdue     || 0,
             _status:   deriveStatus(c.end_date, today),
             startDate: c.start_date || null,
             endDate:   c.end_date   || null,
@@ -1400,6 +1421,7 @@
             <td class="num drill extra-col">${fmtInt(c.positiveFollowups)}</td>
             <td class="num drill extra-col">${fmtInt(c.inmails)}</td>
             <td class="num drill extra-col">${fmtInt(c.retargeting)}</td>
+            <td class="num drill">${fmtInt(c.taskOutstanding)}${c.taskOverdue > 0 ? `<span style="display:block;color:#d33;font-size:11px;font-weight:600;line-height:1.2;margin-top:1px;">${fmtInt(c.taskOverdue)} overdue</span>` : ""}</td>
             <td class="col-actions">${actionsHtml}</td>
           </tr>
         `;
