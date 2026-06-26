@@ -345,7 +345,7 @@
               banner.classList.remove("hidden");
             }
           }
-          document.title = `${org.name} team — Uptown`;
+          document.title = `${org.name} team - Uptown`;
         } catch (err) {
           alert(`Couldn't load that organization: ${err.message}`);
           window.location.replace(isPA ? "/platform-admin/" : "/team/");
@@ -367,7 +367,7 @@
         }
         const o = myAdminOrgs[0];
         org = { id: o.id, name: o.name, seats_paid: o.seats_paid };
-        document.title = `Team — ${org.name}`;
+        document.title = `Team - ${org.name}`;
       }
 
       // Show the org name as the page H1 (replacing the placeholder
