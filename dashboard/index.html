@@ -212,7 +212,7 @@
               <th class="num sortable extra-col" data-sort="positiveFollowups">Positive FU<span class="sort-caret"></span></th>
               <th class="num sortable extra-col" data-sort="inmails">InMails<span class="sort-caret"></span></th>
               <th class="num sortable extra-col" data-sort="retargeting">Retargeting<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="taskOverdue">Open Tasks<span class="sort-caret"></span></th>
+              <th class="num sortable extra-col" data-sort="taskOverdue">Open Tasks<span class="sort-caret"></span></th>
               <th class="col-actions" aria-label="Row actions"></th>
             </tr>
           </thead>
@@ -1421,7 +1421,7 @@
             <td class="num drill extra-col">${fmtInt(c.positiveFollowups)}</td>
             <td class="num drill extra-col">${fmtInt(c.inmails)}</td>
             <td class="num drill extra-col">${fmtInt(c.retargeting)}</td>
-            <td class="num drill">${fmtInt(c.taskOutstanding)}${c.taskOverdue > 0 ? `<span style="display:block;color:#d33;font-size:11px;font-weight:600;line-height:1.2;margin-top:1px;">${fmtInt(c.taskOverdue)} overdue</span>` : ""}</td>
+            <td class="num drill extra-col">${fmtInt(c.taskOutstanding)}${c.taskOverdue > 0 ? `<span style="display:block;color:#d33;font-size:11px;font-weight:600;line-height:1.2;margin-top:1px;">${fmtInt(c.taskOverdue)} overdue</span>` : ""}</td>
             <td class="col-actions">${actionsHtml}</td>
           </tr>
         `;
