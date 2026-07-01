@@ -5481,14 +5481,14 @@
         // tuples: [{ row, idx }] where idx is the position in
         // fuState.rows (preserved through the source filter so click
         // handlers can still look up by index).
-        const now  = Date.now();
+        const tStart = new Date(); tStart.setHours(0,0,0,0);   // start of today
         const tEnd = new Date(); tEnd.setHours(23,59,59,999);
         const overdue  = [];
         const today    = [];
         const upcoming = [];
         tuples.forEach(t => {
           const due = new Date(t.row.due_at).getTime();
-          if      (due < now)                 overdue.push(t);
+          if      (due < tStart.getTime())    overdue.push(t);
           else if (due <= tEnd.getTime())     today.push(t);
           else                                upcoming.push(t);
         });
