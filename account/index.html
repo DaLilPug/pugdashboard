@@ -1976,11 +1976,14 @@
         }
 
         // Refresh ONE prospect's row in state.allProspects after a
-        // server-side mutation. Calls the same RPC as loadAll but
-        // filters server-side (cheap: indexed by client_id + the where
-        // clause prunes to one prospect). Replaces the prospect in
-        // state.allProspects in place; if the prospect drops out of
-        // the current timeframe (no events left in window), removes it.
+        // server-side mutation. NOTE: this runs the same full paginated
+        // summary fetch as loadAll and keeps one row - there is no
+        // server-side single-prospect filter. Fine for single-prospect
+        // flows (one click = one reload-sized fetch); do NOT call it in
+        // a loop - bulk paths should run one loadAll() after the batch
+        // instead. Replaces the prospect in state.allProspects in
+        // place; if the prospect drops out of the current timeframe
+        // (no events left in window), removes it.
         async function refreshProspect(prospectId) {
           if (!prospectId) return;
           const since = cutoffFor(state.tf);
@@ -3375,10 +3378,14 @@
         // Returned as YYYY-MM-DD for the <input type="date"> value.
         // A week feels like the right "remind me later" default; the
         // operator can change it.
+        // Built from local date parts, not toISOString() - the UTC
+        // render shifts a day forward for evening users west of UTC.
         function defaultFollowupDate() {
           const d = new Date();
           d.setDate(d.getDate() + 7);
-          return d.toISOString().slice(0, 10);
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          return `${d.getFullYear()}-${mm}-${dd}`;
         }
 
         // ---- Rating + Notes handlers --------------------------------
@@ -3697,7 +3704,7 @@
             && p.company && p.company.trim()
           );
           if (!targets.length) return;
-          if (!confirm(`Enrich ${targets.length} prospect${targets.length === 1 ? "" : "s"} via Apollo? Each call uses 1 Apollo credit. Results land row-by-row.`)) {
+          if (!confirm(`Enrich ${targets.length} prospect${targets.length === 1 ? "" : "s"} via Apollo? Each call uses 1 Apollo credit. Results load when the batch finishes.`)) {
             return;
           }
 
@@ -3708,6 +3715,7 @@
           let cursor = 0;
           let succeeded = 0;
           let failed    = 0;
+          let done      = 0;
           const worker = async () => {
             while (cursor < targets.length) {
               const p = targets[cursor++];
@@ -3715,16 +3723,31 @@
                 const res = await enrichOne(p.id, "bulk");
                 if (res && res.fields_returned && res.fields_returned.length) succeeded++;
                 else failed++;
-                await refreshProspect(p.id);
               } catch {
                 failed++;
               } finally {
-                state.enrichmentInflight.delete(p.id);
-                rerender();
+                // Rows stay "Enriching…" until the single reload below
+                // paints final values - the enrich response only names
+                // the matched fields (fields_returned), it never carries
+                // the email value, so there is nothing to patch into the
+                // row locally. The bulk-bar count doubles as the progress
+                // readout instead (one textContent write, no refetch, no
+                // rerender).
+                done++;
+                const countEl = document.querySelector(".pr-bulk-count");
+                if (countEl) countEl.textContent = `Enriching ${done} of ${targets.length}…`;
               }
             }
           };
           await Promise.all(Array.from({ length: PARALLEL }, worker));
+          // ONE table refresh for the whole batch. The old path ran
+          // refreshProspect per prospect, and refreshProspect refetches
+          // the ENTIRE paginated prospect summary each call - N enriched
+          // prospects meant N full-table refetches plus N full table
+          // rebuilds. Clear inflight first so loadAll's rerender paints
+          // the final cell states.
+          targets.forEach(p => state.enrichmentInflight.delete(p.id));
+          await loadAll();
           alert(`Bulk enrich complete: ${succeeded} matched, ${targets.length - succeeded - failed} no match, ${failed} failed.`);
         }
 
@@ -5414,6 +5437,16 @@
         return `${r.source}:${r.task_id || r.linkedin_id || ""}`;
       }
 
+      // Keys of the rows the list is actually showing - same source
+      // predicate as renderFollowups(). Select-all, shift-range, and
+      // the header checkbox's indeterminate state must all agree with
+      // what's on screen, not the unfiltered rowset.
+      function visibleFuKeys() {
+        return fuState.rows
+          .filter(r => fuState.sourceFilter === "all" || r.source === fuState.sourceFilter)
+          .map(fuRowKey);
+      }
+
       function renderFollowups() {
         const root = document.getElementById("fu-root");
         const allRows = fuState.rows;
@@ -5669,7 +5702,7 @@
         // can't express "indeterminate" — has to happen in JS post-render).
         const headCheck = root.querySelector(".fu-check-all");
         if (headCheck && fuState.view === "list") {
-          const visibleKeys = fuState.rows.map(fuRowKey);
+          const visibleKeys = visibleFuKeys();
           const sel = visibleKeys.filter(k => fuState.selected.has(k)).length;
           headCheck.indeterminate = sel > 0 && sel < visibleKeys.length;
         }
@@ -5728,7 +5761,7 @@
 
             if (e.shiftKey && fuState.lastCheckedKey && fuState.lastCheckedKey !== key) {
               // Range fill — always SELECT (Excel-/Sheets-like).
-              const keys = fuState.rows.map(fuRowKey);
+              const keys = visibleFuKeys();
               const startIdx = keys.indexOf(fuState.lastCheckedKey);
               const endIdx   = keys.indexOf(key);
               if (startIdx >= 0 && endIdx >= 0) {
@@ -5752,7 +5785,7 @@
           if (e.target.closest("[data-action='toggle-all-fu']")) {
             // Browser fires this for both label/input. Only respond once.
             if (e.target.tagName !== "INPUT") return;
-            const visibleKeys = fuState.rows.map(fuRowKey);
+            const visibleKeys = visibleFuKeys();
             const allSel = visibleKeys.every(k => fuState.selected.has(k));
             if (allSel) for (const k of visibleKeys) fuState.selected.delete(k);
             else        for (const k of visibleKeys) fuState.selected.add(k);
@@ -5891,7 +5924,9 @@
         const dueDateDefault = (() => {
           const d = new Date();
           d.setDate(d.getDate() + 7);
-          return d.toISOString().slice(0, 10);
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          return `${d.getFullYear()}-${mm}-${dd}`;
         })();
         backdrop.innerHTML = `
           <div class="fu-modal">

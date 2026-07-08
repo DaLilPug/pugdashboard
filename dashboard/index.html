@@ -1126,7 +1126,11 @@
         // Mirror start_date/end_date under camelCase keys so the sort
         // comparator can read a single column name regardless of where
         // the value originated (DB row vs metricsFromRpcRow output).
-        const today = new Date().toISOString().slice(0, 10);
+        // Local date parts, not toISOString() - the UTC render flips
+        // accounts to Inactive at UTC midnight, an evening early for
+        // operators west of UTC.
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
         const enriched = clientsCache.map(c => {
           const m  = metricsFromRpcRow(summaryById.get(c.id));
           const tc = taskCountsById.get(c.id) || {};

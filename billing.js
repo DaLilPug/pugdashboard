@@ -153,8 +153,7 @@
                 </label>
               </div>
             ` : `
-              <p class="ub-modal-intro">You'll be charged a prorated amount today on your card ending in
-                ${summary.has_payment_method ? "your saved card" : ""}, and your next invoice will reflect the new seat count.</p>
+              <p class="ub-modal-intro">You'll be charged a prorated amount today on your saved card, and your next invoice will reflect the new seat count.</p>
             `}
 
             <div class="ub-qty-row">
