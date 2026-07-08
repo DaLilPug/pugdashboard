@@ -131,6 +131,65 @@
     return { session: null, needsConfirmation: true, user: data.user };
   }
 
+  // After a dashboard-side refresh, hand the rotated session to the Chrome
+  // extension. Sends the SAME "session_handshake" message the login page's
+  // SSO flow sends, so fielded extension builds accept it unchanged (their
+  // background.js validates the app.uptown.com origin and message shape).
+  //
+  // Why: the login handshake copies this browser's session into the
+  // extension, so both hold ONE refresh token. Supabase rotates refresh
+  // tokens on use - when the dashboard refreshes first, the extension's
+  // stored copy is revoked and its next refresh gets a 400, dropping it to
+  // the signed-out bar even though this browser is still signed in. Pushing
+  // each rotation keeps the extension's copy current.
+  //
+  // Best-effort and fire-and-forget: non-Chrome browsers, no extension
+  // installed, or a share-link tab (synthetic single-account session in
+  // sessionStorage - must never overwrite the operator's real extension
+  // session) all no-op silently.
+  //
+  // Dev escape hatch: an unpacked dev build has a random id. Setting
+  // localStorage.uptown_dev_ext_id (validated against the extension id
+  // charset) adds it as a push target. localStorage requires same-origin
+  // script access to set, so this doesn't reopen the phishing-link vector
+  // the login page's URL-param validation guards against.
+  const PUSH_EXTENSION_IDS = (() => {
+    const ids = [];
+    try {
+      const dev = localStorage.getItem("uptown_dev_ext_id");
+      if (dev && /^[a-p]{32}$/.test(dev)) ids.push(dev);
+    } catch (_) {}
+    ids.push("oiojmfjjdgpjpanoienjmnoigjpjlhlc"); // published store build
+    return ids;
+  })();
+
+  function pushSessionToExtension(session) {
+    try {
+      if (sessionStorage.getItem(STORAGE_KEY)) return; // share-link tab
+      if (typeof chrome === "undefined"
+          || !chrome.runtime
+          || !chrome.runtime.sendMessage) return;
+      const payload = {
+        type: "session_handshake",
+        session: {
+          access_token:  session.access_token,
+          refresh_token: session.refresh_token,
+          user:          session.user || null,
+          expires_at:    session.expires_at,
+        },
+      };
+      for (const id of PUSH_EXTENSION_IDS) {
+        try {
+          chrome.runtime.sendMessage(id, payload, () => {
+            // Touch lastError so Chrome doesn't log "Unchecked
+            // runtime.lastError" when the extension isn't installed.
+            void chrome.runtime.lastError;
+          });
+        } catch (_) { /* id unreachable - fine, best effort */ }
+      }
+    } catch (_) { /* never let a push failure break the refresh */ }
+  }
+
   async function refreshSession() {
     const current = getSession();
     if (!current?.refresh_token) throw new Error("No refresh token");
@@ -155,6 +214,9 @@
       expires_at:    Date.now() + (data.expires_in * 1000),
     };
     setSession(session);
+    // Keep the extension's copy of this session family current - see
+    // pushSessionToExtension above.
+    pushSessionToExtension(session);
     return session;
   }
 
