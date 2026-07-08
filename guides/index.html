@@ -862,6 +862,19 @@
             the <em>Log Response</em> primary button + a "+" overflow for
             ad-hoc events.</li>
       </ol>
+      <p>
+        Two quiet extras appear when the data is there. A small date next to
+        each conversation label ("Jun 14" / "Today") shows when that message
+        was actually sent or received, read straight from the thread - and
+        those true dates are what gets logged (see
+        <a href="#dash-prospects">8.4</a> for how they show up on the
+        dashboard). And when the person on screen matches a prospect already
+        tracked in your account, a collapsible <strong>View N events</strong>
+        row appears under the person card: expand it for their recent outreach
+        history (dates, event types, sentiment, first line of each message)
+        without leaving LinkedIn. Someone you've never logged shows nothing
+        extra.
+      </p>
 
       <h3 id="rb-quick-buttons">2.4 - The three quick-action buttons</h3>
       <p>
@@ -1846,6 +1859,20 @@
           prospects after they're in pipeline.
         </p>
       </div>
+
+      <h4>Response dates + reply lag</h4>
+      <p>
+        Responses logged from the extension carry their <strong>true
+        dates</strong>: the event lands in the timeline on the day the reply
+        actually arrived (read from the LinkedIn thread), not the day someone
+        clicked Log Response, and the send date of the message they replied to
+        is stored with it. When both dates are known, the response shows a
+        muted <em>"replied 3d after your Jul 2 message"</em> line - your reply
+        lag at a glance. Responses logged before this shipped keep their
+        original dates (the day they were logged) and show no lag line. If a
+        date can't be read from the thread, logging falls back to the current
+        day, same as before.
+      </p>
 
       <h4>Editing events</h4>
       <p>
