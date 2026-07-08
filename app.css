@@ -3478,6 +3478,17 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   letter-spacing: .04em;
   white-space: nowrap;
 }
+/* Muted one-liner under a response body - "replied 3d after your
+   Jul 2 message". Only rendered when the row has message_sent_at
+   (new extension logs); historical rows render nothing. */
+.pr-event-reply-lag {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gray-400);
+  letter-spacing: .02em;
+  margin: 2px 0 4px;
+}
 .pr-event-type {
   font-family: 'Montserrat', sans-serif;
   font-size: 11px;

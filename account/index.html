@@ -1938,7 +1938,7 @@
           if (p.events && !force) return p.events;
           const rows = await sb.sbFetch(
             `/rest/v1/outreach?` +
-            `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
+            `select=id,type,occurred_at,message_sent_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
             `&prospect_id=eq.${encodeURIComponent(p.id)}` +
             `&order=occurred_at.asc`
           );
@@ -1961,7 +1961,7 @@
             const idList = chunk.map(p => p.id).join(",");
             const rows = await sb.sbFetchAll(
               `/rest/v1/outreach?` +
-              `select=id,type,occurred_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
+              `select=id,type,occurred_at,message_sent_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
               `&prospect_id=in.(${idList})` +
               `&order=occurred_at.asc`
             );
@@ -2911,7 +2911,28 @@
                                    data-field="message_sent"
                                    data-placeholder="(click to add the message that triggered this response)">${esc(pairedMessage)}</div>
                             </div>`;
-            bodyHtml = respHtml + msgHtml;
+            // Reply-lag chip - only when the extension captured when the
+            // paired message was sent (message_sent_at). Every historical
+            // row is null and renders nothing. Day diff slices the ISO
+            // date part directly (same convention as fmtDate above) so
+            // the chip always agrees with the dates shown on the rows.
+            let lagHtml = "";
+            if (e.message_sent_at && e.occurred_at) {
+              const utcDay = iso => {
+                const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+                return Date.UTC(y, m - 1, d);
+              };
+              const lagDays = Math.round((utcDay(e.occurred_at) - utcDay(e.message_sent_at)) / 86400000);
+              if (lagDays >= 0) {
+                const [, sm, sd] = e.message_sent_at.slice(0, 10).split("-").map(Number);
+                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const label = lagDays === 0
+                  ? "replied same day"
+                  : `replied ${lagDays}d after your ${months[sm - 1]} ${sd} message`;
+                lagHtml = `<div class="pr-event-reply-lag">${esc(label)}</div>`;
+              }
+            }
+            bodyHtml = respHtml + lagHtml + msgHtml;
           } else if (body) {
             bodyHtml = `<div class="pr-event-body">${esc(body)}</div>`;
           }
