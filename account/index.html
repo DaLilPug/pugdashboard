@@ -3924,7 +3924,7 @@
         // Per Austin's design (Option A): inserts into the new
         // scheduled_followups table so the row appears in the
         // Follow-ups tab as a queued task — same look as cadence-
-        // derived ones, with Open thread / Mark sent / X / Edit-due
+        // derived ones, with Profile / Mark sent / X / Edit-due
         // affordances. Marking it sent later logs a real `followup`
         // outreach event AND deletes the scheduled row (see
         // wireFollowupRoot's "sent" branch).
@@ -5598,7 +5598,7 @@
             <div class="fu-step">${esc(stepText)}</div>
             ${previewHtml}
             <div class="fu-actions">
-              <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open thread</button>
+              <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Profile</button>
               <button class="fu-btn"                data-action="copy"     data-idx="${idx}" type="button" ${r.template ? "" : "disabled"}>Copy</button>
               <button class="fu-btn fu-btn-success" data-action="sent"     data-idx="${idx}" type="button">Mark sent</button>
               <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log meeting, response, or schedule a follow-up" aria-label="Log additional action">+</button>
@@ -5671,7 +5671,7 @@
             <td class="fu-col-step">${esc(step)}</td>
             <td class="fu-col-due">${dueHtml}</td>
             <td class="fu-col-actions">
-              <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Open</button>
+              <button class="fu-btn fu-btn-primary" data-action="open"     data-idx="${idx}" type="button">Profile</button>
               <button class="fu-btn fu-btn-success" data-action="sent"     data-idx="${idx}" type="button">Mark sent</button>
               <button class="fu-btn fu-btn-ghost"   data-action="edit-log" data-idx="${idx}" type="button" title="Log meeting, response, or schedule a follow-up" aria-label="Log additional action">+</button>
               <button class="fu-cancel"             data-action="cancel"   data-idx="${idx}" type="button" title="${cancelTitle}" aria-label="${cancelTitle}">×</button>
