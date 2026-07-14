@@ -5407,6 +5407,11 @@
         sourceFilter: ["cadence", "positive", "manual"].includes(localStorage.getItem(FU_SOURCE_KEY))
           ? localStorage.getItem(FU_SOURCE_KEY)
           : "all",
+        // Step + due filters - "all" or a step number string / due bucket.
+        // Deliberately NOT persisted: a remembered narrow slice makes the
+        // queue look mysteriously short next visit. Fresh page = all rows.
+        stepFilter: "all",
+        dueFilter:  "all",
         selected: new Set(),
         rows:     [],
         // Anchor key for shift+click range select in list view (same
@@ -5458,27 +5463,53 @@
         return `${r.source}:${r.task_id || r.linkedin_id || ""}`;
       }
 
-      // Keys of the rows the list is actually showing - same source
-      // predicate as renderFollowups(). Select-all, shift-range, and
-      // the header checkbox's indeterminate state must all agree with
-      // what's on screen, not the unfiltered rowset.
+      // Local-day bucket for a task's due date - the SAME boundaries the
+      // cards view sections use (overdue = before start of today), with
+      // Upcoming split into tomorrow vs later for the due filter.
+      function fuDueBucket(r) {
+        const due = new Date(r.due_at).getTime();
+        const tStart = new Date(); tStart.setHours(0, 0, 0, 0);
+        const tEnd   = new Date(); tEnd.setHours(23, 59, 59, 999);
+        const tmEnd  = new Date(); tmEnd.setDate(tmEnd.getDate() + 1); tmEnd.setHours(23, 59, 59, 999);
+        if (due < tStart.getTime()) return "overdue";
+        if (due <= tEnd.getTime())  return "today";
+        if (due <= tmEnd.getTime()) return "tomorrow";
+        return "later";
+      }
+
+      // THE filter predicate. Every consumer - the render, select-all,
+      // shift-range, the header checkbox's indeterminate state - must go
+      // through this same function so bulk actions can only ever touch
+      // rows the operator can see.
+      function fuRowMatchesFilters(r) {
+        if (fuState.sourceFilter !== "all" && r.source !== fuState.sourceFilter) return false;
+        // Step applies to cadence-derived rows. Manual tasks carry no
+        // step, so they only show while the step filter is "all".
+        if (fuState.stepFilter !== "all" && String(r.step_index) !== fuState.stepFilter) return false;
+        if (fuState.dueFilter !== "all" && fuDueBucket(r) !== fuState.dueFilter) return false;
+        return true;
+      }
+
+      // Keys of the rows the list is actually showing - same predicate
+      // as renderFollowups(). Select-all, shift-range, and the header
+      // checkbox's indeterminate state must all agree with what's on
+      // screen, not the unfiltered rowset.
       function visibleFuKeys() {
-        return fuState.rows
-          .filter(r => fuState.sourceFilter === "all" || r.source === fuState.sourceFilter)
-          .map(fuRowKey);
+        return fuState.rows.filter(fuRowMatchesFilters).map(fuRowKey);
       }
 
       function renderFollowups() {
         const root = document.getElementById("fu-root");
         const allRows = fuState.rows;
 
-        // Apply source filter. We iterate fuState.rows preserving the
-        // original index so per-row click handlers (open, sent, cancel,
-        // edit-due, edit-log) keep doing fuState.rows[idx] correctly
-        // even with a filter active. Tuples = { row, idx } shape.
+        // Apply the filters (source + step + due, via the ONE shared
+        // predicate). We iterate fuState.rows preserving the original
+        // index so per-row click handlers (open, sent, cancel, edit-due,
+        // edit-log) keep doing fuState.rows[idx] correctly even with a
+        // filter active. Tuples = { row, idx } shape.
         const tuples = allRows
           .map((row, idx) => ({ row, idx }))
-          .filter(t => fuState.sourceFilter === "all" || t.row.source === fuState.sourceFilter);
+          .filter(t => fuRowMatchesFilters(t.row));
         const filtered = tuples.map(t => t.row); // legacy alias for empty-state check
 
         // Compute counts per source for the pill labels (so operators
@@ -5494,6 +5525,22 @@
                   data-fu-source="${key}" type="button">${label} <span class="fu-source-pill-count">${counts[key]}</span></button>
         `;
 
+        // Step pills are built from the steps actually present in the
+        // queue (cadence lengths vary per account), so the group renders
+        // only when there's a cadence-derived row to filter. Due pills
+        // use the same local-day buckets as the cards view sections.
+        const stepsPresent = [...new Set(allRows
+          .filter(r => r.source !== "manual" && r.step_index != null)
+          .map(r => r.step_index))].sort((a, b) => a - b);
+        const stepPill = (val, label) => `
+          <button class="fu-source-pill ${fuState.stepFilter === val ? "active" : ""}"
+                  data-fu-step="${val}" type="button">${label}</button>
+        `;
+        const duePill = (val, label) => `
+          <button class="fu-source-pill ${fuState.dueFilter === val ? "active" : ""}"
+                  data-fu-due="${val}" type="button">${label}</button>
+        `;
+
         const toolbar = `
           <div class="fu-toolbar">
             <div class="fu-view-toggle" role="group" aria-label="View mode">
@@ -5506,17 +5553,34 @@
               ${pillBtn("positive", "Positive")}
               ${pillBtn("manual",   "Manual")}
             </div>
+            ${stepsPresent.length ? `
+            <div class="fu-source-pills" role="group" aria-label="Filter by cadence step">
+              <span class="pr-filter-label">Step</span>
+              ${stepPill("all", "All")}
+              ${stepsPresent.map(s => stepPill(String(s), String(s))).join("")}
+            </div>` : ""}
+            <div class="fu-source-pills" role="group" aria-label="Filter by due date">
+              <span class="pr-filter-label">Due</span>
+              ${duePill("all",      "All")}
+              ${duePill("overdue",  "Overdue")}
+              ${duePill("today",    "Today")}
+              ${duePill("tomorrow", "Tomorrow")}
+              ${duePill("later",    "Later")}
+            </div>
             <span class="fu-toolbar-count">${filtered.length} of ${allRows.length}</span>
           </div>
         `;
 
         if (!filtered.length) {
+          const anyFilter = fuState.sourceFilter !== "all"
+            || fuState.stepFilter !== "all"
+            || fuState.dueFilter !== "all";
           root.innerHTML = toolbar + `
             <div class="placeholder">
-              <strong>${fuState.sourceFilter === "all" ? "No follow-ups queued" : "No follow-ups match this filter"}</strong>
-              ${fuState.sourceFilter === "all"
-                  ? "Log a <b>Message</b> in the extension to start a cadence."
-                  : "Switch to All to see everything queued."}
+              <strong>${anyFilter ? "No follow-ups match these filters" : "No follow-ups queued"}</strong>
+              ${anyFilter
+                  ? "Set the filters back to All to see everything queued."
+                  : "Log a <b>Message</b> in the extension to start a cadence."}
             </div>`;
           wireFollowupRoot();
           return;
@@ -5765,6 +5829,25 @@
             // (rerender drops them too via the loadFollowups pass,
             // but selecting+filtering in quick succession would let
             // the orphan keys linger.)
+            fuState.selected.clear();
+            renderFollowups();
+            return;
+          }
+
+          // Step filter pill (All / 1 / 2 / ...) - selection cleared for
+          // the same bulk-bar honesty reason as the source pill above.
+          const stepBtn = e.target.closest("[data-fu-step]");
+          if (stepBtn) {
+            fuState.stepFilter = stepBtn.dataset.fuStep;
+            fuState.selected.clear();
+            renderFollowups();
+            return;
+          }
+
+          // Due filter pill (All / Overdue / Today / Tomorrow / Later)
+          const dueBtn = e.target.closest("[data-fu-due]");
+          if (dueBtn) {
+            fuState.dueFilter = dueBtn.dataset.fuDue;
             fuState.selected.clear();
             renderFollowups();
             return;

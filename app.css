@@ -1372,6 +1372,9 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .fu-toolbar {
   display: flex;
   align-items: center;
+  /* Wraps: the step + due filter groups joined the source pills, and
+     together they overflow one row on narrower desktop windows. */
+  flex-wrap: wrap;
   gap: 14px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
