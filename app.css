@@ -1386,6 +1386,12 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .fu-bulk-due-date {
   padding: 4px 6px;
 }
+/* Due-filter "Date" pill picker - keeps the pill silhouette while the
+   swapped-in native date input is open so the toolbar doesn't jump. */
+.fu-date-pill-input {
+  padding: 3px 10px;
+  border-radius: 999px;
+}
 .fu-view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);

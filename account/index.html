@@ -5412,6 +5412,11 @@
         // queue look mysteriously short next visit. Fresh page = all rows.
         stepFilter: "all",
         dueFilter:  "all",
+        // The Due group's "Date" pill - a specific local day
+        // ("YYYY-MM-DD") active while dueFilter === "date". Kept when
+        // another due pill takes over so re-opening the picker
+        // prefills the last-used day.
+        dueDate: null,
         selected: new Set(),
         rows:     [],
         // Anchor key for shift+click range select in list view (same
@@ -5477,6 +5482,24 @@
         return "later";
       }
 
+      // Local-calendar-day string ("YYYY-MM-DD") for a due timestamp -
+      // same day boundaries as fuDueBucket, built from LOCAL date parts
+      // (toISOString would shift a day for evening users west of UTC).
+      function fuLocalDayStr(dueAt) {
+        const d = new Date(dueAt);
+        const p = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      }
+
+      // Label for the active Date pill - "Jul 22", year appended only
+      // when it isn't this year.
+      function fuDatePillLabel(dayStr) {
+        const [y, m, d] = dayStr.split("-").map(Number);
+        const label = new Date(y, m - 1, d)
+          .toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        return y === new Date().getFullYear() ? label : `${label}, ${y}`;
+      }
+
       // THE filter predicate. Every consumer - the render, select-all,
       // shift-range, the header checkbox's indeterminate state - must go
       // through this same function so bulk actions can only ever touch
@@ -5486,7 +5509,11 @@
         // Step applies to cadence-derived rows. Manual tasks carry no
         // step, so they only show while the step filter is "all".
         if (fuState.stepFilter !== "all" && String(r.step_index) !== fuState.stepFilter) return false;
-        if (fuState.dueFilter !== "all" && fuDueBucket(r) !== fuState.dueFilter) return false;
+        if (fuState.dueFilter === "date") {
+          if (fuLocalDayStr(r.due_at) !== fuState.dueDate) return false;
+        } else if (fuState.dueFilter !== "all" && fuDueBucket(r) !== fuState.dueFilter) {
+          return false;
+        }
         return true;
       }
 
@@ -5540,6 +5567,13 @@
           <button class="fu-source-pill ${fuState.dueFilter === val ? "active" : ""}"
                   data-fu-due="${val}" type="button">${label}</button>
         `;
+        // The Date pill opens a native date picker instead of filtering
+        // directly; once a day is picked it wears that day as its label
+        // and filters to tasks due exactly then. Any other Due pill
+        // clears it.
+        const dueDateLabel = fuState.dueFilter === "date" && fuState.dueDate
+          ? fuDatePillLabel(fuState.dueDate)
+          : "Date";
 
         const toolbar = `
           <div class="fu-toolbar">
@@ -5566,6 +5600,8 @@
               ${duePill("today",    "Today")}
               ${duePill("tomorrow", "Tomorrow")}
               ${duePill("later",    "Later")}
+              <button class="fu-source-pill ${fuState.dueFilter === "date" ? "active" : ""}"
+                      data-fu-due-picker type="button">${dueDateLabel}</button>
             </div>
             <span class="fu-toolbar-count">${filtered.length} of ${allRows.length}</span>
           </div>
@@ -5842,6 +5878,15 @@
             fuState.stepFilter = stepBtn.dataset.fuStep;
             fuState.selected.clear();
             renderFollowups();
+            return;
+          }
+
+          // Due "Date" pill - swaps itself for a date input with the
+          // native picker open (same idiom as the bulk Set-due-date
+          // button). Must be checked BEFORE the generic due pills.
+          const duePickerBtn = e.target.closest("[data-fu-due-picker]");
+          if (duePickerBtn) {
+            handleDueDatePillPick(duePickerBtn);
             return;
           }
 
@@ -6412,6 +6457,46 @@
         input.addEventListener("blur", () => {
           setTimeout(() => {
             if (input.isConnected && !input.disabled) restore();
+          }, 50);
+        });
+      }
+
+      // The Due filter's "Date" pill - same swap-for-a-picker idiom as
+      // handleBulkDueFollowups, but the chosen day drives the filter
+      // instead of a write. Prefilled with the last-used day so
+      // re-opening to adjust is one click.
+      function handleDueDatePillPick(btnEl) {
+        if (btnEl.dataset.editing === "1") return;
+        btnEl.dataset.editing = "1";
+
+        const input = document.createElement("input");
+        input.type      = "date";
+        input.className = "fu-due-input fu-date-pill-input";
+        input.setAttribute("aria-label", "Show tasks due on a specific date");
+        if (fuState.dueDate) input.value = fuState.dueDate;
+        btnEl.replaceWith(input);
+        input.focus();
+        if (typeof input.showPicker === "function") {
+          try { input.showPicker(); } catch { /* ignore */ }
+        }
+
+        // Re-render swaps the input back to the pill untouched.
+        const restore = () => { if (input.isConnected) renderFollowups(); };
+
+        input.addEventListener("change", () => {
+          if (!input.value) { restore(); return; }
+          fuState.dueFilter = "date";
+          fuState.dueDate   = input.value;
+          // Same bulk-bar honesty rule as the other filter pills.
+          fuState.selected.clear();
+          renderFollowups();
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") { e.preventDefault(); restore(); }
+        });
+        input.addEventListener("blur", () => {
+          setTimeout(() => {
+            if (input.isConnected) restore();
           }, 50);
         });
       }
