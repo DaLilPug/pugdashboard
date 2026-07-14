@@ -5772,10 +5772,7 @@
           <div class="fu-bulk-bar" role="region" aria-label="Bulk actions">
             <span class="fu-bulk-count">${fmtInt(count)} selected</span>
             <button class="btn-secondary fu-bulk-action" data-action="bulk-clear-fu"  type="button">Clear</button>
-            <span class="fu-bulk-due-group">
-              <input type="date" class="fu-due-input fu-bulk-due-date" value="${esc(fuState.bulkDueDraft || "")}" aria-label="New due date for selected tasks" />
-              <button class="btn-secondary fu-bulk-action" data-action="bulk-due-fu" type="button">Set due for ${fmtInt(count)}</button>
-            </span>
+            <button class="btn-secondary fu-bulk-action" data-action="bulk-due-fu" type="button">Set due date</button>
             <button class="btn-danger fu-bulk-action"    data-action="bulk-cancel-fu" type="button">Cancel ${fmtInt(count)}</button>
           </div>
         `;
@@ -5801,13 +5798,6 @@
         // on screen rather than the original template render. autoGrow
         // keeps the textarea sized to fit the content as they type.
         root.oninput = (e) => {
-          // Bulk-bar date picker: stash the draft so it survives the
-          // re-render that every selection toggle triggers.
-          const bulkDate = e.target.closest(".fu-bulk-due-date");
-          if (bulkDate) {
-            fuState.bulkDueDraft = bulkDate.value;
-            return;
-          }
           const ta = e.target.closest(".fu-preview-edit");
           if (!ta) return;
           const idx = Number(ta.dataset.idx);
@@ -6387,9 +6377,48 @@
         });
       }
 
-      // Bulk due-date change - every selected task lands on the chosen
-      // date, using the SAME per-source mechanics as the single-row
-      // edit (handleEditFollowupDue):
+      // Bulk due-date change - a single "Set due date" button; clicking
+      // it swaps in a date input with the native picker open (same idiom
+      // as the single-row edit above). Picking a date applies it to
+      // every selected task; Escape / dismissing the picker restores the
+      // button untouched.
+      function handleBulkDueFollowups(btnEl) {
+        if (btnEl.dataset.editing === "1") return;
+        btnEl.dataset.editing = "1";
+
+        const input = document.createElement("input");
+        input.type      = "date";
+        input.className = "fu-due-input fu-bulk-due-date";
+        input.setAttribute("aria-label", "New due date for selected tasks");
+        btnEl.replaceWith(input);
+        input.focus();
+        if (typeof input.showPicker === "function") {
+          try { input.showPicker(); } catch { /* ignore */ }
+        }
+
+        // Re-render swaps the input back to the button; selection is
+        // untouched so the bar rebuilds exactly as it was.
+        const restore = () => { if (input.isConnected) renderFollowups(); };
+
+        input.addEventListener("change", () => {
+          const next = input.value;
+          if (!next) { restore(); return; }
+          input.disabled = true;   // also parks the blur-restore guard
+          applyBulkDueDate(next);
+        });
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") { e.preventDefault(); restore(); }
+        });
+        input.addEventListener("blur", () => {
+          setTimeout(() => {
+            if (input.isConnected && !input.disabled) restore();
+          }, 50);
+        });
+      }
+
+      // The fan-out: every selected task lands on the chosen date, using
+      // the SAME per-source mechanics as the single-row edit
+      // (handleEditFollowupDue):
       //   cadence/positive: PATCH the anchor's cadence_snooze_days by
       //     that ROW's delta (each row has a different current due, so
       //     each gets its own delta) - which shifts the whole remaining
@@ -6397,35 +6426,24 @@
       //     One anchor never appears twice in the list (the view emits
       //     only the NEXT step per prospect), so no double-shift.
       //   manual: UPDATE the scheduled_followups row's due_at directly.
-      async function handleBulkDueFollowups(btnEl) {
-        const input = document.querySelector(".fu-bulk-due-date");
-        const next = input?.value;
-        if (!next) {
-          if (input && typeof input.showPicker === "function") {
-            try { input.showPicker(); } catch { /* ignore */ }
-          } else {
-            input?.focus();
-          }
-          return;
-        }
+      async function applyBulkDueDate(next) {
+        // Any early exit re-renders so the swapped-in date input goes
+        // back to being the "Set due date" button.
+        const bail = () => renderFollowups();
 
         const keys = Array.from(fuState.selected);
-        if (!keys.length) return;
+        if (!keys.length) { bail(); return; }
         const targets = keys
           .map(k => fuState.rows.find(r => fuRowKey(r) === k))
           .filter(Boolean);
-        if (!targets.length) return;
+        if (!targets.length) { bail(); return; }
 
         const cadenceCount = targets.filter(r => r.source !== "manual").length;
         const label = formatDueLabel(`${next}T12:00:00`);
         const cascadeNote = cadenceCount
           ? ` ${fmtInt(cadenceCount)} cadence task${cadenceCount === 1 ? "" : "s"} will shift their remaining sequence with them.`
           : "";
-        if (!confirm(`Set ${fmtInt(targets.length)} task${targets.length === 1 ? "" : "s"} due ${label}?${cascadeNote}`)) return;
-
-        btnEl.disabled = true;
-        const prevLabel = btnEl.textContent;
-        btnEl.textContent = "Updating…";
+        if (!confirm(`Set ${fmtInt(targets.length)} task${targets.length === 1 ? "" : "s"} due ${label}?${cascadeNote}`)) { bail(); return; }
 
         const nextMs = new Date(next + "T00:00:00Z").getTime();
         const results = await Promise.allSettled(
@@ -6461,10 +6479,9 @@
 
         const failed = results.filter(r => r.status === "rejected");
         fuState.selected.clear();
-        fuState.bulkDueDraft = "";
+        // loadFollowups re-renders the whole tab, which replaces the
+        // swapped-in date input with the regular toolbar + bulk bar.
         await loadFollowups();
-        btnEl.disabled = false;
-        btnEl.textContent = prevLabel;
 
         if (failed.length) {
           alert(`${failed.length} due-date update${failed.length === 1 ? "" : "s"} failed. The rest went through.`);
