@@ -1380,6 +1380,17 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   border-bottom: 1px solid var(--border);
   background: var(--surface-1);
 }
+/* Bulk-bar "set due date" group: the date picker + its apply button
+   read as one control between Clear and Cancel. The input itself is
+   styled by the existing .fu-due-input rule; only sizing differs. */
+.fu-bulk-due-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fu-bulk-due-date {
+  padding: 4px 6px;
+}
 .fu-view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);
