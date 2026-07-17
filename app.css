@@ -1605,7 +1605,8 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   padding: 12px 0 2px;
 }
 
-/* Bulk bar + range-clear button sizing. */
+/* Bulk bar. Delete sits alone at the far right so it can't be hit
+   while reaching for Copy / Clear. */
 .an-bulk-bar { margin-top: 2px; }
 .an-bulk-count {
   font-family: 'Montserrat', sans-serif;
@@ -1613,7 +1614,12 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   font-weight: 700;
   color: var(--navy);
 }
-.an-range-clear { height: 30px; padding: 0 12px; }
+.an-bulk-del { margin-left: auto; }
+
+/* Mobile-only "+ Filters" toggle in the section heads (hidden on
+   desktop; the mobile block at the end of this file reveals it and
+   collapses .an-filters behind it). */
+.an-filter-toggle { display: none; height: 30px; padding: 0 12px; }
 .fu-view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);
@@ -6727,6 +6733,13 @@ body.header-drawer-open { overflow: hidden; }
   #panel-analysis .timeframe-wrap { justify-content: flex-start; }
   #panel-analysis .timeframe-custom { flex-wrap: wrap; }
   #panel-analysis .timeframe-custom .filter-date { min-width: 110px; }
+
+  /* All filters collapse behind the "+ Filters" toggle - the date
+     pills / custom range in each head, and on Responses also the
+     sentiment pills + search toolbar. Desktop never sees the toggle. */
+  #panel-analysis .an-filter-toggle { display: inline-flex; align-items: center; }
+  #panel-analysis .an-filters { display: none !important; }
+  #panel-analysis .an-filters-open .an-filters { display: flex !important; }
 
   /* Benchmark tiles: two-up instead of five across. */
   .an-bench-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }

@@ -219,35 +219,58 @@
       <section class="panel-card">
         <div class="panel-card-head">
           <h2>Meetings</h2>
-          <div class="timeframe-custom">
-            <input type="date" class="filter-date" id="an-meet-from" aria-label="Meetings from date">
-            <span class="timeframe-custom-sep">to</span>
-            <input type="date" class="filter-date" id="an-meet-to" aria-label="Meetings to date">
-            <button class="btn-secondary an-range-clear" data-an-clear-range="meet" type="button" title="Show all dates">All</button>
+          <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
+          <div class="timeframe-wrap an-filters">
+            <div class="timeframe-pills" id="an-meet-tfpills" data-an-table-pills="meet">
+              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
+              <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+            </div>
+            <div class="timeframe-custom">
+              <input type="date" class="filter-date" id="an-meet-from" aria-label="Meetings from date">
+              <span class="timeframe-custom-sep">to</span>
+              <input type="date" class="filter-date" id="an-meet-to" aria-label="Meetings to date">
+            </div>
           </div>
         </div>
-        <div class="panel-card-sub">Date booked = when the booking was logged. Meeting date = when the meeting takes place (blank for meetings logged before Jul 16, 2026 - click to set it). Both dates are click-to-edit, notes save on blur. Select rows to copy them for Excel.</div>
         <div id="an-meetings"><div class="loading">Loading…</div></div>
       </section>
 
       <section class="panel-card">
         <div class="panel-card-head">
           <h2>Responses</h2>
-          <div class="timeframe-custom">
-            <input type="date" class="filter-date" id="an-resp-from" aria-label="Responses from date">
-            <span class="timeframe-custom-sep">to</span>
-            <input type="date" class="filter-date" id="an-resp-to" aria-label="Responses to date">
-            <button class="btn-secondary an-range-clear" data-an-clear-range="resp" type="button" title="Show all dates">All</button>
+          <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
+          <div class="timeframe-wrap an-filters">
+            <div class="timeframe-pills" id="an-resp-tfpills" data-an-table-pills="resp">
+              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
+              <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+            </div>
+            <div class="timeframe-custom">
+              <input type="date" class="filter-date" id="an-resp-from" aria-label="Responses from date">
+              <span class="timeframe-custom-sep">to</span>
+              <input type="date" class="filter-date" id="an-resp-to" aria-label="Responses to date">
+            </div>
           </div>
         </div>
-        <div class="panel-card-sub" id="an-resp-lag"></div>
         <div id="an-responses"><div class="loading">Loading…</div></div>
       </section>
 
       <section class="panel-card">
         <div class="panel-card-head">
           <h2>Title performance</h2>
-          <div class="timeframe-wrap">
+          <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
+          <div class="timeframe-wrap an-filters">
             <div class="fu-view-toggle" role="group" aria-label="Group titles by">
               <button class="fu-view-btn active" data-an-titleview="seniority" type="button">By seniority</button>
               <button class="fu-view-btn" data-an-titleview="title" type="button">By exact title</button>
@@ -281,6 +304,7 @@
         <div class="panel-card-sub">The funnel scored against Uptown's benchmarks, over the timeframe selected in Title performance above, with the diagnosis and the lever to pull. <a href="/guides/#benchmarks" target="_blank" rel="noopener">How the benchmarks work</a></div>
         <div id="an-bench" class="an-bench-grid"><div class="loading">Loading…</div></div>
         <div id="an-diagnosis"></div>
+        <div class="panel-card-sub" id="an-resp-lag"></div>
       </section>
 
     </section>
@@ -1573,11 +1597,11 @@
           listsLoaded: false,
           respSent:   "all",
           respSearch: "",
-          // Independent per-table date filters ("YYYY-MM-DD" or null;
-          // both null = all time). The pills window above only drives
-          // Title performance + Health check.
-          respRange: { from: null, to: null },
-          meetRange: { from: null, to: null },
+          // Independent per-table timeframes: preset pill key ("1w".."all")
+          // or "custom" with the From/To pair. The Title performance
+          // pills only drive Titles + Health check.
+          respRange: { tf: "all", from: null, to: null },
+          meetRange: { tf: "all", from: null, to: null },
           // Row caps - tables show this many, "Show 50 more" / "Show
           // all" extend. Reset to 50 whenever a filter changes.
           respLimit: 50,
@@ -1698,9 +1722,15 @@
           const since = cutoffFor(anTf);
           return { sinceIso: since ? new Date(since).toISOString() : null, untilIso: null };
         }
-        // Per-table date-pair filter (local midnight to local end of
-        // day, inclusive). Both dates null = no bounds.
+        // Per-table timeframe: preset pills share cutoffFor's math with
+        // every other timeframe control; "custom" uses the From/To pair
+        // (local midnight to local end of day, inclusive; one side alone
+        // bounds just that side).
         function rangeMs(range) {
+          if (range.tf && range.tf !== "custom") {
+            const since = cutoffFor(range.tf);
+            return { sinceMs: since ? new Date(since).getTime() : null, untilMs: null };
+          }
           return {
             sinceMs: range.from ? new Date(`${range.from}T00:00:00`).getTime() : null,
             untilMs: range.to   ? new Date(`${range.to}T23:59:59.999`).getTime() : null,
@@ -2066,7 +2096,7 @@
         function buildRespToolbar() {
           if (document.getElementById("an-resp-pills")) return;
           respRoot.innerHTML = `
-            <div class="fu-toolbar an-toolbar">
+            <div class="fu-toolbar an-toolbar an-filters">
               <div class="fu-source-pills" id="an-resp-pills" role="group" aria-label="Filter by sentiment"></div>
               <input type="search" class="pr-search an-resp-search" id="an-resp-search" placeholder="Search name, company, title, reply text…" aria-label="Search responses">
               <span class="fu-toolbar-count" id="an-resp-count"></span>
@@ -2097,7 +2127,7 @@
             pill("all", "All") + pill("positive", "Positive") + pill("neutral", "Neutral")
             + pill("negative", "Negative") + pill("unclassified", "Unclassified");
           renderRespTable();
-          renderRespLag(inWindow);
+          renderRespLag();
         }
 
         // Selection helpers shared by the Responses + Meetings tables.
@@ -2123,8 +2153,8 @@
             <div class="pr-bulk-bar an-bulk-bar">
               <span class="an-bulk-count">${count} selected</span>
               <button class="btn-secondary" data-an-copy="${kind}" type="button" title="Copy the selected rows as a table (paste into Excel / Sheets)">Copy for Excel</button>
-              <button class="btn-danger-soft" data-an-delete="${kind}" type="button" title="Delete the selected activities (prospects are kept)">Delete</button>
               <button class="btn-secondary" data-an-clear-sel="${kind}" type="button">Clear</button>
+              <button class="btn-danger-soft an-bulk-del" data-an-delete="${kind}" type="button" title="Delete the selected activities (prospects are kept)">Delete</button>
             </div>`;
         }
         function moreBarHtml(kind, shown, total) {
@@ -2192,15 +2222,17 @@
           syncHeadCheck(tableEl, "resp", rows, anState.respSelected);
         }
 
-        function renderRespLag(inWindow) {
-          const lags = inWindow.map(lagDaysOf).filter(v => v !== null).sort((a, b) => a - b);
-          if (lags.length < 5) {
-            respLagEl.textContent = `Every reply, spreadsheet-style - filter by date, sentiment, or search, select rows to copy them for Excel. Reply lag needs the true send date, tracked since Jul 8, 2026 - ${lags.length} of ${inWindow.length} replies here have one so far.`;
-            return;
-          }
+        // Reply-lag insight. Lives at the BOTTOM of the tab (Health
+        // check card) - it interprets the data rather than describing a
+        // table, so it sits with the rest of the analysis. Computed over
+        // ALL responses with a true send date; renders nothing until
+        // there are enough to mean something.
+        function renderRespLag() {
+          const lags = (anState.responses || []).map(lagDaysOf).filter(v => v !== null).sort((a, b) => a - b);
+          if (lags.length < 5) { respLagEl.textContent = ""; return; }
           const median = lags[Math.floor(lags.length / 2)];
           const slowPct = Math.round(lags.filter(v => v >= 4).length / lags.length * 100);
-          respLagEl.textContent = `Median reply arrives ${median === 0 ? "the same day" : `${median} day${median === 1 ? "" : "s"} after the message`}; ${slowPct}% take 4+ days. Late replies are normal - let the cadence keep working. (Based on ${lags.length} replies with true send dates, tracked since Jul 8, 2026.)`;
+          respLagEl.textContent = `Reply timing: the median reply arrives ${median === 0 ? "the same day" : `${median} day${median === 1 ? "" : "s"} after the message`}; ${slowPct}% take 4+ days. Late replies are normal - let the cadence keep working. (${lags.length} replies with true send dates, tracked since Jul 8, 2026.)`;
         }
 
         // ---- meetings table ------------------------------------------
@@ -2257,7 +2289,7 @@
               </table>
             </div>
             ${moreBarHtml("meet", shown.length, rows.length)}
-            <div class="pr-meta an-table-note">${rows.length} meeting${rows.length === 1 ? "" : "s"} in this range · meeting dates auto-fill from Calendly and HubSpot bookings going forward</div>`;
+            <div class="pr-meta an-table-note">${rows.length} meeting${rows.length === 1 ? "" : "s"} in this range</div>`;
           syncHeadCheck(meetRoot, "meet", rows, anState.meetSelected);
         }
 
@@ -2328,7 +2360,7 @@
           if (!rows.length) return;
           const label = isResp ? "response" : "meeting";
           const noun  = rows.length === 1 ? label : label + "s";
-          if (!confirm(`Delete ${rows.length} ${noun}? Only the ${noun} ${rows.length === 1 ? "is" : "are"} removed - the prospects stay, and their status recalculates from what's left. This can't be undone.`)) return;
+          if (!confirm(`Are you sure? This deletes ${rows.length} ${noun} and can't be undone. Only the ${noun} ${rows.length === 1 ? "is" : "are"} removed - the prospects stay, and their status recalculates from what's left.`)) return;
           try {
             await sb.sbFetch(`/rest/v1/rpc/delete_prospect_events`, {
               method: "POST",
@@ -2510,23 +2542,39 @@
             else { anState.meetSelected.clear(); renderMeetings(); }
             return;
           }
-          const clearRange = e.target.closest("[data-an-clear-range]");
-          if (clearRange) {
-            if (clearRange.dataset.anClearRange === "resp") {
+          // Per-table timeframe pills (Meetings / Responses).
+          const tblPill = e.target.closest("[data-an-table-pills] .timeframe-pill");
+          if (tblPill) {
+            const group = tblPill.closest("[data-an-table-pills]");
+            const kind  = group.dataset.anTablePills;
+            const tf    = tblPill.dataset.tf;
+            activatePill(group, tf);
+            if (kind === "resp") {
               document.getElementById("an-resp-from").value = "";
               document.getElementById("an-resp-to").value = "";
-              anState.respRange = { from: null, to: null };
+              anState.respRange = { tf, from: null, to: null };
               anState.respLimit = 50;
               anState.respSelected.clear();
               if (anState.listsLoaded) renderResponses();
             } else {
               document.getElementById("an-meet-from").value = "";
               document.getElementById("an-meet-to").value = "";
-              anState.meetRange = { from: null, to: null };
+              anState.meetRange = { tf, from: null, to: null };
               anState.meetLimit = 50;
               anState.meetSelected.clear();
               if (anState.listsLoaded) renderMeetings();
             }
+            return;
+          }
+          // Mobile "+ Filters" toggle - reveals the section's filter
+          // controls (date pills + custom range, and on Responses the
+          // sentiment pills + search too).
+          const ft = e.target.closest("[data-an-filters]");
+          if (ft) {
+            const card = ft.closest(".panel-card");
+            const open = card.classList.toggle("an-filters-open");
+            ft.textContent = open ? "Hide filters" : "+ Filters";
+            ft.setAttribute("aria-expanded", open ? "true" : "false");
             return;
           }
           const nd = e.target.closest("[data-an-notes]");
@@ -2600,26 +2648,29 @@
           refreshCore(); // Meetings/Responses have their own date filters
         }));
 
-        // Per-table date filters (Meetings + Responses). Either input
-        // alone bounds one side; the All button clears both. Every
-        // change resets that table's row cap and selection.
-        function wireTableRange(fromId, toId, rangeKey, resetAndRender) {
+        // Per-table date inputs (Meetings + Responses). Setting either
+        // date switches that table to "custom" (deactivating its pills);
+        // one input alone bounds just that side. Every change resets the
+        // table's row cap and selection.
+        function wireTableRange(fromId, toId, pillsId, rangeKey, resetAndRender) {
           const f = document.getElementById(fromId);
           const t = document.getElementById(toId);
           const apply = () => {
             let from = f.value || null, to = t.value || null;
+            if (!from && !to) { anState[rangeKey] = { tf: "all", from: null, to: null }; activatePill(document.getElementById(pillsId), "all"); resetAndRender(); return; }
             if (from && to && from > to) [from, to] = [to, from];
-            anState[rangeKey] = { from, to };
+            anState[rangeKey] = { tf: "custom", from, to };
+            activatePill(document.getElementById(pillsId), "custom"); // matches no pill
             resetAndRender();
           };
           f.addEventListener("change", apply);
           t.addEventListener("change", apply);
         }
-        wireTableRange("an-resp-from", "an-resp-to", "respRange", () => {
+        wireTableRange("an-resp-from", "an-resp-to", "an-resp-tfpills", "respRange", () => {
           anState.respLimit = 50; anState.respSelected.clear();
           if (anState.listsLoaded) renderResponses();
         });
-        wireTableRange("an-meet-from", "an-meet-to", "meetRange", () => {
+        wireTableRange("an-meet-from", "an-meet-to", "an-meet-tfpills", "meetRange", () => {
           anState.meetLimit = 50; anState.meetSelected.clear();
           if (anState.listsLoaded) renderMeetings();
         });
