@@ -1572,6 +1572,33 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .an-resp-search { max-width: 300px; margin-left: auto; }
 .an-table-note { margin-top: 8px; }
 .an-date-unset { color: var(--gray-400); }
+
+/* Message-sent text column (Responses table). */
+.an-msg-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 200px;
+  max-width: 340px;
+  color: var(--gray-600);
+}
+
+/* Row-cap footer (Show 50 more / Show all). */
+.an-more {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 12px 0 2px;
+}
+
+/* Bulk bar + range-clear button sizing. */
+.an-bulk-bar { margin-top: 2px; }
+.an-bulk-count {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.an-range-clear { height: 30px; padding: 0 12px; }
 .fu-view-toggle {
   display: inline-flex;
   border: 1px solid var(--border);
