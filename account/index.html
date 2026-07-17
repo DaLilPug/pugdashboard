@@ -1590,10 +1590,10 @@
         };
 
         const TAGS = {
-          green: { name: "Healthy - every benchmark met", lever: "Hold",
-            cause: "Acceptance, response, positive, and booking are all at or above target in this window.",
+          green: { name: "Healthy - hold your approach", lever: "Hold",
+            cause: "The funnel is converting at target in this window - no issue pattern matches.",
             fixes: [
-              "Change nothing. Audit again in 4 weeks.",
+              "Change nothing structural. Audit again per the cadence below.",
               "The remaining lever is volume: more connection requests at the same quality.",
             ] },
           1: { name: "Low acceptance", lever: "Targeting",
@@ -1831,7 +1831,12 @@
           const A = m.connections >= 10 && accR  !== null && accR  >= BENCH.acc.target;
           const R = m.messages    >= 10 && respR !== null && respR >= BENCH.resp.target;
           const P = m.responses   >= 5  && posR  !== null && posR  >= BENCH.pos.target;
-          const M = mtgPerMonth !== null && mtgPerMonth >= BENCH.mtg.target;
+          // A collapsed booking rate counts as a meetings problem even
+          // when raw pace clears 4/month - a pace that only looks fine
+          // because volume is huge still wastes positives, which is
+          // exactly the "positives are not becoming meetings" pattern.
+          const bookCollapsed = m.positives >= 5 && bookR !== null && bookR < BENCH.book.target / 2;
+          const M = mtgPerMonth !== null && mtgPerMonth >= BENCH.mtg.target && !bookCollapsed;
           const key = `${A ? "H" : "L"}${R ? "H" : "L"}${P ? "H" : "L"}${M ? "H" : "L"}`;
           const special = { LHHH: 5, LLHL: 6, LHLL: 7, HLHL: 8, HLLH: 9, HHLH: 10 };
           let tagId;
@@ -1844,9 +1849,11 @@
           const tag = TAGS[tagId];
 
           // Severity follows the audit-cadence rule: below-target tiles
-          // (ok or bad state) count as misses.
+          // (ok or bad state) count as misses - even when the pattern
+          // match lands on "healthy", a below-target tile means audit
+          // more often than the 4-week green cadence.
           const misses = tiles.filter(t => t.state === "bad" || t.state === "ok").length;
-          const sev = tagId === "green" ? "green" : (misses >= 3 ? "red" : "yellow");
+          const sev = misses === 0 ? "green" : (misses >= 3 ? "red" : "yellow");
           const cadenceLine = sev === "green"
             ? "All benchmarks healthy: audit every 4 weeks."
             : sev === "yellow"
