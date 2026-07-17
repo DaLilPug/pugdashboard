@@ -1573,13 +1573,28 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .an-table-note { margin-top: 8px; }
 .an-date-unset { color: var(--gray-400); }
 
-/* Message-sent text column (Responses table). */
+/* Message-sent text column (Responses table). The row grows with the
+   full RESPONSE; the message you sent clamps to 4 lines (ellipsis on
+   the last one) and expands/collapses on click, so a long template
+   never dwarfs a short reply. */
 .an-msg-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   min-width: 200px;
   max-width: 340px;
   color: var(--gray-600);
+}
+.an-msg-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+.an-msg-clamp.an-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 /* Row-cap footer (Show 50 more / Show all). */
@@ -6700,3 +6715,35 @@ body.header-drawer-open { overflow: hidden; }
   .hubspot-sentiment-select { margin-left: 0; margin-top: 4px; }
 }
 
+
+/* ---- Analysis tab: mobile (<= 800px) ----------------------------
+   Placed at the END of the file so it wins the cascade over the
+   unconditional .an-* rules above (source-order tiebreak). Tables
+   keep their horizontal scroll inside .pr-table-scroll; controls
+   stack and text columns narrow so less panning is needed. */
+@media (max-width: 800px) {
+  /* Section-head controls stack under the title. */
+  #panel-analysis .panel-card-head { align-items: flex-start; }
+  #panel-analysis .timeframe-wrap { justify-content: flex-start; }
+  #panel-analysis .timeframe-custom { flex-wrap: wrap; }
+  #panel-analysis .timeframe-custom .filter-date { min-width: 110px; }
+
+  /* Benchmark tiles: two-up instead of five across. */
+  .an-bench-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+
+  /* Responses toolbar: search drops to its own full-width line. */
+  .an-toolbar { flex-wrap: wrap; }
+  .an-resp-search { flex: 1 1 100%; max-width: 100%; margin-left: 0; }
+  .fu-toolbar-count { flex-basis: 100%; text-align: right; }
+
+  /* Narrower text columns = less horizontal panning. */
+  .an-msg-text  { min-width: 150px; max-width: 220px; }
+  .an-resp-text { min-width: 180px; max-width: 240px; }
+  .an-sub { max-width: 140px; }
+  .an-prospect-cell { min-width: 110px; }
+
+  /* Bulk + pagination bars wrap cleanly. */
+  .an-bulk-bar { flex-wrap: wrap; }
+  .an-more { flex-wrap: wrap; }
+  .an-more .btn-secondary { flex: 1 1 40%; }
+}

@@ -2123,6 +2123,7 @@
             <div class="pr-bulk-bar an-bulk-bar">
               <span class="an-bulk-count">${count} selected</span>
               <button class="btn-secondary" data-an-copy="${kind}" type="button" title="Copy the selected rows as a table (paste into Excel / Sheets)">Copy for Excel</button>
+              <button class="btn-danger-soft" data-an-delete="${kind}" type="button" title="Delete the selected activities (prospects are kept)">Delete</button>
               <button class="btn-secondary" data-an-clear-sel="${kind}" type="button">Clear</button>
             </div>`;
         }
@@ -2168,7 +2169,9 @@
                         <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
                         <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
                       </td>
-                      <td class="an-msg-text">${esc(r.message_sent || "")}</td>
+                      <td class="an-msg-text">${r.message_sent
+                        ? `<div class="an-msg-clamp" title="Click to expand or collapse">${esc(r.message_sent)}</div>`
+                        : ""}</td>
                       <td class="an-resp-text">${esc(r.response || "")}</td>
                       <td>
                         <select class="pr-sent-edit pr-sent-edit-${esc(s || "none")} an-sent-select" data-an-sentiment data-event-id="${esc(r.id)}" aria-label="Sentiment">
@@ -2310,6 +2313,42 @@
           } catch (err) {
             alert("Couldn't copy: " + (err.message || err));
           }
+        }
+
+        // ---- Delete selection ----------------------------------------
+        // Deletes the selected ACTIVITY rows only - prospects stay (the
+        // rollup triggers recompute their status/counts). Uses the same
+        // bulk delete_prospect_events RPC the Prospects tab's bulk
+        // delete goes through: access-checked, single-client guard,
+        // audited.
+        async function deleteSelection(kind) {
+          const isResp = kind === "resp";
+          const set  = isResp ? anState.respSelected : anState.meetSelected;
+          const rows = (isResp ? visibleResponses() : visibleMeetings()).filter(r => set.has(r.id));
+          if (!rows.length) return;
+          const label = isResp ? "response" : "meeting";
+          const noun  = rows.length === 1 ? label : label + "s";
+          if (!confirm(`Delete ${rows.length} ${noun}? Only the ${noun} ${rows.length === 1 ? "is" : "are"} removed - the prospects stay, and their status recalculates from what's left. This can't be undone.`)) return;
+          try {
+            await sb.sbFetch(`/rest/v1/rpc/delete_prospect_events`, {
+              method: "POST",
+              body: JSON.stringify({ p_event_ids: rows.map(r => r.id) }),
+            });
+          } catch (err) {
+            alert("Couldn't delete: " + (err.message || err));
+            return;
+          }
+          const gone = new Set(rows.map(r => r.id));
+          if (isResp) {
+            anState.responses = (anState.responses || []).filter(r => !gone.has(r.id));
+            anState.respSelected.clear();
+            renderResponses();
+          } else {
+            anState.meetings = (anState.meetings || []).filter(r => !gone.has(r.id));
+            anState.meetSelected.clear();
+            renderMeetings();
+          }
+          refreshCore(); // response/meeting counts feed the tiles + titles
         }
 
         // ---- inline editors ------------------------------------------
@@ -2461,6 +2500,10 @@
           }
           const copyBtn = e.target.closest("[data-an-copy]");
           if (copyBtn) { copySelection(copyBtn); return; }
+          const delBtn = e.target.closest("[data-an-delete]");
+          if (delBtn) { deleteSelection(delBtn.dataset.anDelete); return; }
+          const clamp = e.target.closest(".an-msg-clamp");
+          if (clamp) { clamp.classList.toggle("an-expanded"); return; }
           const clearSel = e.target.closest("[data-an-clear-sel]");
           if (clearSel) {
             if (clearSel.dataset.anClearSel === "resp") { anState.respSelected.clear(); renderRespTable(); }
