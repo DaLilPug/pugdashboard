@@ -90,6 +90,7 @@
 
   <div class="sub-tabs" id="sub-tabs">
     <button class="sub-tab active" data-tab="summary"       type="button">Summary</button>
+    <button class="sub-tab"        data-tab="analysis"      type="button">Analysis</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
     <button class="sub-tab"        data-tab="followups"     type="button">Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"       type="button">Cadence</button>
@@ -106,15 +107,22 @@
       <section class="panel-card summary-panel">
         <div class="panel-card-head">
           <h2>Summary</h2>
-          <div class="timeframe-pills" id="sum-pills">
-            <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
-            <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
-            <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
-            <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
-            <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
-            <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
-            <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
-            <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+          <div class="timeframe-wrap">
+            <div class="timeframe-pills" id="sum-pills">
+              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
+              <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+            </div>
+            <div class="timeframe-custom">
+              <input type="date" class="filter-date" id="sum-from" aria-label="From date">
+              <span class="timeframe-custom-sep">to</span>
+              <input type="date" class="filter-date" id="sum-to" aria-label="To date">
+            </div>
           </div>
         </div>
 
@@ -203,6 +211,66 @@
           </div>
         </div>
       </section>
+    </section>
+
+    <!-- =================== ANALYSIS ===================== -->
+    <section id="panel-analysis" class="sub-panel hidden">
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Health check</h2>
+          <div class="timeframe-wrap">
+            <div class="timeframe-pills" id="an-pills">
+              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
+              <button class="timeframe-pill" data-tf="all" type="button">All Time</button>
+            </div>
+            <div class="timeframe-custom">
+              <input type="date" class="filter-date" id="an-from" aria-label="Analysis from date">
+              <span class="timeframe-custom-sep">to</span>
+              <input type="date" class="filter-date" id="an-to" aria-label="Analysis to date">
+            </div>
+          </div>
+        </div>
+        <div class="panel-card-sub">The funnel in the selected window, scored against Uptown's benchmarks, with the diagnosis and the lever to pull. <a href="/guides/#benchmarks" target="_blank" rel="noopener">How the benchmarks work</a></div>
+        <div id="an-bench" class="an-bench-grid"><div class="loading">Loading…</div></div>
+        <div id="an-diagnosis"></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Title performance</h2>
+          <div class="fu-view-toggle" role="group" aria-label="Group titles by">
+            <button class="fu-view-btn active" data-an-titleview="seniority" type="button">By seniority</button>
+            <button class="fu-view-btn" data-an-titleview="title" type="button">By exact title</button>
+          </div>
+        </div>
+        <div class="panel-card-sub">Who accepts, who replies, and who books - by job title, in the selected window. Each prospect counts once. Acceptance is measured only over prospects who received a connection request.</div>
+        <div id="an-title-callouts"></div>
+        <div id="an-titles"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Responses</h2>
+        </div>
+        <div class="panel-card-sub" id="an-resp-lag"></div>
+        <div id="an-responses"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Meetings</h2>
+        </div>
+        <div class="panel-card-sub">Date booked = when the booking was logged. Meeting date = when the meeting takes place (blank for meetings logged before Jul 16, 2026 - click to set it). Both dates are click-to-edit, notes save on blur.</div>
+        <div id="an-meetings"><div class="loading">Loading…</div></div>
+      </section>
+
     </section>
 
     <!-- =================== PROSPECTS ===================== -->
@@ -882,7 +950,7 @@
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false };
+      const loaded = { summary: false, analysis: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false };
 
       tabs.addEventListener("click", (e) => {
         const btn = e.target.closest(".sub-tab");
@@ -903,6 +971,7 @@
         );
         if (!loaded[name]) {
           if      (name === "summary")   initSummary();
+          else if (name === "analysis")  initAnalysis();
           else if (name === "prospects") initProspects();
           else if (name === "followups") initFollowups();
           else if (name === "assets") initAssets();
@@ -977,8 +1046,45 @@
           tf = btn.dataset.tf;
           localStorage.setItem(LAST_TF, tf);
           activatePill(pillsEl, tf);
+          // Preset pills and the custom range are mutually exclusive -
+          // picking a preset clears the From/To inputs.
+          fromEl.value = "";
+          toEl.value   = "";
           if (summaryByTf) renderScoped();
         });
+
+        // Custom From/To range. Fires once BOTH dates are set; each
+        // range is fetched fresh (presets stay cached in summaryByTf).
+        // tf = "custom" is never persisted - a fresh page load starts
+        // back on the preset pills.
+        const fromEl = document.getElementById("sum-from");
+        const toEl   = document.getElementById("sum-to");
+        [fromEl, toEl].forEach(el => el.addEventListener("change", applyCustomRange));
+
+        async function applyCustomRange() {
+          const from = fromEl.value, to = toEl.value;
+          if (!from || !to) return;
+          // Backwards pair still works - run the earlier day first.
+          const [lo, hi] = from <= to ? [from, to] : [to, from];
+          tf = "custom";
+          activatePill(pillsEl, "custom"); // matches no pill = all inactive
+          kpiEl.innerHTML = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
+          try {
+            // Local-midnight to local-end-of-day, inclusive - matches
+            // the RPC's inclusive-both-ends window. Building Dates from
+            // "T00:00:00" strings keeps them in LOCAL time (no UTC
+            // day-shift for evening users).
+            const entry = await fetchSummaryForRange(
+              new Date(`${lo}T00:00:00`).toISOString(),
+              new Date(`${hi}T23:59:59.999`).toISOString()
+            );
+            if (!summaryByTf) summaryByTf = {};
+            summaryByTf.custom = entry;
+            if (tf === "custom") renderScoped();
+          } catch (err) {
+            kpiEl.innerHTML = `<div class="placeholder"><strong>Couldn't load that date range</strong>${esc(err.message || "")}</div>`;
+          }
+        }
 
         loadAll();
 
@@ -1044,14 +1150,19 @@
         // objects ordered by day ASC — drawChart consumes them directly.
         async function fetchSummaryForTf(tfKey) {
           const since = cutoffFor(tfKey);
+          return fetchSummaryForRange(since ? new Date(since).toISOString() : null, null);
+        }
+
+        // Range variant - also serves the custom From/To picker.
+        async function fetchSummaryForRange(sinceIso, untilIso) {
           const rows = await sb.sbFetch(
             `/rest/v1/rpc/client_summary_for_period`,
             {
               method: "POST",
               body: JSON.stringify({
                 p_client_id: clientId,
-                p_since: since ? new Date(since).toISOString() : null,
-                p_until: null,
+                p_since: sinceIso,
+                p_until: untilIso,
               }),
             }
           );
@@ -1393,6 +1504,794 @@
             </div>
           `).join("");
         }
+      }
+
+      // ================= ANALYSIS =====================================
+      //
+      // Interprets the account's data instead of just counting it:
+      //   1. Health check - the funnel vs Uptown's benchmarks (guides
+      //      section 10) for the selected window, plus the matching
+      //      issue-pattern diagnosis with the lever to pull (targeting
+      //      or messaging).
+      //   2. Title performance - per-title funnel from the
+      //      analysis_title_performance RPC, grouped by seniority or
+      //      exact title, with data-driven targeting callouts.
+      //   3. Responses - every reply in the window as a spreadsheet:
+      //      received date, true send date + reply lag (tracked since
+      //      2026-07-08), full text, editable sentiment, prospect notes.
+      //   4. Meetings - date booked + meeting date, both click-to-edit,
+      //      plus notes. Mirrors the old Google Sheets tabs.
+      //
+      // Window metrics + title rows refetch on window change; the
+      // responses / meetings / notes lists load once and filter
+      // client-side.
+      function initAnalysis() {
+        const pillsEl    = document.getElementById("an-pills");
+        const fromEl     = document.getElementById("an-from");
+        const toEl       = document.getElementById("an-to");
+        const benchEl    = document.getElementById("an-bench");
+        const diagEl     = document.getElementById("an-diagnosis");
+        const calloutsEl = document.getElementById("an-title-callouts");
+        const titlesEl   = document.getElementById("an-titles");
+        const respLagEl  = document.getElementById("an-resp-lag");
+        const respRoot   = document.getElementById("an-responses");
+        const meetRoot   = document.getElementById("an-meetings");
+        const panelEl    = document.getElementById("panel-analysis");
+
+        const AN_TF_KEY = `account_${clientId}_an_tf`;
+        let anTf = localStorage.getItem(AN_TF_KEY) || "3m";
+        let anRange = null; // { sinceIso, untilIso } while anTf === "custom"
+        if (anTf === "custom") anTf = "3m"; // custom is never persisted
+        activatePill(pillsEl, anTf);
+
+        const anState = {
+          entry:    null,   // { metrics, dailyBuckets } for the window
+          titles:   null,   // analysis_title_performance rows
+          titleView: "seniority",
+          responses: null,  // ALL response rows, newest first
+          meetings:  null,  // ALL meeting_booked rows, newest first
+          notesByProspect: {},
+          listsLoaded: false,
+          respSent:   "all",
+          respSearch: "",
+        };
+        let coreToken = 0;
+
+        // Local date formatter - string slice, no Date object, so the
+        // shown day never shifts across timezones (fmtDate lives inside
+        // initProspects' closure and is not reachable here).
+        const anDate = (iso) => {
+          if (!iso) return "—";
+          const [y, m, d] = String(iso).slice(0, 10).split("-");
+          return (y && m && d) ? `${m}/${d}/${y}` : "—";
+        };
+        // Whole-day reply lag, matching the timeline chip's convention.
+        const lagDaysOf = (r) => {
+          if (!r.message_sent_at || !r.occurred_at) return null;
+          const u = iso => { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); return Date.UTC(y, m - 1, d); };
+          const n = Math.round((u(r.occurred_at) - u(r.message_sent_at)) / 86400000);
+          return n >= 0 ? n : null;
+        };
+
+        // ---- benchmarks + the 10 issue patterns (guides section 10) --
+        const BENCH = {
+          acc:  { target: 0.30, label: "Acceptance rate" },
+          resp: { target: 0.20, label: "Response rate" },
+          pos:  { target: 0.15, label: "Positive rate" },
+          book: { target: 0.40, label: "Booking rate" },
+          mtg:  { target: 4,    label: "Meetings / month" },
+        };
+
+        const TAGS = {
+          green: { name: "Healthy - every benchmark met", lever: "Hold",
+            cause: "Acceptance, response, positive, and booking are all at or above target in this window.",
+            fixes: [
+              "Change nothing. Audit again in 4 weeks.",
+              "The remaining lever is volume: more connection requests at the same quality.",
+            ] },
+          1: { name: "Low acceptance", lever: "Targeting",
+            cause: "The connection request itself is being declined - a targeting or profile problem.",
+            fixes: [
+              "Check the LinkedIn profile's headline and photo.",
+              "Tighten title matching in the Connection Requests saved search.",
+              "Set Posted on LinkedIn to last 30 days - active leads accept 30-50% more.",
+              "Spot-check who the saved search is actually returning.",
+            ] },
+          2: { name: "High acceptance, low response", lever: "Targeting + Messaging",
+            cause: "Active people accept, but the wrong fit, a weak pattern disrupt, or a spammy-reading message keeps them from replying.",
+            fixes: [
+              "Read 20-30 neutral and negative replies in the Responses table below and tag the patterns.",
+              "Exclude bad-fit company or title keywords from the search.",
+              "Change the opener / pattern disrupt.",
+              "Simplify jargon in Message 1.",
+            ] },
+          3: { name: "Replies come in, few are positive", lever: "Messaging",
+            cause: "The problem statement is not landing - it misses what this audience prioritizes.",
+            fixes: [
+              "Tag the common no's from 20-30 negative and neutral replies (the Responses table below is built for this).",
+              "Try a softer CTA to validate the problem statement.",
+            ] },
+          4: { name: "Positives are not becoming meetings", lever: "Messaging",
+            cause: "Not enough urgency, the wrong conversion channel, or a meeting-link problem.",
+            fixes: [
+              "Rewrite the problem statement for urgency.",
+              "Switch to a harder CTA.",
+              "Move positives to a different channel (phone or email).",
+              "Audit the meeting link end to end.",
+            ] },
+          5: { name: "Narrow audience, working funnel", lever: "Targeting",
+            cause: "A selective ICP self-filters at the request step; the people who do accept convert all the way down.",
+            fixes: [
+              "Keep the ICP - low acceptance is the audience being narrow, not broken.",
+              "Test small profile tweaks.",
+              "Increase request volume to compensate.",
+            ] },
+          6: { name: "Sample too small to trust", lever: "Targeting",
+            cause: "The high positive rate sits on a tiny denominator - statistical noise until volume exists.",
+            fixes: [
+              "Fix acceptance first (see Low acceptance).",
+              "Hold messaging changes until there is enough volume to evaluate them.",
+            ] },
+          7: { name: "Engaged repliers, weak offer", lever: "Targeting + Messaging",
+            cause: "Few acceptors engage, and the offer is not compelling to the ones who do.",
+            fixes: [
+              "Fix acceptance first (see Low acceptance).",
+              "Then rewrite the problem statement to focus on outcomes.",
+            ] },
+          8: { name: "Weak opener - messages not read", lever: "Messaging",
+            cause: "The people who do reply skew positive, which means the message works once read - most never get past the first line.",
+            fixes: [
+              "Rewrite the opening line / pattern disrupt.",
+              "Keep the rest of the message intact.",
+              "A/B test openers.",
+            ] },
+          9: { name: "Numbers do not add up - audit the data", lever: "Data",
+            cause: "Meetings are landing without the responses and positives to explain them. Statistically unlikely at volume.",
+            fixes: [
+              "Verify every reply is being logged, not just the good ones (inbox discipline).",
+              "Verify meeting attribution on the Meeting Links tab.",
+              "If the data holds up, treat this as High acceptance, low response.",
+            ] },
+          10: { name: "Meetings on heroics", lever: "Messaging",
+            cause: "The team converts manually despite a weak positive rate - the closer is doing work the message should do.",
+            fixes: [
+              "Keep the conversion approach - it is working.",
+              "Rewrite the problem statement so the positive rate climbs.",
+              "Watch meetings closely so the rewrite does not break what works.",
+            ] },
+        };
+
+        // ---- window helpers ------------------------------------------
+        function windowBounds() {
+          if (anTf === "custom" && anRange) return anRange;
+          const since = cutoffFor(anTf);
+          return { sinceIso: since ? new Date(since).toISOString() : null, untilIso: null };
+        }
+        function windowMs() {
+          const b = windowBounds();
+          return {
+            sinceMs: b.sinceIso ? new Date(b.sinceIso).getTime() : null,
+            untilMs: b.untilIso ? new Date(b.untilIso).getTime() : null,
+          };
+        }
+        // Days covered by the window, for prorating meetings/month.
+        // All Time / This Year fall back to the first day with activity.
+        function windowDaysFor(entry) {
+          const b = windowBounds();
+          let start = b.sinceIso ? new Date(b.sinceIso).getTime() : null;
+          if (!start) {
+            const first = entry && entry.dailyBuckets && entry.dailyBuckets.length
+              ? entry.dailyBuckets[0].day : null;
+            start = first ? new Date(`${first}T00:00:00`).getTime() : null;
+          }
+          if (!start) return null;
+          const end = b.untilIso ? new Date(b.untilIso).getTime() : Date.now();
+          return Math.max(1, Math.round((end - start) / 86400000));
+        }
+
+        // ---- fetches -------------------------------------------------
+        async function fetchWindowSummary() {
+          const b = windowBounds();
+          const rows = await sb.sbFetch(`/rest/v1/rpc/client_summary_for_period`, {
+            method: "POST",
+            body: JSON.stringify({ p_client_id: clientId, p_since: b.sinceIso, p_until: b.untilIso }),
+          });
+          const r = (rows && rows[0]) || {};
+          return {
+            metrics: {
+              connections: Number(r.connections) || 0,
+              messages:    Number(r.messages)    || 0,
+              responses:   Number(r.responses)   || 0,
+              positives:   Number(r.positives)   || 0,
+              meetings:    Number(r.meetings)    || 0,
+            },
+            dailyBuckets: r.daily_buckets || [],
+          };
+        }
+        async function fetchTitles() {
+          const b = windowBounds();
+          const rows = await sb.sbFetch(`/rest/v1/rpc/analysis_title_performance`, {
+            method: "POST",
+            body: JSON.stringify({ p_client_id: clientId, p_since: b.sinceIso, p_until: b.untilIso }),
+          });
+          return (rows || []).map(r => ({
+            title:     r.title || "(no title)",
+            prospects: Number(r.prospects) || 0,
+            requested: Number(r.requested) || 0,
+            accepted:  Number(r.accepted)  || 0,
+            messaged:  Number(r.messaged)  || 0,
+            responded: Number(r.responded) || 0,
+            positive:  Number(r.positive)  || 0,
+            meetings:  Number(r.meetings)  || 0,
+          }));
+        }
+        async function loadListsOnce() {
+          if (anState.listsLoaded) return;
+          const encId = encodeURIComponent(clientId);
+          const RESP_SELECT = "id,prospect_id,prospect_name,company,title,linkedin_id,profile_url,sales_nav_url,occurred_at,message_sent_at,response,response_sentiment,response_sentiment_detail";
+          const MEET_SELECT = "id,prospect_id,prospect_name,company,title,email,linkedin_id,profile_url,sales_nav_url,occurred_at,meeting_at";
+          const [responses, meetings, notesRows] = await Promise.all([
+            sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.response&select=${RESP_SELECT}&order=occurred_at.desc`),
+            sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.meeting_booked&select=${MEET_SELECT}&order=occurred_at.desc`),
+            sb.sbFetch(`/rest/v1/prospects?client_id=eq.${encId}&select=id,notes&notes=not.is.null`).catch(() => []),
+          ]);
+          anState.responses = responses || [];
+          anState.meetings  = meetings  || [];
+          anState.notesByProspect = {};
+          for (const p of (notesRows || [])) {
+            if (p.notes) anState.notesByProspect[p.id] = p.notes;
+          }
+          anState.listsLoaded = true;
+        }
+
+        async function refreshCore() {
+          const token = ++coreToken;
+          benchEl.innerHTML  = `<div class="loading">Loading…</div>`;
+          titlesEl.innerHTML = `<div class="loading">Loading…</div>`;
+          try {
+            const [entry, titles] = await Promise.all([fetchWindowSummary(), fetchTitles()]);
+            if (token !== coreToken) return; // superseded by a newer window pick
+            anState.entry  = entry;
+            anState.titles = titles;
+            renderBenchAndDiagnosis();
+            renderTitles();
+          } catch (err) {
+            if (token !== coreToken) return;
+            benchEl.innerHTML = `<div class="placeholder"><strong>Couldn't load the analysis</strong>${esc(err.message || "")}</div>`;
+            diagEl.innerHTML = ""; titlesEl.innerHTML = ""; calloutsEl.innerHTML = "";
+          }
+        }
+
+        // ---- health check + diagnosis --------------------------------
+        function renderBenchAndDiagnosis() {
+          const m = anState.entry.metrics;
+          const days = windowDaysFor(anState.entry);
+          const mtgPerMonth = days ? (m.meetings * 30) / days : null;
+
+          const accR  = m.connections ? m.messages  / m.connections : null;
+          const respR = m.messages    ? m.responses / m.messages    : null;
+          const posR  = m.responses   ? m.positives / m.responses   : null;
+          const bookR = m.positives   ? m.meetings  / m.positives   : null;
+
+          const rateState = (r, target, den, minDen) => {
+            if (r === null || !den || den < minDen) return "na";
+            if (r >= target)     return "good";
+            if (r >= target / 2) return "ok";
+            return "bad";
+          };
+          const mtgState = mtgPerMonth === null ? "na"
+            : mtgPerMonth >= BENCH.mtg.target ? "good"
+            : mtgPerMonth >= BENCH.mtg.target / 2 ? "ok" : "bad";
+
+          const tiles = [
+            { key: "acc",  r: accR,  state: rateState(accR,  BENCH.acc.target,  m.connections, 10),
+              value: accR  === null ? "—" : `${(accR  * 100).toFixed(1)}%`, sub: `target 30% · ${m.messages}/${m.connections}` },
+            { key: "resp", r: respR, state: rateState(respR, BENCH.resp.target, m.messages, 10),
+              value: respR === null ? "—" : `${(respR * 100).toFixed(1)}%`, sub: `target 20% · ${m.responses}/${m.messages}` },
+            { key: "pos",  r: posR,  state: rateState(posR,  BENCH.pos.target,  m.responses, 5),
+              value: posR  === null ? "—" : `${(posR  * 100).toFixed(1)}%`, sub: `target 15% · ${m.positives}/${m.responses}` },
+            { key: "book", r: bookR, state: rateState(bookR, BENCH.book.target, m.positives, 5),
+              value: bookR === null ? "—" : `${(bookR * 100).toFixed(1)}%`, sub: `target 40% · ${m.meetings}/${m.positives}` },
+            { key: "mtg",  r: mtgPerMonth, state: mtgState,
+              value: mtgPerMonth === null ? "—" : mtgPerMonth.toFixed(1), sub: `target 4+/mo · ${m.meetings} in window` },
+          ];
+          benchEl.innerHTML = tiles.map(t => `
+            <div class="an-bench-card an-bench-${t.state}">
+              <div class="kpi-label">${esc(BENCH[t.key].label)}</div>
+              <div class="an-bench-value">${esc(t.value)}</div>
+              <div class="an-bench-target">${esc(t.sub)}</div>
+            </div>
+          `).join("");
+
+          // Diagnosis: exact special patterns first, then funnel order.
+          const A = accR  !== null && accR  >= BENCH.acc.target;
+          const R = respR !== null && respR >= BENCH.resp.target;
+          const P = posR  !== null && posR  >= BENCH.pos.target;
+          const M = mtgPerMonth !== null && mtgPerMonth >= BENCH.mtg.target;
+          const key = `${A ? "H" : "L"}${R ? "H" : "L"}${P ? "H" : "L"}${M ? "H" : "L"}`;
+          const special = { LHHH: 5, LLHL: 6, LHLL: 7, HLHL: 8, HLLH: 9, HHLH: 10 };
+          let tagId;
+          if (special[key])      tagId = special[key];
+          else if (!A)           tagId = 1;
+          else if (!R)           tagId = 2;
+          else if (!P)           tagId = 3;
+          else if (!M)           tagId = 4;
+          else                   tagId = "green";
+          const tag = TAGS[tagId];
+
+          // Severity follows the audit-cadence rule: below-target tiles
+          // (ok or bad state) count as misses.
+          const misses = tiles.filter(t => t.state === "bad" || t.state === "ok").length;
+          const sev = tagId === "green" ? "green" : (misses >= 3 ? "red" : "yellow");
+          const cadenceLine = sev === "green"
+            ? "All benchmarks healthy: audit every 4 weeks."
+            : sev === "yellow"
+              ? "One or two benchmarks off: audit every 2 weeks. If a benchmark still lags 3+ weeks after your change, escalate."
+              : "Multiple benchmarks off: audit weekly. If a benchmark still lags 3+ weeks after your change, escalate.";
+
+          const lowVolume = m.connections < 50 && m.messages < 30;
+          diagEl.innerHTML = `
+            ${lowVolume ? `<div class="an-lowvol">Low volume in this window (${m.connections} requests, ${m.messages} messages). Read the diagnosis as a hint, not a verdict - build volume first.</div>` : ""}
+            <div class="an-diag an-diag-${sev}">
+              <div class="an-diag-head">
+                <span class="an-lever">${esc(tag.lever)}</span>
+                <strong>${esc(tag.name)}</strong>
+              </div>
+              <div class="an-diag-cause">${esc(tag.cause)}</div>
+              <ul class="an-diag-fixes">${tag.fixes.map(f => `<li>${esc(f)}</li>`).join("")}</ul>
+              <div class="an-diag-cadence">${esc(cadenceLine)}</div>
+            </div>`;
+          void failing;
+        }
+
+        // ---- title performance ---------------------------------------
+        function seniorityBucket(title) {
+          const t = (title || "").toLowerCase();
+          if (!t || t === "(no title)") return "No title";
+          if (/found|owner|entrepreneur/.test(t))      return "Founder / Owner";
+          if (/\bceo\b|chief executive/.test(t))       return "CEO";
+          if (/chief|\bc[a-z]o\b/.test(t))             return "Other C-suite";
+          if (/president|chairman|chairwoman/.test(t)) return "President / Chair";
+          if (/vice president|\bvp\b|\bsvp\b|\bevp\b/.test(t)) return "VP";
+          if (/director/.test(t))                      return "Director";
+          if (/head of|\bhead\b/.test(t))              return "Head of";
+          if (/manager|\bmgr\b/.test(t))               return "Manager";
+          return "Other";
+        }
+        const SENIORITY_ORDER = ["Founder / Owner", "CEO", "Other C-suite", "President / Chair", "VP", "Director", "Head of", "Manager", "Other", "No title"];
+
+        function seniorityRows() {
+          const byBucket = {};
+          for (const r of (anState.titles || [])) {
+            const b = seniorityBucket(r.title);
+            const t = byBucket[b] || (byBucket[b] = { title: b, prospects: 0, requested: 0, accepted: 0, messaged: 0, responded: 0, positive: 0, meetings: 0 });
+            t.prospects += r.prospects; t.requested += r.requested; t.accepted += r.accepted;
+            t.messaged  += r.messaged;  t.responded += r.responded; t.positive += r.positive;
+            t.meetings  += r.meetings;
+          }
+          return SENIORITY_ORDER.filter(b => byBucket[b]).map(b => byBucket[b]);
+        }
+
+        function rateCell(num, den, target, minDen) {
+          if (!den) return `<td class="num an-rate-na">—</td>`;
+          const r = num / den;
+          const cls = den >= minDen
+            ? (r >= target ? "rate-good" : r >= target / 2 ? "rate-ok" : "rate-bad")
+            : "an-rate-na";
+          return `<td class="num"><span class="${cls}">${(r * 100).toFixed(1)}%</span> <span class="an-rate-n">${num}/${den}</span></td>`;
+        }
+
+        function renderTitles() {
+          const raw = anState.titles || [];
+          let rows, note = "";
+          if (anState.titleView === "title") {
+            rows = raw.filter(r => r.prospects >= 3).sort((a, b) => b.prospects - a.prospects);
+            const hidden = raw.length - rows.length;
+            if (hidden > 0) note = `${hidden} titles with fewer than 3 prospects are hidden - switch to By seniority to include everyone.`;
+          } else {
+            rows = seniorityRows();
+          }
+
+          if (!rows.length) {
+            calloutsEl.innerHTML = "";
+            titlesEl.innerHTML = `<div class="placeholder"><strong>No prospect activity in this window</strong>Pick a longer timeframe above.</div>`;
+            return;
+          }
+
+          calloutsEl.innerHTML = buildCallouts(seniorityRows()).map(c => `
+            <div class="an-callout"><span class="an-lever">${esc(c.lever)}</span><span>${esc(c.text)}</span></div>
+          `).join("");
+
+          titlesEl.innerHTML = `
+            <div class="pr-table-scroll">
+              <table class="pr-table an-table">
+                <thead><tr>
+                  <th>Title</th><th class="num">Prospects</th><th class="num">Acceptance</th>
+                  <th class="num">Response</th><th class="num">Positive</th><th class="num">Meetings</th>
+                </tr></thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr>
+                      <td class="an-title-cell">${esc(r.title)}</td>
+                      <td class="num">${r.prospects}</td>
+                      ${rateCell(r.accepted, r.requested, BENCH.acc.target, 10)}
+                      ${rateCell(r.responded, r.messaged, BENCH.resp.target, 10)}
+                      ${rateCell(r.positive, r.responded, BENCH.pos.target, 5)}
+                      <td class="num">${r.meetings || "—"}</td>
+                    </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>
+            ${note ? `<div class="pr-meta an-table-note">${esc(note)}</div>` : ""}`;
+        }
+
+        // Data-driven callouts over the seniority buckets. Conservative
+        // gates so a hot streak on 4 prospects never drives a strategy
+        // call: acceptance compares need 20+ requests per bucket,
+        // positive-rate compares need 8+ responses.
+        function buildCallouts(buckets) {
+          const out = [];
+          const accRows = buckets.filter(b => b.requested >= 20);
+          if (accRows.length >= 2) {
+            const sorted = [...accRows].sort((a, b) => (b.accepted / b.requested) - (a.accepted / a.requested));
+            const best = sorted[0], worst = sorted[sorted.length - 1];
+            const bp = best.accepted / best.requested * 100;
+            const wp = worst.accepted / worst.requested * 100;
+            if (bp - wp >= 15) {
+              out.push({ lever: "Targeting", text: `${best.title} accept at ${bp.toFixed(0)}% (${best.accepted}/${best.requested}) vs ${worst.title} at ${wp.toFixed(0)}% (${worst.accepted}/${worst.requested}). Shift request volume toward ${best.title}.` });
+            }
+          }
+          const totResp = buckets.reduce((s, b) => s + b.responded, 0);
+          const totPos  = buckets.reduce((s, b) => s + b.positive,  0);
+          const avgPos  = totResp ? totPos / totResp : null;
+          if (avgPos !== null) {
+            for (const b of buckets.filter(x => x.responded >= 8)) {
+              const p = b.positive / b.responded;
+              if (p - avgPos >= 0.10 && b.positive >= 3) {
+                out.push({ lever: "Targeting", text: `Replies from ${b.title} go positive at ${(p * 100).toFixed(0)}% vs ${(avgPos * 100).toFixed(0)}% account-wide (${b.positive}/${b.responded}). Their problems match the pitch - put more volume here.` });
+              } else if (avgPos - p >= 0.10 && b.responded >= 10) {
+                out.push({ lever: "Messaging", text: `${b.title} reply (${b.responded} responses) but only ${(p * 100).toFixed(0)}% positive vs ${(avgPos * 100).toFixed(0)}% account-wide. Read their negative replies below - the problem statement likely misses what they care about.` });
+              }
+            }
+          }
+          const mtgRows = buckets.filter(b => b.meetings >= 2).sort((a, b) => b.meetings - a.meetings);
+          if (mtgRows.length) {
+            out.push({ lever: "Targeting", text: `${mtgRows[0].title} account for ${mtgRows[0].meetings} booked meetings in this window - weight new volume toward the titles that already book.` });
+          }
+          if (!out.length) {
+            out.push({ lever: "Hold", text: "No title group separates from the pack in this window - the differences are within noise at current volume." });
+          }
+          return out.slice(0, 4);
+        }
+
+        // ---- responses table -----------------------------------------
+        function visibleResponses(ignoreSentAndSearch = false) {
+          const { sinceMs, untilMs } = windowMs();
+          const q = anState.respSearch.trim().toLowerCase();
+          return (anState.responses || []).filter(r => {
+            const t = new Date(r.occurred_at).getTime();
+            if (sinceMs !== null && t < sinceMs) return false;
+            if (untilMs !== null && t > untilMs) return false;
+            if (ignoreSentAndSearch) return true;
+            if (anState.respSent === "unclassified") {
+              if (r.response_sentiment) return false;
+            } else if (anState.respSent !== "all" && r.response_sentiment !== anState.respSent) {
+              return false;
+            }
+            if (q) {
+              const hay = `${r.prospect_name || ""} ${r.company || ""} ${r.title || ""} ${r.response || ""}`.toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            return true;
+          });
+        }
+
+        function notesCellHtml(prospectId) {
+          if (!prospectId) return `<span class="an-rate-na">—</span>`;
+          const notes = anState.notesByProspect[prospectId] || "";
+          return notes.trim()
+            ? `<div class="pr-notes-display pr-notes-has" data-an-notes data-prospect-id="${esc(prospectId)}" title="Click to edit notes">${esc(notes)}</div>`
+            : `<div class="pr-notes-display pr-notes-empty" data-an-notes data-prospect-id="${esc(prospectId)}">+ Notes</div>`;
+        }
+        function linksCellHtml(r) {
+          const links = [
+            r.profile_url   ? `<a class="an-link" href="${esc(r.profile_url)}" target="_blank" rel="noopener">LinkedIn ↗</a>` : "",
+            r.sales_nav_url ? `<a class="an-link" href="${esc(r.sales_nav_url)}" target="_blank" rel="noopener">Sales Nav ↗</a>` : "",
+          ].filter(Boolean).join("");
+          return links || `<span class="an-rate-na">—</span>`;
+        }
+
+        function buildRespToolbar() {
+          if (document.getElementById("an-resp-pills")) return;
+          respRoot.innerHTML = `
+            <div class="fu-toolbar an-toolbar">
+              <div class="fu-source-pills" id="an-resp-pills" role="group" aria-label="Filter by sentiment"></div>
+              <input type="search" class="pr-search an-resp-search" id="an-resp-search" placeholder="Search name, company, title, reply text…" aria-label="Search responses">
+              <span class="fu-toolbar-count" id="an-resp-count"></span>
+            </div>
+            <div id="an-resp-table"></div>`;
+          document.getElementById("an-resp-search").addEventListener("input", (e) => {
+            anState.respSearch = e.target.value || "";
+            renderRespTable();
+          });
+        }
+
+        function renderResponses() {
+          buildRespToolbar();
+          const inWindow = visibleResponses(true);
+          const counts = { all: inWindow.length, positive: 0, neutral: 0, negative: 0, unclassified: 0 };
+          for (const r of inWindow) {
+            if (r.response_sentiment === "positive")      counts.positive++;
+            else if (r.response_sentiment === "neutral")  counts.neutral++;
+            else if (r.response_sentiment === "negative") counts.negative++;
+            else counts.unclassified++;
+          }
+          const pill = (key, label) => `
+            <button class="fu-source-pill ${anState.respSent === key ? "active" : ""}" data-an-sent-pill="${key}" type="button">
+              ${label} <span class="fu-source-pill-count">${counts[key]}</span>
+            </button>`;
+          document.getElementById("an-resp-pills").innerHTML =
+            pill("all", "All") + pill("positive", "Positive") + pill("neutral", "Neutral")
+            + pill("negative", "Negative") + pill("unclassified", "Unclassified");
+          renderRespTable();
+          renderRespLag(inWindow);
+        }
+
+        function renderRespTable() {
+          const rows = visibleResponses();
+          const tableEl = document.getElementById("an-resp-table");
+          document.getElementById("an-resp-count").textContent =
+            `${rows.length} of ${visibleResponses(true).length}`;
+          if (!rows.length) {
+            tableEl.innerHTML = `<div class="placeholder"><strong>No responses match</strong>Widen the timeframe or clear the filters.</div>`;
+            return;
+          }
+          tableEl.innerHTML = `
+            <div class="pr-table-scroll">
+              <table class="pr-table an-table">
+                <thead><tr>
+                  <th>Received</th><th>Msg sent</th><th class="num">Lag</th><th>Prospect</th>
+                  <th>Response</th><th>Sentiment</th><th>Notes</th><th>Links</th>
+                </tr></thead>
+                <tbody>
+                  ${rows.map(r => {
+                    const lag = lagDaysOf(r);
+                    const s = r.response_sentiment || "";
+                    return `
+                    <tr class="an-row">
+                      <td class="pr-last">${esc(anDate(r.occurred_at))}</td>
+                      <td class="pr-last">${r.message_sent_at ? esc(anDate(r.message_sent_at)) : `<span class="an-rate-na">—</span>`}</td>
+                      <td class="num">${lag === null ? `<span class="an-rate-na">—</span>` : (lag === 0 ? "0d" : `${lag}d`)}</td>
+                      <td class="an-prospect-cell">
+                        <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
+                        <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
+                      </td>
+                      <td class="an-resp-text">${esc(r.response || "")}</td>
+                      <td>
+                        <select class="pr-sent-edit an-sent-select" data-an-sentiment data-event-id="${esc(r.id)}" aria-label="Sentiment">
+                          <option value=""${s === "" ? " selected" : ""}>—</option>
+                          <option value="positive"${s === "positive" ? " selected" : ""}>Positive</option>
+                          <option value="neutral"${s === "neutral" ? " selected" : ""}>Neutral</option>
+                          <option value="negative"${s === "negative" ? " selected" : ""}>Negative</option>
+                        </select>
+                      </td>
+                      <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
+                      <td class="an-links-cell">${linksCellHtml(r)}</td>
+                    </tr>`;
+                  }).join("")}
+                </tbody>
+              </table>
+            </div>`;
+        }
+
+        function renderRespLag(inWindow) {
+          const lags = inWindow.map(lagDaysOf).filter(v => v !== null).sort((a, b) => a - b);
+          if (lags.length < 5) {
+            respLagEl.textContent = `Every reply in the window, spreadsheet-style. Reply lag needs the true send date, tracked since Jul 8, 2026 - ${lags.length} of ${inWindow.length} replies here have one so far.`;
+            return;
+          }
+          const median = lags[Math.floor(lags.length / 2)];
+          const slowPct = Math.round(lags.filter(v => v >= 4).length / lags.length * 100);
+          respLagEl.textContent = `Median reply arrives ${median === 0 ? "the same day" : `${median} day${median === 1 ? "" : "s"} after the message`}; ${slowPct}% take 4+ days. Late replies are normal - let the cadence keep working. (Based on ${lags.length} replies with true send dates, tracked since Jul 8, 2026.)`;
+        }
+
+        // ---- meetings table ------------------------------------------
+        function visibleMeetings() {
+          const { sinceMs, untilMs } = windowMs();
+          return (anState.meetings || []).filter(r => {
+            const t = new Date(r.occurred_at).getTime();
+            if (sinceMs !== null && t < sinceMs) return false;
+            if (untilMs !== null && t > untilMs) return false;
+            return true;
+          });
+        }
+
+        function renderMeetings() {
+          const rows = visibleMeetings();
+          if (!rows.length) {
+            meetRoot.innerHTML = `<div class="placeholder"><strong>No meetings booked in this window</strong>Widen the timeframe above to see older ones.</div>`;
+            return;
+          }
+          meetRoot.innerHTML = `
+            <div class="pr-table-scroll">
+              <table class="pr-table an-table">
+                <thead><tr>
+                  <th>Booked</th><th>Meeting date</th><th>Prospect</th><th>Notes</th><th>Links</th>
+                </tr></thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr class="an-row">
+                      <td class="pr-last"><span class="fu-due-editable" data-an-date data-field="occurred_at" data-event-id="${esc(r.id)}" data-iso="${esc((r.occurred_at || "").slice(0, 10))}" title="Click to change the booked date">${esc(anDate(r.occurred_at))}</span></td>
+                      <td class="pr-last">${r.meeting_at
+                        ? `<span class="fu-due-editable" data-an-date data-field="meeting_at" data-event-id="${esc(r.id)}" data-iso="${esc(String(r.meeting_at).slice(0, 10))}" title="Click to change the meeting date">${esc(anDate(r.meeting_at))}</span>`
+                        : `<span class="fu-due-editable an-date-unset" data-an-date data-field="meeting_at" data-event-id="${esc(r.id)}" data-iso="" title="Set the meeting date">+ Set date</span>`}</td>
+                      <td class="an-prospect-cell">
+                        <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
+                        <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
+                      </td>
+                      <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
+                      <td class="an-links-cell">${linksCellHtml(r)}</td>
+                    </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>
+            <div class="pr-meta an-table-note">${rows.length} meeting${rows.length === 1 ? "" : "s"} in this window · meeting dates auto-fill from Calendly and HubSpot bookings going forward</div>`;
+        }
+
+        // ---- inline editors ------------------------------------------
+        function startDateEdit(span) {
+          if (span.dataset.editing === "1") return;
+          span.dataset.editing = "1";
+          const field = span.dataset.field;
+          const id    = span.dataset.eventId;
+          const input = document.createElement("input");
+          input.type = "date";
+          input.className = "fu-due-input";
+          if (span.dataset.iso) input.value = span.dataset.iso;
+          span.replaceWith(input);
+          input.focus();
+          if (typeof input.showPicker === "function") { try { input.showPicker(); } catch { /* ignore */ } }
+          const restore = () => { if (input.isConnected) renderMeetings(); };
+          input.addEventListener("change", async () => {
+            const v = input.value;
+            // occurred_at can't be cleared; an emptied meeting_at clears it.
+            if (field === "occurred_at" && !v) { restore(); return; }
+            input.disabled = true;
+            try {
+              await sb.sbFetch(`/rest/v1/rpc/update_outreach_event`, {
+                method: "POST",
+                body: JSON.stringify({ p_id: id, p_changes: { [field]: v || null } }),
+              });
+              const row = (anState.meetings || []).find(x => x.id === id);
+              if (row) row[field] = v ? `${v}T00:00:00.000Z` : null;
+              renderMeetings();
+              if (field === "occurred_at") refreshCore(); // booked date moves window metrics
+            } catch (err) {
+              alert("Couldn't update the date: " + (err.message || err));
+              restore();
+            }
+          });
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") { e.preventDefault(); restore(); }
+          });
+          input.addEventListener("blur", () => {
+            setTimeout(() => { if (input.isConnected && !input.disabled) restore(); }, 50);
+          });
+        }
+
+        function startNotesEdit(div) {
+          if (div.dataset.editing === "1") return;
+          div.dataset.editing = "1";
+          const pid  = div.dataset.prospectId;
+          const prev = anState.notesByProspect[pid] || "";
+          const ta = document.createElement("textarea");
+          ta.className = "pr-notes-edit";
+          ta.value = prev;
+          div.replaceWith(ta);
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+          let cancelled = false;
+          const done = () => { renderRespTable(); renderMeetings(); };
+          ta.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") { e.preventDefault(); cancelled = true; ta.blur(); }
+            else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); ta.blur(); }
+          });
+          ta.addEventListener("blur", async () => {
+            if (cancelled) { done(); return; }
+            const next = ta.value;
+            if (next.trim() === prev.trim()) { done(); return; }
+            try {
+              await sb.sbFetch(`/rest/v1/rpc/set_prospect_notes`, {
+                method: "POST",
+                body: JSON.stringify({ p_prospect_id: pid, p_notes: next.trim() === "" ? null : next }),
+              });
+              if (next.trim() === "") delete anState.notesByProspect[pid];
+              else anState.notesByProspect[pid] = next;
+            } catch (err) {
+              alert("Couldn't save notes: " + (err.message || err));
+            }
+            done();
+          });
+        }
+
+        // ---- events --------------------------------------------------
+        panelEl.addEventListener("click", (e) => {
+          const pill = e.target.closest("#an-pills .timeframe-pill");
+          if (pill) {
+            anTf = pill.dataset.tf;
+            localStorage.setItem(AN_TF_KEY, anTf);
+            anRange = null;
+            fromEl.value = ""; toEl.value = "";
+            activatePill(pillsEl, anTf);
+            refreshCore();
+            if (anState.listsLoaded) { renderResponses(); renderMeetings(); }
+            return;
+          }
+          const tv = e.target.closest("[data-an-titleview]");
+          if (tv) {
+            anState.titleView = tv.dataset.anTitleview;
+            panelEl.querySelectorAll("[data-an-titleview]").forEach(b => b.classList.toggle("active", b === tv));
+            if (anState.titles) renderTitles();
+            return;
+          }
+          const sp = e.target.closest("[data-an-sent-pill]");
+          if (sp) { anState.respSent = sp.dataset.anSentPill; renderResponses(); return; }
+          const nd = e.target.closest("[data-an-notes]");
+          if (nd) { startNotesEdit(nd); return; }
+          const de = e.target.closest("[data-an-date]");
+          if (de) { startDateEdit(de); return; }
+        });
+
+        panelEl.addEventListener("change", async (e) => {
+          const sel = e.target.closest("[data-an-sentiment]");
+          if (!sel) return;
+          const id = sel.dataset.eventId;
+          const v  = sel.value || null;
+          sel.disabled = true;
+          try {
+            // Same direct PATCH the timeline's sentiment select uses.
+            await sb.sbFetch(`/rest/v1/outreach?id=eq.${encodeURIComponent(id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ response_sentiment: v }),
+              headers: { Prefer: "return=minimal" },
+            });
+            const row = (anState.responses || []).find(x => x.id === id);
+            if (row) row.response_sentiment = v;
+            renderResponses();
+            refreshCore(); // positives changed - refresh tiles + titles quietly
+          } catch (err) {
+            alert("Couldn't update sentiment: " + (err.message || err));
+            renderResponses();
+          }
+        });
+
+        [fromEl, toEl].forEach(el => el.addEventListener("change", () => {
+          const f = fromEl.value, t = toEl.value;
+          if (!f || !t) return;
+          const [lo, hi] = f <= t ? [f, t] : [t, f];
+          anTf = "custom";
+          anRange = {
+            sinceIso: new Date(`${lo}T00:00:00`).toISOString(),
+            untilIso: new Date(`${hi}T23:59:59.999`).toISOString(),
+          };
+          activatePill(pillsEl, "custom"); // matches no pill = all inactive
+          refreshCore();
+          if (anState.listsLoaded) { renderResponses(); renderMeetings(); }
+        }));
+
+        // ---- boot ----------------------------------------------------
+        (async () => {
+          await null; // yield one microtask; mirrors initSummary's TDZ guard
+          refreshCore();
+          try {
+            await loadListsOnce();
+            renderResponses();
+            renderMeetings();
+          } catch (err) {
+            respRoot.innerHTML = `<div class="placeholder"><strong>Couldn't load responses</strong>${esc(err.message || "")}</div>`;
+            meetRoot.innerHTML = `<div class="placeholder"><strong>Couldn't load meetings</strong>${esc(err.message || "")}</div>`;
+          }
+        })();
       }
 
       // ================= PROSPECTS ====================================
@@ -1811,12 +2710,25 @@
           const since = cutoffFor(state.tf);
           const until = null;  // open-ended on the right
           try {
-            const [rows, tasks] = await Promise.all([
+            const [rows, tasks, meetingRows] = await Promise.all([
               fetchAllProspectSummary(since, until),
               sb.sbFetch(
                 `/rest/v1/tasks_due?client_id=eq.${encodeURIComponent(clientId)}&select=linkedin_id,profile_url,sales_nav_url`
               ).catch(() => []), // tasks_due missing on a fresh DB → graceful fallback
+              // Meeting dates for the Status column. Only rows that HAVE
+              // a meeting_at (integration-sourced or hand-set), newest
+              // booking first so the map keeps the latest meeting date
+              // per prospect. Small result; failures degrade to no date.
+              sb.sbFetch(
+                `/rest/v1/outreach?client_id=eq.${encodeURIComponent(clientId)}&type=eq.meeting_booked&meeting_at=not.is.null&select=prospect_id,meeting_at&order=occurred_at.desc`
+              ).catch(() => []),
             ]);
+            state.meetingAtByProspect = {};
+            for (const m of (meetingRows || [])) {
+              if (m.prospect_id && !(m.prospect_id in state.meetingAtByProspect)) {
+                state.meetingAtByProspect[m.prospect_id] = m.meeting_at;
+              }
+            }
             state.allProspects = (rows || []).map(adoptProspectRow);
             state.taskKeys = buildTaskKeys(tasks || []);
           } catch (err) {
@@ -1924,6 +2836,10 @@
             status:       r.status         || "other",
             sentiment:    r.sentiment      || null,
             sentiment_at: r.sentiment_at   || null,
+            // Latest meeting date (outreach.meeting_at) for prospects
+            // with a booked meeting - shown under the Status chip.
+            // NULL for meetings logged before 2026-07-16 or by hand.
+            meeting_at:   (state.meetingAtByProspect || {})[r.id] || null,
             events:       null,    // lazy: loaded on demand by ensureEventsLoaded
           };
         }
@@ -1938,7 +2854,7 @@
           if (p.events && !force) return p.events;
           const rows = await sb.sbFetch(
             `/rest/v1/outreach?` +
-            `select=id,type,occurred_at,message_sent_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
+            `select=id,type,occurred_at,message_sent_at,meeting_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
             `&prospect_id=eq.${encodeURIComponent(p.id)}` +
             `&order=occurred_at.asc`
           );
@@ -1961,7 +2877,7 @@
             const idList = chunk.map(p => p.id).join(",");
             const rows = await sb.sbFetchAll(
               `/rest/v1/outreach?` +
-              `select=id,type,occurred_at,message_sent_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
+              `select=id,type,occurred_at,message_sent_at,meeting_at,prospect_name,email,phone,company,title,linkedin_id,profile_url,sales_nav_url,message_sent,response,responded_at,response_sentiment,response_sentiment_detail,merge_group_id,prospect_id` +
               `&prospect_id=in.(${idList})` +
               `&order=occurred_at.asc`
             );
@@ -2525,7 +3441,11 @@
               </td>
               <td class="pr-company">${esc(p.company || "—")}</td>
               <td class="pr-title">${esc(p.title || "—")}</td>
-              <td><span class="pr-status pr-status-${p.status}">${esc(statusLabel)}</span></td>
+              <td><span class="pr-status pr-status-${p.status}">${esc(statusLabel)}</span>${
+                p.status === "meeting" && p.meeting_at
+                  ? `<div class="pr-status-date" title="Meeting date">${esc(fmtDate(p.meeting_at))}</div>`
+                  : ""
+              }</td>
               <td>${sentimentHtml}</td>
               <td class="pr-rating-cell">${ratingHtml}</td>
               <td class="num">${fmtInt(p.eventCount)}</td>
@@ -2933,6 +3853,11 @@
               }
             }
             bodyHtml = respHtml + lagHtml + msgHtml;
+          } else if (e.type === "meeting_booked" && e.meeting_at) {
+            // The row date above = when the booking was made; this line
+            // = when the meeting takes place. Editable from the Analysis
+            // tab's Meetings table.
+            bodyHtml = `<div class="pr-event-body pr-event-meeting-date" title="When the meeting takes place">Meeting date: ${esc(fmtDate(e.meeting_at))}</div>`;
           } else if (body) {
             bodyHtml = `<div class="pr-event-body">${esc(body)}</div>`;
           }
