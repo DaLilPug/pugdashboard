@@ -648,6 +648,7 @@
             <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
             <li><a href="#dash-hubspot-sync">Native HubSpot sync</a></li>
             <li><a href="#dash-share">Sharing an account</a></li>
+            <li><a href="#dash-analysis">Analysis</a></li>
           </ol>
         </li>
         <li><a href="#extension">Extension reference (Tracker UI)</a>
@@ -1767,7 +1768,9 @@
 
       <ul>
         <li><strong>Timeframe pills</strong> - same set as the top-level dashboard,
-            independent per-account selection.</li>
+            independent per-account selection. Next to the pills, a
+            <strong>From / To</strong> date pair scopes the tiles and chart to
+            any custom range - picking a preset pill clears it.</li>
         <li><strong>KPI strip</strong> - the headline funnel numbers (Connections,
             Messages, Acc. rate, Responses, Resp. rate, Positives, Pos. resp. rate,
             Meetings, Pos. booking rate) for the selected timeframe.</li>
@@ -1803,7 +1806,10 @@
         <li><strong>Name &amp; basic info</strong> (with an Edit-info pencil for
             corrections).</li>
         <li><strong>Status</strong> - derived from the most recent event
-            (Connected, Messaged, Responded, Booked, etc.).</li>
+            (Connected, Messaged, Responded, Booked, etc.). Prospects with a
+            booked meeting show the <em>meeting date</em> under the chip when
+            it's known (see <a href="#dash-analysis">8.16 - Analysis</a> for
+            where meeting dates come from and how to edit them).</li>
         <li><strong>Sentiment</strong> - most recent response sentiment (positive
             / neutral / negative). Inline-editable via the small pill.</li>
         <li><strong>Rating</strong> - your own thumbs up / thumbs down on this
@@ -2842,6 +2848,45 @@
         </p>
       </div>
 
+      <h3 id="dash-analysis">8.16 - Per-account: Analysis</h3>
+      <p>
+        The Analysis tab reads the account's data and tells you what to change.
+        Everything on it is scoped to one timeframe - the preset pills or a
+        custom From/To range at the top - so you can audit "the last month"
+        or "since we changed Message 1" directly.
+      </p>
+      <ul>
+        <li><strong>Health check</strong> - the five benchmark tiles
+            (acceptance, response, positive, booking, meetings per month)
+            scored against the targets in
+            <a href="#benchmarks">section 10</a>. Green means at target,
+            amber means at least halfway there, red means below half.</li>
+        <li><strong>Diagnosis</strong> - the tab matches your numbers against
+            the issue patterns from section 10 and shows the likely cause,
+            what to try, and whether the lever is <em>targeting</em> or
+            <em>messaging</em>. A low-volume banner appears when the window
+            is too thin to diagnose confidently.</li>
+        <li><strong>Title performance</strong> - the funnel by job title
+            (grouped by seniority, or exact titles), each prospect counted
+            once. Callouts above the table flag title groups that accept,
+            go positive, or book meaningfully better or worse than the
+            account average - with minimum sample sizes so a hot streak on
+            four prospects never drives a strategy call.</li>
+        <li><strong>Responses</strong> - every reply in the window,
+            spreadsheet-style: date received, the date your message was sent,
+            the reply lag between them (tracked since Jul 8, 2026), the full
+            reply text, sentiment (editable), your prospect notes (click to
+            edit, saves on blur), and LinkedIn / Sales Nav links. Filter by
+            sentiment or search - this is the table to use when a diagnosis
+            says "read 20-30 negative replies and tag the patterns."</li>
+        <li><strong>Meetings</strong> - every booked meeting with
+            <em>Date booked</em> (when the booking was logged) and
+            <em>Meeting date</em> (when the meeting happens), both
+            click-to-edit, plus notes. Meeting dates fill automatically from
+            Calendly and HubSpot bookings; meetings logged before Jul 16,
+            2026 have a blank meeting date until you set one.</li>
+      </ul>
+
       <!-- ============================================================== -->
       <h2 id="extension"><span class="num">9.</span>Extension reference (Tracker UI)</h2>
 
@@ -2986,9 +3031,10 @@
 
       <h3>Issue patterns at a glance</h3>
       <p>
-        These are the patterns we look for during a manual audit. The future
-        AI Analysis feature on the dashboard will surface them automatically;
-        for now, here's the cheat sheet.
+        These are the patterns we look for during an audit. The dashboard's
+        <a href="#dash-analysis">Analysis tab</a> matches your numbers against
+        them automatically and shows the diagnosis; here's the full cheat
+        sheet behind it.
       </p>
 
       <details class="collapsible">
