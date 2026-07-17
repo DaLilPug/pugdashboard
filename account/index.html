@@ -1059,6 +1059,7 @@
         // back on the preset pills.
         const fromEl = document.getElementById("sum-from");
         const toEl   = document.getElementById("sum-to");
+        let customToken = 0;
         [fromEl, toEl].forEach(el => el.addEventListener("change", applyCustomRange));
 
         async function applyCustomRange() {
@@ -1066,6 +1067,10 @@
           if (!from || !to) return;
           // Backwards pair still works - run the earlier day first.
           const [lo, hi] = from <= to ? [from, to] : [to, from];
+          // Supersession guard: adjusting a date mid-fetch dispatches a
+          // second request; only the newest one may render (both set
+          // tf = "custom", so the tf check alone can't tell them apart).
+          const token = ++customToken;
           tf = "custom";
           activatePill(pillsEl, "custom"); // matches no pill = all inactive
           kpiEl.innerHTML = `<div class="kpi-card"><div class="kpi-label">Loading…</div></div>`;
@@ -1078,10 +1083,12 @@
               new Date(`${lo}T00:00:00`).toISOString(),
               new Date(`${hi}T23:59:59.999`).toISOString()
             );
+            if (token !== customToken) return; // superseded by a newer range
             if (!summaryByTf) summaryByTf = {};
             summaryByTf.custom = entry;
             if (tf === "custom") renderScoped();
           } catch (err) {
+            if (token !== customToken) return;
             kpiEl.innerHTML = `<div class="placeholder"><strong>Couldn't load that date range</strong>${esc(err.message || "")}</div>`;
           }
         }
@@ -1675,16 +1682,19 @@
           };
         }
         // Days covered by the window, for prorating meetings/month.
-        // All Time / This Year fall back to the first day with activity.
+        // The start clamps to the first day with activity when that is
+        // LATER than the window start - a 2-week-old account viewed on
+        // a 3-month window paces its meetings over 14 days, not 90.
+        // All Time / This Year rely on the same first-activity day.
         function windowDaysFor(entry) {
           const b = windowBounds();
-          let start = b.sinceIso ? new Date(b.sinceIso).getTime() : null;
-          if (!start) {
-            const first = entry && entry.dailyBuckets && entry.dailyBuckets.length
-              ? entry.dailyBuckets[0].day : null;
-            start = first ? new Date(`${first}T00:00:00`).getTime() : null;
-          }
-          if (!start) return null;
+          const sinceMs = b.sinceIso ? new Date(b.sinceIso).getTime() : null;
+          const first = entry && entry.dailyBuckets && entry.dailyBuckets.length
+            ? new Date(`${entry.dailyBuckets[0].day}T00:00:00`).getTime()
+            : null;
+          const start = (sinceMs !== null && first !== null) ? Math.max(sinceMs, first)
+            : (sinceMs !== null ? sinceMs : first);
+          if (start === null) return null;
           const end = b.untilIso ? new Date(b.untilIso).getTime() : Date.now();
           return Math.max(1, Math.round((end - start) / 86400000));
         }
@@ -1733,7 +1743,11 @@
           const [responses, meetings, notesRows] = await Promise.all([
             sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.response&select=${RESP_SELECT}&order=occurred_at.desc`),
             sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.meeting_booked&select=${MEET_SELECT}&order=occurred_at.desc`),
-            sb.sbFetch(`/rest/v1/prospects?client_id=eq.${encId}&select=id,notes&notes=not.is.null`).catch(() => []),
+            // sbFetchAll, NOT sbFetch: an unpaged read silently truncates
+            // at 1000 rows, and a noted prospect missing from this map
+            // would render "+ Notes" - typing there would then silently
+            // REPLACE the unloaded real note on save.
+            sb.sbFetchAll(`/rest/v1/prospects?client_id=eq.${encId}&select=id,notes&notes=not.is.null`).catch(() => []),
           ]);
           anState.responses = responses || [];
           anState.meetings  = meetings  || [];
@@ -1803,10 +1817,20 @@
             </div>
           `).join("");
 
+          // Nothing happened in this window - a diagnosis would just be
+          // "Low acceptance" fired at empty denominators. Say so instead.
+          if (m.connections + m.messages + m.responses + m.positives + m.meetings === 0) {
+            diagEl.innerHTML = `<div class="placeholder"><strong>No activity in this window</strong>Pick a longer timeframe above.</div>`;
+            return;
+          }
+
           // Diagnosis: exact special patterns first, then funnel order.
-          const A = accR  !== null && accR  >= BENCH.acc.target;
-          const R = respR !== null && respR >= BENCH.resp.target;
-          const P = posR  !== null && posR  >= BENCH.pos.target;
+          // Each flag needs the same minimum denominator its tile uses -
+          // otherwise 2 responses with 1 positive would read as "high
+          // positive rate" and steer the pattern match.
+          const A = m.connections >= 10 && accR  !== null && accR  >= BENCH.acc.target;
+          const R = m.messages    >= 10 && respR !== null && respR >= BENCH.resp.target;
+          const P = m.responses   >= 5  && posR  !== null && posR  >= BENCH.pos.target;
           const M = mtgPerMonth !== null && mtgPerMonth >= BENCH.mtg.target;
           const key = `${A ? "H" : "L"}${R ? "H" : "L"}${P ? "H" : "L"}${M ? "H" : "L"}`;
           const special = { LHHH: 5, LLHL: 6, LHLL: 7, HLHL: 8, HLLH: 9, HHLH: 10 };
@@ -1874,7 +1898,10 @@
         function rateCell(num, den, target, minDen) {
           if (!den) return `<td class="num an-rate-na">—</td>`;
           const r = num / den;
-          const cls = den >= minDen
+          // r > 1 means out-of-funnel data (e.g. responses from prospects
+          // never messaged in this window) - show the numbers, skip the
+          // benchmark color rather than paint 1100% green.
+          const cls = (den >= minDen && r <= 1)
             ? (r >= target ? "rate-good" : r >= target / 2 ? "rate-ok" : "rate-bad")
             : "an-rate-na";
           return `<td class="num"><span class="${cls}">${(r * 100).toFixed(1)}%</span> <span class="an-rate-n">${num}/${den}</span></td>`;
@@ -1930,7 +1957,11 @@
         // positive-rate compares need 8+ responses.
         function buildCallouts(buckets) {
           const out = [];
-          const accRows = buckets.filter(b => b.requested >= 20);
+          // "Other" and "No title" are catch-alls, not targetable
+          // segments - "shift volume toward No title" is not a strategy.
+          // They still count toward the account-wide averages below.
+          const isTargetable = b => b.title !== "No title" && b.title !== "Other";
+          const accRows = buckets.filter(b => isTargetable(b) && b.requested >= 20);
           if (accRows.length >= 2) {
             const sorted = [...accRows].sort((a, b) => (b.accepted / b.requested) - (a.accepted / a.requested));
             const best = sorted[0], worst = sorted[sorted.length - 1];
@@ -1944,7 +1975,7 @@
           const totPos  = buckets.reduce((s, b) => s + b.positive,  0);
           const avgPos  = totResp ? totPos / totResp : null;
           if (avgPos !== null) {
-            for (const b of buckets.filter(x => x.responded >= 8)) {
+            for (const b of buckets.filter(x => isTargetable(x) && x.responded >= 8)) {
               const p = b.positive / b.responded;
               if (p - avgPos >= 0.10 && b.positive >= 3) {
                 out.push({ lever: "Targeting", text: `Replies from ${b.title} go positive at ${(p * 100).toFixed(0)}% vs ${(avgPos * 100).toFixed(0)}% account-wide (${b.positive}/${b.responded}). Their problems match the pitch - put more volume here.` });
@@ -1953,7 +1984,7 @@
               }
             }
           }
-          const mtgRows = buckets.filter(b => b.meetings >= 2).sort((a, b) => b.meetings - a.meetings);
+          const mtgRows = buckets.filter(b => isTargetable(b) && b.meetings >= 2).sort((a, b) => b.meetings - a.meetings);
           if (mtgRows.length) {
             out.push({ lever: "Targeting", text: `${mtgRows[0].title} account for ${mtgRows[0].meetings} booked meetings in this window - weight new volume toward the titles that already book.` });
           }
@@ -2105,6 +2136,17 @@
           });
         }
 
+        // One date cell's span - also used to restore a cancelled editor
+        // in place (a full re-render would destroy other open editors).
+        function meetDateSpan(r, field) {
+          if (field === "meeting_at") {
+            return r.meeting_at
+              ? `<span class="fu-due-editable" data-an-date data-field="meeting_at" data-event-id="${esc(r.id)}" data-iso="${esc(meetingDayYmd(r.meeting_at))}" title="Click to change the meeting date">${esc(meetingDayUs(r.meeting_at))}</span>`
+              : `<span class="fu-due-editable an-date-unset" data-an-date data-field="meeting_at" data-event-id="${esc(r.id)}" data-iso="" title="Set the meeting date">+ Set date</span>`;
+          }
+          return `<span class="fu-due-editable" data-an-date data-field="occurred_at" data-event-id="${esc(r.id)}" data-iso="${esc((r.occurred_at || "").slice(0, 10))}" title="Click to change the booked date">${esc(anDate(r.occurred_at))}</span>`;
+        }
+
         function renderMeetings() {
           const rows = visibleMeetings();
           if (!rows.length) {
@@ -2120,10 +2162,8 @@
                 <tbody>
                   ${rows.map(r => `
                     <tr class="an-row">
-                      <td class="pr-last"><span class="fu-due-editable" data-an-date data-field="occurred_at" data-event-id="${esc(r.id)}" data-iso="${esc((r.occurred_at || "").slice(0, 10))}" title="Click to change the booked date">${esc(anDate(r.occurred_at))}</span></td>
-                      <td class="pr-last">${r.meeting_at
-                        ? `<span class="fu-due-editable" data-an-date data-field="meeting_at" data-event-id="${esc(r.id)}" data-iso="${esc(String(r.meeting_at).slice(0, 10))}" title="Click to change the meeting date">${esc(anDate(r.meeting_at))}</span>`
-                        : `<span class="fu-due-editable an-date-unset" data-an-date data-field="meeting_at" data-event-id="${esc(r.id)}" data-iso="" title="Set the meeting date">+ Set date</span>`}</td>
+                      <td class="pr-last">${meetDateSpan(r, "occurred_at")}</td>
+                      <td class="pr-last">${meetDateSpan(r, "meeting_at")}</td>
                       <td class="an-prospect-cell">
                         <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
                         <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
@@ -2150,19 +2190,33 @@
           span.replaceWith(input);
           input.focus();
           if (typeof input.showPicker === "function") { try { input.showPicker(); } catch { /* ignore */ } }
-          const restore = () => { if (input.isConnected) renderMeetings(); };
+          // Cancel restores THIS cell in place - re-rendering the whole
+          // table here would destroy any other editor already open.
+          const restore = () => {
+            if (!input.isConnected) return;
+            const td = input.closest("td");
+            const row = (anState.meetings || []).find(x => x.id === id);
+            if (td && row) td.innerHTML = meetDateSpan(row, field);
+            else renderMeetings();
+          };
           input.addEventListener("change", async () => {
             const v = input.value;
             // occurred_at can't be cleared; an emptied meeting_at clears it.
             if (field === "occurred_at" && !v) { restore(); return; }
             input.disabled = true;
+            // Store local NOON, not the bare date: a bare date lands at
+            // UTC midnight, which is the previous local day for US
+            // viewers - it would fall outside a custom window starting
+            // that same day and display off-by-one. Noon local stays
+            // inside the picked local day in any nearby timezone.
+            const isoVal = v ? new Date(`${v}T12:00:00`).toISOString() : null;
             try {
               await sb.sbFetch(`/rest/v1/rpc/update_outreach_event`, {
                 method: "POST",
-                body: JSON.stringify({ p_id: id, p_changes: { [field]: v || null } }),
+                body: JSON.stringify({ p_id: id, p_changes: { [field]: isoVal } }),
               });
               const row = (anState.meetings || []).find(x => x.id === id);
-              if (row) row[field] = v ? `${v}T00:00:00.000Z` : null;
+              if (row) row[field] = isoVal;
               renderMeetings();
               if (field === "occurred_at") refreshCore(); // booked date moves window metrics
             } catch (err) {
@@ -2190,7 +2244,25 @@
           ta.focus();
           ta.setSelectionRange(ta.value.length, ta.value.length);
           let cancelled = false;
-          const done = () => { renderRespTable(); renderMeetings(); };
+          // Close by patching cells in place. A full table re-render here
+          // would destroy any OTHER editor already open (the blur handler
+          // of a removed element never fires, so typed text would be
+          // silently lost while this save was in flight).
+          const done = () => {
+            const html = notesCellHtml(pid);
+            if (ta.isConnected) {
+              const td = ta.closest("td");
+              if (td) td.innerHTML = html;
+            }
+            // Same prospect's notes cell in the other table (responses
+            // and meetings share the notes map).
+            panelEl.querySelectorAll(`[data-an-notes][data-prospect-id="${CSS.escape(pid)}"]`).forEach(d => {
+              if (d.dataset.editing !== "1" && d !== ta) {
+                const td = d.closest("td");
+                if (td && !td.contains(ta)) td.innerHTML = html;
+              }
+            });
+          };
           ta.addEventListener("keydown", (e) => {
             if (e.key === "Escape") { e.preventDefault(); cancelled = true; ta.blur(); }
             else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); ta.blur(); }
@@ -3442,7 +3514,7 @@
               <td class="pr-title">${esc(p.title || "—")}</td>
               <td><span class="pr-status pr-status-${p.status}">${esc(statusLabel)}</span>${
                 p.status === "meeting" && p.meeting_at
-                  ? `<div class="pr-status-date" title="Meeting date">${esc(fmtDate(p.meeting_at))}</div>`
+                  ? `<div class="pr-status-date" title="Meeting date">${esc(meetingDayUs(p.meeting_at))}</div>`
                   : ""
               }</td>
               <td>${sentimentHtml}</td>
@@ -3855,8 +3927,10 @@
           } else if (e.type === "meeting_booked" && e.meeting_at) {
             // The row date above = when the booking was made; this line
             // = when the meeting takes place. Editable from the Analysis
-            // tab's Meetings table.
-            bodyHtml = `<div class="pr-event-body pr-event-meeting-date" title="When the meeting takes place">Meeting date: ${esc(fmtDate(e.meeting_at))}</div>`;
+            // tab's Meetings table. Additive: a meeting row with body
+            // text keeps it below the date line.
+            bodyHtml = `<div class="pr-event-body pr-event-meeting-date" title="When the meeting takes place">Meeting date: ${esc(meetingDayUs(e.meeting_at))}</div>`
+              + (body ? `<div class="pr-event-body">${esc(body)}</div>` : "");
           } else if (body) {
             bodyHtml = `<div class="pr-event-body">${esc(body)}</div>`;
           }
@@ -9279,6 +9353,31 @@
       }
 
       // ================= helpers ======================================
+
+      // Meeting-date day helpers (used by the Prospects status chip, the
+      // timeline card, and the Analysis Meetings table). meeting_at is a
+      // REAL timestamp when it comes from Calendly/HubSpot (the meeting's
+      // start time) but sits at exactly UTC midnight when set by legacy
+      // hand entry. Slicing the ISO string would show an evening meeting
+      // one day late for viewers west of UTC, while local-converting a
+      // UTC-midnight value would show it one day EARLY - so: exact UTC
+      // midnight = show the stored day as-is; anything else = the
+      // viewer's local day.
+      function meetingDayYmd(iso) {
+        const s = String(iso || "");
+        if (!s) return "";
+        if (/T00:00:00(\.0+)?(\+00:?00|Z)$/.test(s)) return s.slice(0, 10);
+        const d = new Date(s);
+        if (isNaN(d)) return s.slice(0, 10);
+        const p = n => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      }
+      function meetingDayUs(iso) {
+        const ymd = meetingDayYmd(iso);
+        if (!ymd) return "—";
+        const [y, m, d] = ymd.split("-");
+        return `${m}/${d}/${y}`;
+      }
 
       function activatePill(root, v) {
         root.querySelectorAll(".timeframe-pill").forEach(b => {
