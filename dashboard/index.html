@@ -83,6 +83,15 @@
     Mirrors the placement Austin sketched in image 1.
   -->
   <div class="filter-bar">
+    <!-- Quick search: live keyword filter against account name + company.
+         Transient (not persisted) — it's a find-this-account-now tool, the
+         multiselects below remain the durable filters. -->
+    <div class="filter-group filter-group-search">
+      <input type="search" id="quick-search" class="filter-search"
+             placeholder="Search account or company…"
+             aria-label="Search accounts or companies" autocomplete="off" />
+    </div>
+
     <div class="filter-group">
       <span class="filter-label">Accounts</span>
       <div class="ms-wrap" data-filter="accounts">
@@ -570,6 +579,7 @@
 
       const pillsEl    = document.getElementById("timeframe-pills");
       const statusEl   = document.getElementById("status-filter");
+      const quickSearchEl = document.getElementById("quick-search");
       const kpiEl      = document.getElementById("kpi-strip");
       const tableEl    = document.getElementById("client-table");
       const tbodyEl    = document.getElementById("client-tbody");
@@ -642,6 +652,10 @@
       // Stored in localStorage as a JSON array of ids; null = absent.
       let selectedAccountIds = parseStoredSet(localStorage.getItem(LS_SEL_ACCTS));
       let selectedCompanies  = parseStoredSet(localStorage.getItem(LS_SEL_COS));
+      // Quick-search text. Deliberately NOT persisted: it's a transient
+      // find-this-account tool, and a remembered search re-hiding rows on
+      // the next visit would read as "my accounts disappeared".
+      let quickSearch = "";
 
       activatePill(tf);
       statusEl.value       = statusVal;
@@ -662,6 +676,23 @@
         statusVal = statusEl.value;
         localStorage.setItem(LS_STATUS, statusVal);
         rerender();
+      });
+
+      // Quick search filters client-side from enrichedCache — no refetch,
+      // so every keystroke repaints instantly even with hundreds of
+      // accounts. KPI strip follows the filter like it does for the
+      // multiselects.
+      quickSearchEl.addEventListener("input", () => {
+        quickSearch = quickSearchEl.value;
+        renderKpiStrip(kpiEl, filteredEnriched().length, aggregateForKpis(filteredEnriched()));
+        renderTable();
+      });
+      quickSearchEl.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && quickSearchEl.value) {
+          quickSearchEl.value = "";
+          quickSearchEl.dispatchEvent(new Event("input"));
+          e.stopPropagation();
+        }
       });
 
       // Show archived toggles whether the clients query includes rows
@@ -1167,7 +1198,17 @@
         const stOK  = statusVal === "all"
           ? (_ => true)
           : (c => c._status === statusVal);
-        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c));
+        // Quick search: every whitespace-separated token must appear in
+        // name+company (so "nick south" or partial words like "sh an"
+        // both narrow as you type).
+        const qTokens = quickSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const qOK = !qTokens.length
+          ? (_ => true)
+          : (c => {
+              const hay = `${c.name || ""} ${c.company || ""}`.toLowerCase();
+              return qTokens.every(t => hay.includes(t));
+            });
+        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c) && qOK(c));
       }
 
       let enrichedCache = [];

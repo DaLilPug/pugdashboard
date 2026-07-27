@@ -779,6 +779,30 @@ body.login-body {
 }
 .filter-select:hover { border-color: var(--navy-light, #cfd9e2); }
 
+/* Quick search input (dashboard filter bar). Same look as .pr-search on
+   the Prospects tab so search reads consistently across the app. */
+.filter-search {
+  height: 32px;
+  width: 220px;
+  padding: 0 14px;
+  border: 1.5px solid var(--gray-100);
+  border-radius: var(--r-pill);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--navy);
+  background: var(--surface-2);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color .15s, background .15s;
+}
+.filter-search::placeholder { color: var(--gray-400); }
+.filter-search:hover { border-color: var(--gray-200); background: #fff; }
+.filter-search:focus { border-color: var(--navy); background: #fff; }
+/* Match the ms-search convention: no webkit cancel affordance, operators
+   clear with backspace or Escape. */
+.filter-search::-webkit-search-decoration,
+.filter-search::-webkit-search-cancel-button { -webkit-appearance: none; }
+
 .filter-daterange {
   gap: 4px;
 }
@@ -2925,6 +2949,10 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   .fu-list { grid-template-columns: 1fr; }
   .chart-container { height: 280px; }
   .panel-card { padding: 16px 18px; }
+  /* Quick search gets the full row on phones; its filter-group must
+     stretch too or the input's 100% resolves against a shrunk flex item. */
+  .filter-search { width: 100%; }
+  .filter-group-search { width: 100%; }
 }
 
 /* ==============================================================
