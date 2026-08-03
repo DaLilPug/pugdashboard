@@ -139,7 +139,7 @@
 
     <div class="filter-spacer"></div>
 
-    <div class="filter-group">
+    <div class="filter-group filter-group-timeframe">
       <span class="filter-label">Timeframe</span>
       <div class="timeframe-pills" id="timeframe-pills">
         <button class="timeframe-pill" data-tf="1w" type="button">1W</button>
@@ -160,6 +160,15 @@
              multi-year data. All Time is still one click away. -->
         <button class="timeframe-pill active" data-tf="yr" type="button">This Year</button>
         <button class="timeframe-pill" data-tf="all" type="button">All Time</button>
+      </div>
+      <!-- Custom From/To range, mirroring the account Summary head.
+           Fires once both dates are set; picking a preset pill clears it.
+           (mobile-nav.js inserts its pill-mirroring <select> between the
+           pills div and this block on phones - both stay visible there.) -->
+      <div class="timeframe-custom">
+        <input type="date" class="filter-date" id="tf-from" aria-label="From date">
+        <span class="timeframe-custom-sep">to</span>
+        <input type="date" class="filter-date" id="tf-to" aria-label="To date">
       </div>
     </div>
 
@@ -578,6 +587,8 @@
       })();
 
       const pillsEl    = document.getElementById("timeframe-pills");
+      const tfFromEl   = document.getElementById("tf-from");
+      const tfToEl     = document.getElementById("tf-to");
       const statusEl   = document.getElementById("status-filter");
       const quickSearchEl = document.getElementById("quick-search");
       const kpiEl      = document.getElementById("kpi-strip");
@@ -644,6 +655,9 @@
       }
 
       let tf         = localStorage.getItem(LS_TF)     || "yr";
+      // Custom From/To range. Like the account page, tf = "custom" is
+      // never persisted - a fresh page load starts on the last preset.
+      let customRange = null; // { lo: "YYYY-MM-DD", hi: "YYYY-MM-DD" } while tf === "custom"
       let statusVal  = localStorage.getItem(LS_STATUS) || "active";
       let sortKey    = localStorage.getItem(LS_SORT_KEY) || "startDate";
       let sortDir    = localStorage.getItem(LS_SORT_DIR) || "desc";
@@ -669,8 +683,25 @@
         tf = btn.dataset.tf;
         localStorage.setItem(LS_TF, tf);
         activatePill(tf);
+        // Preset pills and the custom range are mutually exclusive -
+        // picking a preset clears the From/To inputs.
+        tfFromEl.value = "";
+        tfToEl.value   = "";
+        customRange    = null;
         rerender();
       });
+
+      // Custom From/To range. Fires once BOTH dates are set. A
+      // backwards pair still works - the earlier day runs first.
+      [tfFromEl, tfToEl].forEach(el => el.addEventListener("change", () => {
+        const from = tfFromEl.value, to = tfToEl.value;
+        if (!from || !to) return;
+        const [lo, hi] = from <= to ? [from, to] : [to, from];
+        customRange = { lo, hi };
+        tf = "custom";           // deliberately NOT written to LS_TF
+        activatePill("custom");  // matches no pill = all presets inactive
+        rerender();
+      }));
 
       statusEl.addEventListener("change", () => {
         statusVal = statusEl.value;
@@ -1790,6 +1821,15 @@
       function effectiveRange() {
         // Derive [sinceIso, untilIso] from the timeframe pill. Either
         // end can be null. All Time = both null.
+        // Custom From/To: local-midnight to local-end-of-day, inclusive -
+        // matches the RPC's inclusive-both-ends window and the account
+        // page's convention (local-time input -> UTC ISO output).
+        if (tf === "custom" && customRange) {
+          return [
+            new Date(`${customRange.lo}T00:00:00`).toISOString(),
+            new Date(`${customRange.hi}T23:59:59.999`).toISOString(),
+          ];
+        }
         if (tf === "all") return [null, null];
         // "This Year" is Jan 1 of the current year in the operator's local
         // time, converted to UTC ISO for the query. Matches the custom-range

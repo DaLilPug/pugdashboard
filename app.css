@@ -6306,6 +6306,13 @@ body.header-drawer-open { overflow: hidden; }
   .timeframe-pills { display: none !important; }
   .timeframe-pills + .mobile-pill-select { display: inline-block; }
 
+  /* Dashboard filter bar: the Timeframe group is now select + custom
+     From/To. Let the group wrap and give the date pair its own full
+     row so both inputs stay side by side and comfortably tappable. */
+  .filter-group-timeframe { flex-wrap: wrap; }
+  .filter-group-timeframe .timeframe-custom { flex: 1 1 100%; }
+  .filter-group-timeframe .timeframe-custom .filter-date { flex: 1 1 0; min-width: 0; }
+
   .sub-tabs { display: none !important; }
   .sub-tabs + .mobile-pill-select {
     display: block;
