@@ -1665,6 +1665,120 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
    benchmark, so they must never read as pass or fail. */
 .an-bench-money { border-left-color: var(--navy); }
 
+/* ---- Row highlights (Responses table) ---------------------------
+   An internal auditing overlay: pick a colour and the whole ROW tints.
+   The column itself never gains content beyond one small dot, so the
+   table reads exactly as it did before anything is marked.
+
+   The five tints are the Google Sheets light palette Austin's audit
+   sheet already uses, so a highlighted row here matches the same row
+   highlighted there. */
+.an-hl-sw-yellow { background: #fff2cc; }
+.an-hl-sw-blue   { background: #cfe2f3; }
+.an-hl-sw-purple { background: #d9d2e9; }
+.an-hl-sw-green  { background: #d9ead3; }
+.an-hl-sw-red    { background: #f4cccc; }
+
+/* .an-row sets no background of its own and has no hover state, so a
+   plain row background is enough - nothing to out-specify. */
+.an-hl-row-yellow { background: #fff2cc; }
+.an-hl-row-blue   { background: #cfe2f3; }
+.an-hl-row-purple { background: #d9d2e9; }
+.an-hl-row-green  { background: #d9ead3; }
+.an-hl-row-red    { background: #f4cccc; }
+
+/* Thin last column. The header is a screen-reader label only - a word
+   here would be wider than the whole column needs to be. Qualified
+   through .pr-table thead/tbody to out-specify the base cell padding
+   rather than reaching for !important on it. */
+.pr-table thead th.an-hl-col,
+.pr-table tbody td.an-hl-cell {
+  width: 34px;
+  padding-left: 6px;
+  padding-right: 10px;
+}
+.pr-table tbody td.an-hl-cell { text-align: center; }
+
+/* The opener. Unset it is a faint hollow ring that only comes forward
+   on row hover or focus, so an unmarked table stays quiet. Set, it is
+   the colour itself. */
+.an-hl-dot {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  opacity: .45;
+  transition: opacity .12s, border-color .12s, transform .12s;
+}
+.an-row:hover .an-hl-dot { opacity: 1; }
+.an-hl-dot:hover { border-color: var(--navy); transform: scale(1.15); }
+.an-hl-dot:focus-visible { opacity: 1; outline: 2px solid var(--navy); outline-offset: 1px; }
+.an-hl-dot.an-hl-dot-set { opacity: 1; border-color: rgba(1, 58, 82, .35); }
+
+/* Picker popover. Fixed-position on <body> so .pr-table-scroll can't
+   clip it (its overflow-x: auto clips vertically too). */
+.an-hl-pop {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  gap: 6px;
+  padding: 7px 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(1, 58, 82, .16);
+}
+.an-hl-opt {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1.5px solid rgba(1, 58, 82, .18);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform .1s, border-color .1s;
+}
+.an-hl-opt:hover { transform: scale(1.15); border-color: var(--navy); }
+.an-hl-opt.an-hl-opt-on { border-color: var(--navy); border-width: 2.5px; }
+.an-hl-opt:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
+/* "No highlight" reads as an empty swatch with a strike through it. */
+.an-hl-opt-none {
+  background:
+    linear-gradient(to top left,
+      transparent calc(50% - 1px), var(--gray-400) calc(50% - 1px),
+      var(--gray-400) calc(50% + 1px), transparent calc(50% + 1px)),
+    #fff;
+}
+
+/* Colour chips in the Highlight filter group, sized to sit level with
+   the All / Any / None text chips beside them. */
+.an-hl-chip {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1.5px solid var(--gray-100);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: all .12s;
+}
+.an-hl-chip:hover { border-color: var(--navy); }
+.an-hl-chip.active { border-color: var(--navy); border-width: 2.5px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Sentiment cell (Responses): the select plus, when the prospect has a
    meeting on the books, a flag underneath it. */
 .an-sent-cell { min-width: 118px; }

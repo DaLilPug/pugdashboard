@@ -264,6 +264,19 @@
                 <button class="pr-chip"        data-notes="none" type="button">No notes</button>
               </div>
             </div>
+            <div class="pr-filter-group an-hl-filter">
+              <span class="pr-filter-label">Highlight</span>
+              <div class="pr-filter-chips" data-an-hl-filter>
+                <button class="pr-chip active" data-hl="all"  type="button">All</button>
+                <button class="pr-chip"        data-hl="any"  type="button">Any</button>
+                <button class="pr-chip"        data-hl="none" type="button">None</button>
+                <button class="an-hl-chip an-hl-sw-yellow" data-hl="yellow" type="button" title="Only yellow" aria-label="Only yellow"></button>
+                <button class="an-hl-chip an-hl-sw-blue"   data-hl="blue"   type="button" title="Only blue"   aria-label="Only blue"></button>
+                <button class="an-hl-chip an-hl-sw-purple" data-hl="purple" type="button" title="Only purple" aria-label="Only purple"></button>
+                <button class="an-hl-chip an-hl-sw-green"  data-hl="green"  type="button" title="Only green"  aria-label="Only green"></button>
+                <button class="an-hl-chip an-hl-sw-red"    data-hl="red"    type="button" title="Only red"    aria-label="Only red"></button>
+              </div>
+            </div>
             <div class="timeframe-pills" id="an-resp-tfpills" data-an-table-pills="resp">
               <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
               <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
@@ -1630,6 +1643,12 @@
           // on load reads as missing data.
           respNotes: "all",
           meetNotes: "all",
+          // Row highlights are an internal auditing overlay, NOT prospect
+          // or activity data - deliberately no database column. They live
+          // in this browser's localStorage per account, keyed by outreach
+          // event id: { eventId: "yellow" | "blue" | ... }.
+          highlights: {},
+          respHl: "all",  // "all" | "any" | "none" | a color key
           // Date-column sort per table. Both start newest-first, which
           // is the order the rows arrive in.
           meetSort: { key: "occurred_at", dir: "desc" },
@@ -1851,6 +1870,9 @@
               };
             }
           }
+          // Prune highlights against the ids that actually came back, so
+          // deleted responses don't leave marks behind forever.
+          loadHighlights(new Set((responses || []).map(r => r.id)));
           anState.listsLoaded = true;
         }
 
@@ -2166,6 +2188,12 @@
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.respNotes, r.prospect_id)) return false;
+            if (anState.respHl !== "all") {
+              const c = highlightOf(r.id);
+              if (anState.respHl === "any"  && !c) return false;
+              if (anState.respHl === "none" &&  c) return false;
+              if (HL_KEYS.includes(anState.respHl) && c !== anState.respHl) return false;
+            }
             if (ignoreSentAndSearch) return true;
             if (anState.respSent === "unclassified") {
               if (r.response_sentiment) return false;
@@ -2212,6 +2240,54 @@
           }
           return map;
         }
+        // ---- row highlights (Responses table) ------------------------
+        // Local-only auditing marks. Stored in localStorage rather than
+        // the database on purpose: they describe a review pass, not the
+        // prospect or the reply, so they never belong on either record.
+        // The trade-off is that they are per-browser - a teammate on
+        // another machine sees an unhighlighted table.
+        const HL_COLORS = [
+          { key: "yellow", label: "Yellow" },
+          { key: "blue",   label: "Blue"   },
+          { key: "purple", label: "Purple" },
+          { key: "green",  label: "Green"  },
+          { key: "red",    label: "Red"    },
+        ];
+        const HL_KEYS = HL_COLORS.map(c => c.key);
+        const AN_HL_KEY = `account_${clientId}_an_resp_highlights`;
+
+        function loadHighlights(validIds) {
+          let raw = {};
+          try { raw = JSON.parse(localStorage.getItem(AN_HL_KEY) || "{}") || {}; }
+          catch { raw = {}; }
+          // Drop anything whose response no longer exists (deleted rows)
+          // or whose colour we no longer recognise, so the blob can't
+          // grow without bound across months of auditing.
+          const clean = {};
+          for (const [id, color] of Object.entries(raw)) {
+            if (validIds.has(id) && HL_KEYS.includes(color)) clean[id] = color;
+          }
+          anState.highlights = clean;
+          if (Object.keys(clean).length !== Object.keys(raw).length) saveHighlights();
+        }
+        function saveHighlights() {
+          try { localStorage.setItem(AN_HL_KEY, JSON.stringify(anState.highlights)); }
+          catch { /* storage full or private mode - highlights just won't persist */ }
+        }
+        const highlightOf = (id) => anState.highlights[id] || "";
+        function setHighlight(id, color) {
+          if (color) anState.highlights[id] = color;
+          else delete anState.highlights[id];
+          saveHighlights();
+        }
+        // The whole cell is one small button. Nothing else ever renders
+        // here - the colour shows up as the row background instead.
+        function highlightCellHtml(id) {
+          const c = highlightOf(id);
+          const label = c ? `${HL_COLORS.find(x => x.key === c).label} highlight` : "No highlight";
+          return `<button class="an-hl-dot ${c ? `an-hl-sw-${c} an-hl-dot-set` : ""}" data-an-hl-open data-event-id="${esc(id)}" type="button" title="${esc(label)} - click to change" aria-label="${esc(label)}"></button>`;
+        }
+
         // ---- money fields (Meetings table) ---------------------------
         // Whole dollars print clean; cents only appear when they exist.
         const fmtMoney = (n) => {
@@ -2361,20 +2437,20 @@
                 <thead><tr>
                   ${checkHeadHtml("resp")}
                   ${sortTh("resp", "occurred_at", "Received")}
-                  <th>Sent date</th><th class="num">Lag</th><th>Prospect</th><th>Links</th>
+                  <th>Sent date</th><th>Prospect</th><th>Links</th>
                   <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th>
+                  <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
                   ${shown.map(r => {
-                    const lag = lagDaysOf(r);
                     const s = r.response_sentiment || "";
                     const mtg = r.prospect_id ? mtgByProspect[r.prospect_id] : null;
+                    const hl = highlightOf(r.id);
                     return `
-                    <tr class="an-row">
+                    <tr class="an-row${hl ? ` an-hl-row an-hl-row-${hl}` : ""}">
                       ${checkCellHtml("resp", r.id, anState.respSelected.has(r.id))}
                       <td class="pr-last">${esc(anDate(r.occurred_at))}</td>
                       <td class="pr-last">${r.message_sent_at ? esc(anDate(r.message_sent_at)) : `<span class="an-rate-na">—</span>`}</td>
-                      <td class="num">${lag === null ? `<span class="an-rate-na">—</span>` : (lag === 0 ? "0d" : `${lag}d`)}</td>
                       <td class="an-prospect-cell">
                         <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
                         <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
@@ -2394,6 +2470,7 @@
                         ${bookedFlagHtml(mtg)}
                       </td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
+                      <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
                     </tr>`;
                   }).join("")}
                 </tbody>
@@ -2503,7 +2580,7 @@
             const mtgByProspect = meetingByProspect();
             header = ["Received", "Message Sent Date", "Reply Lag (days)", "Name", "Title", "Company", "Email",
                       "LinkedIn URL", "Sales Nav URL", "Message Sent", "Response", "Sentiment",
-                      "Sentiment Detail", "Meeting Booked", "Notes"];
+                      "Sentiment Detail", "Meeting Booked", "Notes", "Highlight"];
             rows = sel.map(r => {
               const lag = lagDaysOf(r);
               const mtg = r.prospect_id ? mtgByProspect[r.prospect_id] : null;
@@ -2517,6 +2594,7 @@
                 r.response_sentiment || "", r.response_sentiment_detail || "",
                 mtg ? (mtg.meeting_at ? meetingDayUs(mtg.meeting_at) : "Yes") : "",
                 (r.prospect_id && anState.notesByProspect[r.prospect_id]) || "",
+                highlightOf(r.id),
               ];
             });
           } else {
@@ -2576,6 +2654,12 @@
           if (isResp) {
             anState.responses = (anState.responses || []).filter(r => !gone.has(r.id));
             anState.respSelected.clear();
+            // Don't leave highlights pointing at rows that no longer exist.
+            let droppedHl = false;
+            for (const id of gone) {
+              if (anState.highlights[id]) { delete anState.highlights[id]; droppedHl = true; }
+            }
+            if (droppedHl) saveHighlights();
             renderResponses();
           } else {
             anState.meetings = (anState.meetings || []).filter(r => !gone.has(r.id));
@@ -2769,6 +2853,78 @@
           });
         }
 
+        // ---- highlight picker ----------------------------------------
+        // The popover lives on <body> with fixed positioning. Anchoring
+        // it inside the cell would put it in .pr-table-scroll, whose
+        // overflow-x: auto also clips vertically, so the picker would be
+        // cut off on the last rows of the table.
+        let hlPop = null;
+        function closeHlPop() {
+          if (hlPop) { hlPop.remove(); hlPop = null; }
+        }
+        function openHlPop(btn) {
+          const id = btn.dataset.eventId;
+          // Second click on the same dot closes it.
+          if (hlPop && hlPop.dataset.eventId === id) { closeHlPop(); return; }
+          closeHlPop();
+          const current = highlightOf(id);
+          hlPop = document.createElement("div");
+          hlPop.className = "an-hl-pop";
+          hlPop.dataset.eventId = id;
+          hlPop.setAttribute("role", "group");
+          hlPop.setAttribute("aria-label", "Row highlight");
+          hlPop.innerHTML =
+            `<button class="an-hl-opt an-hl-opt-none${current ? "" : " an-hl-opt-on"}" data-an-hl-pick="" type="button" title="No highlight" aria-label="No highlight"></button>`
+            + HL_COLORS.map(c =>
+              `<button class="an-hl-opt an-hl-sw-${c.key}${current === c.key ? " an-hl-opt-on" : ""}" data-an-hl-pick="${c.key}" type="button" title="${esc(c.label)}" aria-label="${esc(c.label)}"></button>`
+            ).join("");
+          document.body.appendChild(hlPop);
+          const b = btn.getBoundingClientRect();
+          const p = hlPop.getBoundingClientRect();
+          // Below-left of the dot by default; flip up or pull left when
+          // that would run past the viewport edge.
+          let top = b.bottom + 6;
+          if (top + p.height > window.innerHeight - 8) top = b.top - p.height - 6;
+          const left = Math.min(b.left, window.innerWidth - p.width - 8);
+          hlPop.style.top  = `${Math.max(8, top)}px`;
+          hlPop.style.left = `${Math.max(8, left)}px`;
+          const focusMe = hlPop.querySelector(".an-hl-opt-on") || hlPop.firstElementChild;
+          if (focusMe) focusMe.focus();
+        }
+        function applyHighlight(id, color) {
+          setHighlight(id, color);
+          closeHlPop();
+          // With a highlight filter on, this row may have just left the
+          // view, so rebuild. Otherwise patch the row in place - a full
+          // rebuild would lose scroll position and any open notes editor.
+          if (anState.respHl !== "all") { renderRespTable(); return; }
+          const tableEl = document.getElementById("an-resp-table");
+          const dot = tableEl && tableEl.querySelector(`[data-an-hl-open][data-event-id="${CSS.escape(id)}"]`);
+          if (!dot) { renderRespTable(); return; }
+          const tr = dot.closest("tr");
+          const td = dot.closest("td");
+          tr.className = `an-row${color ? ` an-hl-row an-hl-row-${color}` : ""}`;
+          if (td) td.innerHTML = highlightCellHtml(id);
+        }
+
+        // Picks land on <body>, outside panelEl's listener below.
+        document.addEventListener("click", (e) => {
+          const pick = e.target.closest("[data-an-hl-pick]");
+          if (pick) {
+            const id = hlPop && hlPop.dataset.eventId;
+            if (id) applyHighlight(id, pick.dataset.anHlPick);
+            return;
+          }
+          // The opener's own click is handled in panelEl and must not
+          // immediately close what it just opened.
+          if (hlPop && !e.target.closest(".an-hl-pop") && !e.target.closest("[data-an-hl-open]")) closeHlPop();
+        });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeHlPop(); });
+        window.addEventListener("resize", closeHlPop);
+        // Capture phase so scrolling the table's own container counts,
+        // not just the page. Closing beats chasing a moving anchor.
+        document.addEventListener("scroll", closeHlPop, true);
+
         // ---- collapse / expand (Meetings + Responses) -----------------
         // The tables are long; the minus button folds a whole section
         // (table AND its filter row) down to its title so you can get
@@ -2813,6 +2969,17 @@
             if (s.key === key) s.dir = s.dir === "desc" ? "asc" : "desc";
             else { s.key = key; s.dir = "desc"; }
             if (kind === "meet") renderMeetings(); else renderRespTable();
+            return;
+          }
+          const hlOpen = e.target.closest("[data-an-hl-open]");
+          if (hlOpen) { openHlPop(hlOpen); return; }
+          const hlf = e.target.closest("[data-an-hl-filter] button[data-hl]");
+          if (hlf) {
+            anState.respHl = hlf.dataset.hl;
+            hlf.parentElement.querySelectorAll("button[data-hl]").forEach(b => b.classList.toggle("active", b === hlf));
+            anState.respLimit = 50;
+            anState.respSelected.clear();
+            if (anState.listsLoaded) renderResponses();
             return;
           }
           const nf = e.target.closest("[data-an-notes-filter] .pr-chip");
