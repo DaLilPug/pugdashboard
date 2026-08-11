@@ -2866,6 +2866,13 @@
         button brings it back - the tab remembers which way you left each
         one for that account.
       </p>
+      <p>
+        Click a date column header to sort by it: <em>Booked</em> or
+        <em>Meeting date</em> on Meetings, <em>Received</em> on Responses.
+        The first click puts newest first, the next flips to oldest first,
+        and the caret shows which way it's pointing. Rows with no meeting
+        date set stay at the bottom either way.
+      </p>
       <ul>
         <li><strong>Meetings</strong> - every booked meeting with
             <em>Date booked</em> (when the booking was logged) and
@@ -2874,6 +2881,15 @@
             and your prospect notes. Meeting dates fill automatically from
             Calendly and HubSpot bookings; meetings logged before Jul 16,
             2026 have a blank meeting date until you set one.</li>
+        <li><strong>Opportunity value and Revenue closed</strong> - two
+            optional dollar fields on the Meetings table. Click <em>+
+            Add</em> in either column, type a number, and press Enter;
+            clearing the box removes the value. Both attach to the
+            prospect rather than the individual meeting, so a prospect who
+            books twice is one deal carrying one number, shown on both
+            rows. Leave them empty if you don't track deal size here -
+            nothing else in the tab depends on them. These fields appear
+            only on the Analysis tab, not on Prospects.</li>
         <li><strong>Responses</strong> - every reply, spreadsheet-style:
             date received, the date your message was sent, the reply lag
             between them (tracked since Jul 8, 2026), LinkedIn / Sales Nav
@@ -2904,8 +2920,14 @@
             account average - with minimum sample sizes so a hot streak on
             four prospects never drives a strategy call.</li>
         <li><strong>Health check</strong> - the five benchmark tiles
-            (acceptance, response, positive, booking, meetings per month)
-            scored against the targets in
+            (acceptance, response, positive, booking, meetings per month),
+            plus an <em>Opportunity value</em> and a <em>Revenue closed</em>
+            total whenever those fields have been filled in. The money
+            tiles are totals you typed, not rates measured against a
+            target, so they carry no pass-or-fail color, and each one is
+            left out entirely when it adds up to nothing. Both count each
+            prospect once and cover the same window as the rest of the
+            card. The five rate tiles are scored against the targets in
             <a href="#benchmarks">section 10</a>, plus the matched issue
             pattern with the likely cause, what to try, and whether the
             lever is <em>targeting</em> or <em>messaging</em>. A low-volume

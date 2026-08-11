@@ -1612,6 +1612,10 @@
           responses: null,  // ALL response rows, newest first
           meetings:  null,  // ALL meeting_booked rows, newest first
           notesByProspect: {},
+          // { prospectId: { opportunity_value, revenue_closed } } - the
+          // money fields live on the PROSPECT, so one person who books
+          // three meetings is one deal worth one number.
+          dealsByProspect: {},
           listsLoaded: false,
           respSent:   "all",
           respSearch: "",
@@ -1626,6 +1630,10 @@
           // on load reads as missing data.
           respNotes: "all",
           meetNotes: "all",
+          // Date-column sort per table. Both start newest-first, which
+          // is the order the rows arrive in.
+          meetSort: { key: "occurred_at", dir: "desc" },
+          respSort: { key: "occurred_at", dir: "desc" },
           // Row caps - tables show this many, "Show 50 more" / "Show
           // all" extend. Reset to 50 whenever a filter changes.
           respLimit: 50,
@@ -1825,14 +1833,23 @@
             // sbFetchAll, NOT sbFetch: an unpaged read silently truncates
             // at 1000 rows, and a noted prospect missing from this map
             // would render "+ Notes" - typing there would then silently
-            // REPLACE the unloaded real note on save.
-            sb.sbFetchAll(`/rest/v1/prospects?client_id=eq.${encId}&select=id,notes&notes=not.is.null`).catch(() => []),
+            // REPLACE the unloaded real note on save. The same hazard
+            // applies to the money fields, so the `or` filter has to
+            // catch a prospect carrying ANY of the three.
+            sb.sbFetchAll(`/rest/v1/prospects?client_id=eq.${encId}&select=id,notes,opportunity_value,revenue_closed&or=(notes.not.is.null,opportunity_value.not.is.null,revenue_closed.not.is.null)`).catch(() => []),
           ]);
           anState.responses = responses || [];
           anState.meetings  = meetings  || [];
           anState.notesByProspect = {};
+          anState.dealsByProspect = {};
           for (const p of (notesRows || [])) {
             if (p.notes) anState.notesByProspect[p.id] = p.notes;
+            if (p.opportunity_value !== null || p.revenue_closed !== null) {
+              anState.dealsByProspect[p.id] = {
+                opportunity_value: p.opportunity_value === null ? null : Number(p.opportunity_value),
+                revenue_closed:    p.revenue_closed    === null ? null : Number(p.revenue_closed),
+              };
+            }
           }
           anState.listsLoaded = true;
         }
@@ -1856,6 +1873,33 @@
         }
 
         // ---- health check + diagnosis --------------------------------
+        // Opportunity value / revenue closed summed over the Health
+        // check window. Scoped by the date the meeting was BOOKED, the
+        // same event date every other tile counts on, and counted once
+        // per prospect no matter how many meetings they booked.
+        function dealTotalsForWindow() {
+          const b = windowBounds();
+          const sinceMs = b.sinceIso ? new Date(b.sinceIso).getTime() : null;
+          const untilMs = b.untilIso ? new Date(b.untilIso).getTime() : null;
+          const seen = new Set();
+          let opp = 0, rev = 0, oppCount = 0, revCount = 0;
+          for (const m of (anState.meetings || [])) {
+            if (!m.prospect_id || seen.has(m.prospect_id)) continue;
+            const t = new Date(m.occurred_at).getTime();
+            // Window check BEFORE marking seen, so a prospect whose
+            // first meeting fell outside the window still counts on a
+            // later one inside it.
+            if (sinceMs !== null && t < sinceMs) continue;
+            if (untilMs !== null && t > untilMs) continue;
+            seen.add(m.prospect_id);
+            const d = anState.dealsByProspect[m.prospect_id];
+            if (!d) continue;
+            if (d.opportunity_value > 0) { opp += d.opportunity_value; oppCount++; }
+            if (d.revenue_closed    > 0) { rev += d.revenue_closed;    revCount++; }
+          }
+          return { opp, rev, oppCount, revCount };
+        }
+
         function renderBenchAndDiagnosis() {
           const m = anState.entry.metrics;
           const days = windowDaysFor(anState.entry);
@@ -1876,6 +1920,23 @@
             : mtgPerMonth >= BENCH.mtg.target ? "good"
             : mtgPerMonth >= BENCH.mtg.target / 2 ? "ok" : "bad";
 
+          // Money totals for this window, de-duplicated by prospect -
+          // the value sits on the prospect, so someone with three
+          // meetings must not count three times. A total of 0 means
+          // nobody filled the field in, and the tile is left out
+          // entirely rather than shown as a zero: most accounts never
+          // use this, and an empty $0 would read as a bad result.
+          const deals = dealTotalsForWindow();
+          const moneyTiles = [];
+          if (deals.opp > 0) {
+            moneyTiles.push({ label: "Opportunity value", value: fmtMoney(deals.opp),
+              sub: `${deals.oppCount} prospect${deals.oppCount === 1 ? "" : "s"} in window` });
+          }
+          if (deals.rev > 0) {
+            moneyTiles.push({ label: "Revenue closed", value: fmtMoney(deals.rev),
+              sub: `${deals.revCount} prospect${deals.revCount === 1 ? "" : "s"} in window` });
+          }
+
           const tiles = [
             { key: "acc",  r: accR,  state: rateState(accR,  BENCH.acc.target,  m.connections, 10),
               value: accR  === null ? "—" : `${(accR  * 100).toFixed(1)}%`, sub: `target 30% · ${m.messages}/${m.connections}` },
@@ -1891,6 +1952,12 @@
           benchEl.innerHTML = tiles.map(t => `
             <div class="an-bench-card an-bench-${t.state}">
               <div class="kpi-label">${esc(BENCH[t.key].label)}</div>
+              <div class="an-bench-value">${esc(t.value)}</div>
+              <div class="an-bench-target">${esc(t.sub)}</div>
+            </div>
+          `).join("") + moneyTiles.map(t => `
+            <div class="an-bench-card an-bench-money">
+              <div class="kpi-label">${esc(t.label)}</div>
               <div class="an-bench-value">${esc(t.value)}</div>
               <div class="an-bench-target">${esc(t.sub)}</div>
             </div>
@@ -2094,7 +2161,7 @@
         function visibleResponses(ignoreSentAndSearch = false) {
           const { sinceMs, untilMs } = rangeMs(anState.respRange);
           const q = anState.respSearch.trim().toLowerCase();
-          return (anState.responses || []).filter(r => {
+          const rows = (anState.responses || []).filter(r => {
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
@@ -2111,6 +2178,8 @@
             }
             return true;
           });
+          // The baseline call only feeds counts, so skip the sort there.
+          return ignoreSentAndSearch ? rows : sortByDate(rows, anState.respSort.key, anState.respSort.dir);
         }
 
         function notesCellHtml(prospectId) {
@@ -2143,6 +2212,56 @@
           }
           return map;
         }
+        // ---- money fields (Meetings table) ---------------------------
+        // Whole dollars print clean; cents only appear when they exist.
+        const fmtMoney = (n) => {
+          const v = Number(n);
+          if (!isFinite(v)) return "—";
+          return v.toLocaleString("en-US", {
+            style: "currency", currency: "USD",
+            minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+            maximumFractionDigits: 2,
+          });
+        };
+        const MONEY_LABEL = {
+          opportunity_value: "opportunity value",
+          revenue_closed:    "revenue closed",
+        };
+        function dealValue(prospectId, field) {
+          const d = prospectId && anState.dealsByProspect[prospectId];
+          const v = d ? d[field] : null;
+          return (v === null || v === undefined) ? null : Number(v);
+        }
+        function moneyCellHtml(prospectId, field) {
+          if (!prospectId) return `<span class="an-rate-na">—</span>`;
+          const v = dealValue(prospectId, field);
+          const attrs = `data-an-money data-field="${field}" data-prospect-id="${esc(prospectId)}"`;
+          return v === null
+            ? `<div class="an-money-display an-money-empty" ${attrs} title="Click to set the ${MONEY_LABEL[field]}">+ Add</div>`
+            : `<div class="an-money-display an-money-has" ${attrs} title="Click to edit">${esc(fmtMoney(v))}</div>`;
+        }
+
+        // ---- date-column sorting -------------------------------------
+        // Rows with no date sink to the bottom in BOTH directions - a
+        // screenful of "+ Set date" is never what a date sort was for.
+        function sortByDate(rows, key, dir) {
+          const mul = dir === "asc" ? 1 : -1;
+          return rows.slice().sort((a, b) => {
+            const av = a[key] ? new Date(a[key]).getTime() : null;
+            const bv = b[key] ? new Date(b[key]).getTime() : null;
+            if (av === null && bv === null) return 0;
+            if (av === null) return 1;
+            if (bv === null) return -1;
+            return (av - bv) * mul;
+          });
+        }
+        function sortTh(kind, key, label, extraClass = "") {
+          const s = kind === "meet" ? anState.meetSort : anState.respSort;
+          const on = s.key === key;
+          const cls = on ? (s.dir === "asc" ? "sorted-asc" : "sorted-desc") : "";
+          return `<th class="sortable ${cls} ${extraClass}" data-an-sort="${kind}" data-sort-key="${key}" title="Click to sort">${esc(label)}<span class="sort-caret">${on ? (s.dir === "asc" ? "▲" : "▼") : ""}</span></th>`;
+        }
+
         function bookedFlagHtml(mtg) {
           if (!mtg) return "";
           const when = mtg.meeting_at
@@ -2241,7 +2360,8 @@
               <table class="pr-table an-table">
                 <thead><tr>
                   ${checkHeadHtml("resp")}
-                  <th>Received</th><th>Sent date</th><th class="num">Lag</th><th>Prospect</th><th>Links</th>
+                  ${sortTh("resp", "occurred_at", "Received")}
+                  <th>Sent date</th><th class="num">Lag</th><th>Prospect</th><th>Links</th>
                   <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
@@ -2299,13 +2419,14 @@
         // ---- meetings table ------------------------------------------
         function visibleMeetings() {
           const { sinceMs, untilMs } = rangeMs(anState.meetRange);
-          return (anState.meetings || []).filter(r => {
+          const rows = (anState.meetings || []).filter(r => {
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.meetNotes, r.prospect_id)) return false;
             return true;
           });
+          return sortByDate(rows, anState.meetSort.key, anState.meetSort.dir);
         }
 
         // One date cell's span - also used to restore a cancelled editor
@@ -2332,7 +2453,11 @@
               <table class="pr-table an-table">
                 <thead><tr>
                   ${checkHeadHtml("meet")}
-                  <th>Booked</th><th>Meeting date</th><th>Prospect</th><th>Links</th><th>Notes</th>
+                  ${sortTh("meet", "occurred_at", "Booked")}
+                  ${sortTh("meet", "meeting_at",  "Meeting date")}
+                  <th>Prospect</th><th>Links</th>
+                  <th class="num">Opportunity value</th><th class="num">Revenue closed</th>
+                  <th>Notes</th>
                 </tr></thead>
                 <tbody>
                   ${shown.map(r => `
@@ -2345,6 +2470,8 @@
                         <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
                       </td>
                       <td class="an-links-cell">${linksCellHtml(r)}</td>
+                      <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "opportunity_value")}</td>
+                      <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "revenue_closed")}</td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
                     </tr>`).join("")}
                 </tbody>
@@ -2368,34 +2495,47 @@
         async function copySelection(btn) {
           const kind = btn.dataset.anCopy;
           let header, rows;
+          // Column order mirrors what's on screen, so a paste lines up
+          // with the table you copied it from. Money exports as a bare
+          // number (no $ or commas) so Excel can sum the column.
           if (kind === "resp") {
             const sel = visibleResponses().filter(r => anState.respSelected.has(r.id));
+            const mtgByProspect = meetingByProspect();
             header = ["Received", "Message Sent Date", "Reply Lag (days)", "Name", "Title", "Company", "Email",
-                      "Message Sent", "Response", "Sentiment", "Sentiment Detail", "Notes", "LinkedIn URL", "Sales Nav URL"];
+                      "LinkedIn URL", "Sales Nav URL", "Message Sent", "Response", "Sentiment",
+                      "Sentiment Detail", "Meeting Booked", "Notes"];
             rows = sel.map(r => {
               const lag = lagDaysOf(r);
+              const mtg = r.prospect_id ? mtgByProspect[r.prospect_id] : null;
               return [
                 anDate(r.occurred_at),
                 r.message_sent_at ? anDate(r.message_sent_at) : "",
                 lag === null ? "" : lag,
                 r.prospect_name || "", r.title || "", r.company || "", r.email || "",
+                r.profile_url || "", r.sales_nav_url || "",
                 r.message_sent || "", r.response || "",
                 r.response_sentiment || "", r.response_sentiment_detail || "",
+                mtg ? (mtg.meeting_at ? meetingDayUs(mtg.meeting_at) : "Yes") : "",
                 (r.prospect_id && anState.notesByProspect[r.prospect_id]) || "",
-                r.profile_url || "", r.sales_nav_url || "",
               ];
             });
           } else {
             const sel = visibleMeetings().filter(r => anState.meetSelected.has(r.id));
             header = ["Date Booked", "Meeting Date", "Name", "Title", "Company", "Email",
-                      "Notes", "LinkedIn URL", "Sales Nav URL"];
-            rows = sel.map(r => [
-              anDate(r.occurred_at),
-              r.meeting_at ? meetingDayUs(r.meeting_at) : "",
-              r.prospect_name || "", r.title || "", r.company || "", r.email || "",
-              (r.prospect_id && anState.notesByProspect[r.prospect_id]) || "",
-              r.profile_url || "", r.sales_nav_url || "",
-            ]);
+                      "LinkedIn URL", "Sales Nav URL", "Opportunity Value", "Revenue Closed", "Notes"];
+            rows = sel.map(r => {
+              const opp = dealValue(r.prospect_id, "opportunity_value");
+              const rev = dealValue(r.prospect_id, "revenue_closed");
+              return [
+                anDate(r.occurred_at),
+                r.meeting_at ? meetingDayUs(r.meeting_at) : "",
+                r.prospect_name || "", r.title || "", r.company || "", r.email || "",
+                r.profile_url || "", r.sales_nav_url || "",
+                opp === null ? "" : opp,
+                rev === null ? "" : rev,
+                (r.prospect_id && anState.notesByProspect[r.prospect_id]) || "",
+              ];
+            });
           }
           if (!rows.length) return;
           const tsv = [header, ...rows].map(r => r.map(anTsvEscape).join("\t")).join("\r\n");
@@ -2558,6 +2698,77 @@
           });
         }
 
+        // Money cells edit like the notes cells: swap the display for an
+        // input, save on blur, patch every cell showing that prospect
+        // back in place. A full re-render here would destroy any other
+        // editor already open (a removed element never fires blur, so
+        // typed text would vanish mid-save).
+        function startMoneyEdit(div) {
+          if (div.dataset.editing === "1") return;
+          div.dataset.editing = "1";
+          const pid   = div.dataset.prospectId;
+          const field = div.dataset.field;
+          const prev  = dealValue(pid, field);
+          const input = document.createElement("input");
+          input.type = "number";
+          input.className = "an-money-edit";
+          input.min = "0";
+          input.step = "0.01";
+          input.placeholder = "0";
+          input.setAttribute("aria-label", MONEY_LABEL[field]);
+          if (prev !== null) input.value = String(prev);
+          div.replaceWith(input);
+          input.focus();
+          input.select();
+          let cancelled = false;
+          const done = () => {
+            const html = moneyCellHtml(pid, field);
+            if (input.isConnected) {
+              const td = input.closest("td");
+              if (td) td.innerHTML = html;
+            }
+            // Same prospect, same field, elsewhere in the table.
+            panelEl.querySelectorAll(`[data-an-money][data-field="${field}"][data-prospect-id="${CSS.escape(pid)}"]`).forEach(d => {
+              if (d.dataset.editing !== "1" && d !== input) {
+                const td = d.closest("td");
+                if (td && !td.contains(input)) td.innerHTML = html;
+              }
+            });
+          };
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") { e.preventDefault(); cancelled = true; input.blur(); }
+            else if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+          });
+          input.addEventListener("blur", async () => {
+            if (cancelled) { done(); return; }
+            const raw = input.value.trim();
+            // Empty clears the field. Anything unparseable is a typo,
+            // not an instruction to wipe a number - leave it alone.
+            let next = null;
+            if (raw !== "") {
+              const n = Number(raw);
+              if (!isFinite(n) || n < 0) { done(); return; }
+              next = Math.round(n * 100) / 100;
+            }
+            if (next === prev) { done(); return; }
+            try {
+              await sb.sbFetch(`/rest/v1/rpc/set_prospect_deal_field`, {
+                method: "POST",
+                body: JSON.stringify({ p_prospect_id: pid, p_field: field, p_value: next }),
+              });
+              const d = anState.dealsByProspect[pid] || { opportunity_value: null, revenue_closed: null };
+              d[field] = next;
+              if (d.opportunity_value === null && d.revenue_closed === null) delete anState.dealsByProspect[pid];
+              else anState.dealsByProspect[pid] = d;
+            } catch (err) {
+              alert("Couldn't save the value: " + (err.message || err));
+            }
+            done();
+            // The Health check totals just moved.
+            if (anState.entry) renderBenchAndDiagnosis();
+          });
+        }
+
         // ---- collapse / expand (Meetings + Responses) -----------------
         // The tables are long; the minus button folds a whole section
         // (table AND its filter row) down to its title so you can get
@@ -2592,6 +2803,18 @@
           // Per-table "Notes" chips. Checked before [data-an-notes] below
           // (a notes CELL) - different attribute, but keep them ordered
           // so a future rename can't turn a filter click into an edit.
+          // Date-column sort headers. Same column flips direction; a
+          // different column starts newest-first.
+          const sh = e.target.closest("[data-an-sort]");
+          if (sh) {
+            const kind = sh.dataset.anSort;
+            const key  = sh.dataset.sortKey;
+            const s = kind === "meet" ? anState.meetSort : anState.respSort;
+            if (s.key === key) s.dir = s.dir === "desc" ? "asc" : "desc";
+            else { s.key = key; s.dir = "desc"; }
+            if (kind === "meet") renderMeetings(); else renderRespTable();
+            return;
+          }
           const nf = e.target.closest("[data-an-notes-filter] .pr-chip");
           if (nf) {
             const group = nf.closest("[data-an-notes-filter]");
@@ -2694,6 +2917,8 @@
             ft.setAttribute("aria-expanded", open ? "true" : "false");
             return;
           }
+          const md = e.target.closest("[data-an-money]");
+          if (md) { startMoneyEdit(md); return; }
           const nd = e.target.closest("[data-an-notes]");
           if (nd) { startNotesEdit(nd); return; }
           const de = e.target.closest("[data-an-date]");
@@ -2800,6 +3025,10 @@
             await loadListsOnce();
             renderResponses();
             renderMeetings();
+            // The money tiles need the meetings + deal values, which
+            // land after refreshCore's first paint. Repaint if the
+            // window summary is already in.
+            if (anState.entry) renderBenchAndDiagnosis();
           } catch (err) {
             respRoot.innerHTML = `<div class="placeholder"><strong>Couldn't load responses</strong>${esc(err.message || "")}</div>`;
             meetRoot.innerHTML = `<div class="placeholder"><strong>Couldn't load meetings</strong>${esc(err.message || "")}</div>`;

@@ -1622,6 +1622,49 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 .an-collapse-btn:hover { border-color: var(--navy); background: var(--navy-light); }
 
+/* Opportunity value / Revenue closed (Meetings table). Click-to-edit
+   like the notes cells, right-aligned so the digits line up down the
+   column. Empty reads "+ Add" rather than $0 - nobody has entered a
+   number yet, which is not the same as the deal being worth nothing. */
+.an-money-cell { text-align: right; white-space: nowrap; min-width: 116px; }
+.an-money-display {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--navy);
+  cursor: text;
+  min-height: 20px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.an-money-display:hover {
+  background: var(--surface-1);
+  border-color: var(--border);
+}
+.an-money-display.an-money-has { font-weight: 600; }
+.an-money-display.an-money-empty { color: var(--gray-400); font-style: italic; }
+.an-money-edit {
+  width: 100%;
+  min-width: 90px;
+  padding: 4px 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--navy);
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.an-money-edit:focus { outline: 1px solid var(--accent, #1EB683); }
+
+/* Money tiles in the Health check. Neutral left border on purpose:
+   these are totals the operator typed, not rates measured against a
+   benchmark, so they must never read as pass or fail. */
+.an-bench-money { border-left-color: var(--navy); }
+
 /* Sentiment cell (Responses): the select plus, when the prospect has a
    meeting on the books, a flag underneath it. */
 .an-sent-cell { min-width: 118px; }
