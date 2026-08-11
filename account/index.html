@@ -216,11 +216,20 @@
     <!-- =================== ANALYSIS ===================== -->
     <section id="panel-analysis" class="sub-panel hidden">
 
-      <section class="panel-card">
+      <section class="panel-card" data-an-card="meet">
         <div class="panel-card-head">
           <h2>Meetings</h2>
+          <button class="an-collapse-btn" data-an-collapse="meet" type="button" aria-expanded="true" aria-controls="an-meetings" title="Collapse the meetings table">−</button>
           <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
           <div class="timeframe-wrap an-filters">
+            <div class="pr-filter-group an-notes-filter">
+              <span class="pr-filter-label">Notes</span>
+              <div class="pr-filter-chips" data-an-notes-filter="meet">
+                <button class="pr-chip active" data-notes="all"  type="button">All</button>
+                <button class="pr-chip"        data-notes="has"  type="button">Has notes</button>
+                <button class="pr-chip"        data-notes="none" type="button">No notes</button>
+              </div>
+            </div>
             <div class="timeframe-pills" id="an-meet-tfpills" data-an-table-pills="meet">
               <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
               <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
@@ -238,14 +247,23 @@
             </div>
           </div>
         </div>
-        <div id="an-meetings"><div class="loading">Loading…</div></div>
+        <div id="an-meetings" class="an-collapsible"><div class="loading">Loading…</div></div>
       </section>
 
-      <section class="panel-card">
+      <section class="panel-card" data-an-card="resp">
         <div class="panel-card-head">
           <h2>Responses</h2>
+          <button class="an-collapse-btn" data-an-collapse="resp" type="button" aria-expanded="true" aria-controls="an-responses" title="Collapse the responses table">−</button>
           <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
           <div class="timeframe-wrap an-filters">
+            <div class="pr-filter-group an-notes-filter">
+              <span class="pr-filter-label">Notes</span>
+              <div class="pr-filter-chips" data-an-notes-filter="resp">
+                <button class="pr-chip active" data-notes="all"  type="button">All</button>
+                <button class="pr-chip"        data-notes="has"  type="button">Has notes</button>
+                <button class="pr-chip"        data-notes="none" type="button">No notes</button>
+              </div>
+            </div>
             <div class="timeframe-pills" id="an-resp-tfpills" data-an-table-pills="resp">
               <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
               <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
@@ -263,7 +281,7 @@
             </div>
           </div>
         </div>
-        <div id="an-responses"><div class="loading">Loading…</div></div>
+        <div id="an-responses" class="an-collapsible"><div class="loading">Loading…</div></div>
       </section>
 
       <section class="panel-card">
@@ -1602,6 +1620,12 @@
           // pills only drive Titles + Health check.
           respRange: { tf: "all", from: null, to: null },
           meetRange: { tf: "all", from: null, to: null },
+          // Per-table "Notes" chips ("all" | "has" | "none"). Session
+          // only - the tab's other table filters aren't persisted
+          // either, and a remembered filter that silently hides rows
+          // on load reads as missing data.
+          respNotes: "all",
+          meetNotes: "all",
           // Row caps - tables show this many, "Show 50 more" / "Show
           // all" extend. Reset to 50 whenever a filter changes.
           respLimit: 50,
@@ -2057,6 +2081,16 @@
         }
 
         // ---- responses table -----------------------------------------
+        // Notes chips live in the section HEAD next to the date filters,
+        // so they scope the window the same way dates do - the sentiment
+        // pill counts and the "X of Y" denominator both sit inside them.
+        const hasNotesFor = (pid) => !!(pid && (anState.notesByProspect[pid] || "").trim());
+        function notesFilterKeeps(mode, pid) {
+          if (mode === "all") return true;
+          const has = hasNotesFor(pid);
+          return mode === "has" ? has : !has;
+        }
+
         function visibleResponses(ignoreSentAndSearch = false) {
           const { sinceMs, untilMs } = rangeMs(anState.respRange);
           const q = anState.respSearch.trim().toLowerCase();
@@ -2064,6 +2098,7 @@
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
+            if (!notesFilterKeeps(anState.respNotes, r.prospect_id)) return false;
             if (ignoreSentAndSearch) return true;
             if (anState.respSent === "unclassified") {
               if (r.response_sentiment) return false;
@@ -2091,6 +2126,29 @@
             r.sales_nav_url ? `<a class="an-link" href="${esc(r.sales_nav_url)}" target="_blank" rel="noopener">Sales Nav ↗</a>` : "",
           ].filter(Boolean).join("");
           return links || `<span class="an-rate-na">—</span>`;
+        }
+
+        // Newest meeting_booked per prospect, so the Responses table can
+        // flag "this reply turned into a meeting" under the sentiment.
+        // Built per render rather than cached - inline date edits and
+        // bulk deletes both mutate anState.meetings in place.
+        function meetingByProspect() {
+          const map = {};
+          for (const m of (anState.meetings || [])) {
+            if (!m.prospect_id) continue;
+            const prev = map[m.prospect_id];
+            if (!prev || String(m.occurred_at || "") > String(prev.occurred_at || "")) {
+              map[m.prospect_id] = m;
+            }
+          }
+          return map;
+        }
+        function bookedFlagHtml(mtg) {
+          if (!mtg) return "";
+          const when = mtg.meeting_at
+            ? `Booked ${anDate(mtg.occurred_at)} · meeting ${meetingDayUs(mtg.meeting_at)}`
+            : `Booked ${anDate(mtg.occurred_at)} · no meeting date set`;
+          return `<div class="an-booked-flag" title="${esc(when)}">✓ Meeting booked</div>`;
         }
 
         function buildRespToolbar() {
@@ -2176,19 +2234,21 @@
             return;
           }
           const shown = rows.slice(0, anState.respLimit);
+          const mtgByProspect = meetingByProspect();
           tableEl.innerHTML = `
             <div id="an-resp-bulk">${bulkBarHtml("resp", anState.respSelected.size)}</div>
             <div class="pr-table-scroll">
               <table class="pr-table an-table">
                 <thead><tr>
                   ${checkHeadHtml("resp")}
-                  <th>Received</th><th>Sent date</th><th class="num">Lag</th><th>Prospect</th>
-                  <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th><th>Links</th>
+                  <th>Received</th><th>Sent date</th><th class="num">Lag</th><th>Prospect</th><th>Links</th>
+                  <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
                   ${shown.map(r => {
                     const lag = lagDaysOf(r);
                     const s = r.response_sentiment || "";
+                    const mtg = r.prospect_id ? mtgByProspect[r.prospect_id] : null;
                     return `
                     <tr class="an-row">
                       ${checkCellHtml("resp", r.id, anState.respSelected.has(r.id))}
@@ -2199,20 +2259,21 @@
                         <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
                         <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
                       </td>
+                      <td class="an-links-cell">${linksCellHtml(r)}</td>
                       <td class="an-msg-text">${r.message_sent
                         ? `<div class="an-msg-clamp" title="Click to expand or collapse">${esc(r.message_sent)}</div>`
                         : ""}</td>
                       <td class="an-resp-text">${esc(r.response || "")}</td>
-                      <td>
+                      <td class="an-sent-cell">
                         <select class="pr-sent-edit pr-sent-edit-${esc(s || "none")} an-sent-select" data-an-sentiment data-event-id="${esc(r.id)}" aria-label="Sentiment">
                           <option value=""${s === "" ? " selected" : ""}>—</option>
                           <option value="positive"${s === "positive" ? " selected" : ""}>Positive</option>
                           <option value="neutral"${s === "neutral" ? " selected" : ""}>Neutral</option>
                           <option value="negative"${s === "negative" ? " selected" : ""}>Negative</option>
                         </select>
+                        ${bookedFlagHtml(mtg)}
                       </td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
-                      <td class="an-links-cell">${linksCellHtml(r)}</td>
                     </tr>`;
                   }).join("")}
                 </tbody>
@@ -2242,6 +2303,7 @@
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
+            if (!notesFilterKeeps(anState.meetNotes, r.prospect_id)) return false;
             return true;
           });
         }
@@ -2260,7 +2322,7 @@
         function renderMeetings() {
           const rows = visibleMeetings();
           if (!rows.length) {
-            meetRoot.innerHTML = `<div class="placeholder"><strong>No meetings booked in this range</strong>Clear the date filter above to see everything.</div>`;
+            meetRoot.innerHTML = `<div class="placeholder"><strong>No meetings match</strong>Clear the date range or the Notes filter above to see everything.</div>`;
             return;
           }
           const shown = rows.slice(0, anState.meetLimit);
@@ -2270,7 +2332,7 @@
               <table class="pr-table an-table">
                 <thead><tr>
                   ${checkHeadHtml("meet")}
-                  <th>Booked</th><th>Meeting date</th><th>Prospect</th><th>Notes</th><th>Links</th>
+                  <th>Booked</th><th>Meeting date</th><th>Prospect</th><th>Links</th><th>Notes</th>
                 </tr></thead>
                 <tbody>
                   ${shown.map(r => `
@@ -2282,8 +2344,8 @@
                         <div class="pr-name-main">${esc(r.prospect_name || "—")}</div>
                         <div class="an-sub">${esc([r.title, r.company].filter(Boolean).join(" · "))}</div>
                       </td>
-                      <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
                       <td class="an-links-cell">${linksCellHtml(r)}</td>
+                      <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
                     </tr>`).join("")}
                 </tbody>
               </table>
@@ -2379,6 +2441,7 @@
             anState.meetings = (anState.meetings || []).filter(r => !gone.has(r.id));
             anState.meetSelected.clear();
             renderMeetings();
+            renderRespTable(); // "Meeting booked" flags just changed
           }
           refreshCore(); // response/meeting counts feed the tiles + titles
         }
@@ -2488,11 +2551,65 @@
               alert("Couldn't save notes: " + (err.message || err));
             }
             done();
+            // With a Notes filter on, this row may have just moved into
+            // or out of view - patching the cell in place isn't enough.
+            if (anState.respNotes !== "all") renderRespTable();
+            if (anState.meetNotes !== "all") renderMeetings();
           });
         }
 
+        // ---- collapse / expand (Meetings + Responses) -----------------
+        // The tables are long; the minus button folds a whole section
+        // (table AND its filter row) down to its title so you can get
+        // past it. Remembered per account - it's a layout preference and
+        // the +/- state says plainly which way it's set.
+        const AN_COLLAPSE_KEY = (kind) => `account_${clientId}_an_${kind}_collapsed`;
+        const AN_COLLAPSE_LABEL = { meet: "meetings", resp: "responses" };
+        function setCollapsed(kind, collapsed, persist = true) {
+          const card = panelEl.querySelector(`[data-an-card="${kind}"]`);
+          if (!card) return;
+          card.classList.toggle("an-collapsed", collapsed);
+          const btn = card.querySelector("[data-an-collapse]");
+          if (btn) {
+            btn.textContent = collapsed ? "+" : "−";
+            btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+            btn.title = `${collapsed ? "Expand" : "Collapse"} the ${AN_COLLAPSE_LABEL[kind]} table`;
+          }
+          if (persist) {
+            try { localStorage.setItem(AN_COLLAPSE_KEY(kind), collapsed ? "1" : "0"); } catch { /* private mode */ }
+          }
+        }
+        ["meet", "resp"].forEach(k => setCollapsed(k, localStorage.getItem(AN_COLLAPSE_KEY(k)) === "1", false));
+
         // ---- events --------------------------------------------------
         panelEl.addEventListener("click", (e) => {
+          const cb = e.target.closest("[data-an-collapse]");
+          if (cb) {
+            const kind = cb.dataset.anCollapse;
+            setCollapsed(kind, !cb.closest(".panel-card").classList.contains("an-collapsed"));
+            return;
+          }
+          // Per-table "Notes" chips. Checked before [data-an-notes] below
+          // (a notes CELL) - different attribute, but keep them ordered
+          // so a future rename can't turn a filter click into an edit.
+          const nf = e.target.closest("[data-an-notes-filter] .pr-chip");
+          if (nf) {
+            const group = nf.closest("[data-an-notes-filter]");
+            const kind  = group.dataset.anNotesFilter;
+            group.querySelectorAll(".pr-chip").forEach(c => c.classList.toggle("active", c === nf));
+            if (kind === "resp") {
+              anState.respNotes = nf.dataset.notes;
+              anState.respLimit = 50;
+              anState.respSelected.clear();
+              if (anState.listsLoaded) renderResponses();
+            } else {
+              anState.meetNotes = nf.dataset.notes;
+              anState.meetLimit = 50;
+              anState.meetSelected.clear();
+              if (anState.listsLoaded) renderMeetings();
+            }
+            return;
+          }
           const pill = e.target.closest("#an-pills .timeframe-pill");
           if (pill) {
             anTf = pill.dataset.tf;

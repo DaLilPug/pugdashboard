@@ -1597,6 +1597,49 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 .an-table-note { margin-top: 8px; }
 .an-date-unset { color: var(--gray-400); }
 
+/* Collapse / expand toggle, sitting immediately right of the Meetings
+   and Responses headings. margin-right:auto eats the head's free space
+   so the button stays glued to the title while the filters keep their
+   right edge (the head is justify-content: space-between). */
+.an-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: auto;
+  padding: 0;
+  border: 1.5px solid var(--gray-100);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--navy);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: all .12s;
+}
+.an-collapse-btn:hover { border-color: var(--navy); background: var(--navy-light); }
+
+/* Sentiment cell (Responses): the select plus, when the prospect has a
+   meeting on the books, a flag underneath it. */
+.an-sent-cell { min-width: 118px; }
+.an-booked-flag {
+  display: inline-block;
+  margin-top: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(30, 182, 131, 0.12);
+  color: #0d7a4f;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 /* Message-sent text column (Responses table). The row grows with the
    full RESPONSE; the message you sent clamps to 4 lines (ellipsis on
    the last one) and expands/collapses on click, so a long template
@@ -6795,3 +6838,13 @@ body.header-drawer-open { overflow: hidden; }
   .an-more { flex-wrap: wrap; }
   .an-more .btn-secondary { flex: 1 1 40%; }
 }
+
+/* ---- Analysis tab: collapsed sections ----------------------------
+   LAST in the file on purpose. The mobile block above uses !important
+   on .an-filters, so these have to come after it (and out-specify it)
+   to fold the filter row away at every width. A collapsed card is just
+   its title plus the "+" that opens it back up. */
+#panel-analysis .panel-card.an-collapsed .an-collapsible { display: none; }
+#panel-analysis .panel-card.an-collapsed .an-filters,
+#panel-analysis .panel-card.an-collapsed .an-filter-toggle { display: none !important; }
+#panel-analysis .panel-card.an-collapsed .panel-card-head { margin-bottom: 0; }
