@@ -1693,8 +1693,8 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
    rather than reaching for !important on it. */
 .pr-table thead th.an-hl-col,
 .pr-table tbody td.an-hl-cell {
-  width: 34px;
-  padding-left: 6px;
+  width: 46px;
+  padding-left: 8px;
   padding-right: 10px;
 }
 .pr-table tbody td.an-hl-cell { text-align: center; }
@@ -1704,16 +1704,22 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
    the colour itself. */
 .an-hl-dot {
   display: inline-block;
-  width: 13px;
-  height: 13px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 1.5px solid var(--gray-200);
   border-radius: 50%;
-  background: transparent;
   cursor: pointer;
   opacity: .45;
   transition: opacity .12s, border-color .12s, transform .12s;
 }
+/* Scoped to the unset state via :not() rather than set flat on
+   .an-hl-dot. A plain `background: transparent` here sits LATER in the
+   file than the .an-hl-sw-* colours and has equal specificity, so it
+   silently wins the source-order tiebreak and every set dot renders
+   hollow. :not(.an-hl-dot-set) is (0,2,0), so it beats the swatch when
+   the dot is empty and stops applying the moment it is coloured. */
+.an-hl-dot:not(.an-hl-dot-set) { background: transparent; }
 .an-row:hover .an-hl-dot { opacity: 1; }
 .an-hl-dot:hover { border-color: var(--navy); transform: scale(1.15); }
 .an-hl-dot:focus-visible { opacity: 1; outline: 2px solid var(--navy); outline-offset: 1px; }
