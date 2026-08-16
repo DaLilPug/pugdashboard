@@ -4,10 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Guides - Uptown Tracker</title>
+  <!-- Signed-in reference doc, not marketing. Keep it out of search results:
+       the playbook discusses outreach volume and LinkedIn's practical caps,
+       which has no business being indexable on a vendor domain. -->
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <!-- Hide the page until requireAuth() resolves. Without this the whole
+       playbook paints for a beat before the redirect fires, which defeats
+       the point of gating it. Scripts off = stays hidden, which is the
+       safe default for a signed-in-only document. -->
+  <style id="auth-guard">body { visibility: hidden; }</style>
   <style>
     /* Self-contained styles - guides is a long-lived reference doc that
        should render correctly even if app.css moves or breaks. Mirrors
@@ -3591,6 +3600,20 @@
   <footer class="app-footer">
     <a href="/terms/">Terms</a><span class="sep">·</span><a href="/privacy/">Privacy</a><span class="sep">·</span>&copy; 2026 Uptown Creation, LLC
   </footer>
+
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script src="/auth.js"></script>
+  <script>
+    /* Guides is a signed-in reference doc: same gate as /dashboard/,
+       /account/ and /platform-admin/. requireAuth() redirects to /login/
+       when there's no session; the auth-guard style above keeps the body
+       hidden until we know the visitor is allowed to read it. */
+    (async function gate() {
+      await Auth.requireAuth();
+      document.getElementById('auth-guard')?.remove();
+    })();
+  </script>
 
   <script>
     /* TOC drawer: hamburger toggle + scroll-spy active highlight +

@@ -1,0 +1,12 @@
+# app.uptown.com is a signed-in application, not a content site.
+# Nothing here should be indexed: /guides/ is the operator playbook
+# (it discusses outreach volume and LinkedIn's practical caps) and every
+# other path is either an auth-gated app surface or a legal page.
+
+User-agent: *
+Disallow: /guides/
+Disallow: /dashboard/
+Disallow: /account/
+Disallow: /platform-admin/
+Disallow: /login/
+Disallow: /reset/
