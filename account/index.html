@@ -550,6 +550,31 @@
       </div>
 
       <div class="cad-grid">
+        <!-- Initial Message sits FIRST so it reads left-to-right in the order the
+             operator actually works: message 1, then the follow-ups it triggers,
+             then what happens once someone replies. Reuses the .cad-editor shell
+             and the .tmpl-*-d row classes from the Assets tab so it inherits all
+             existing styling; only the ids are new. -->
+        <div class="cad-editor cad-editor-initial">
+          <div class="cad-head">
+            <div class="cad-head-row">
+              <h2>Initial Message</h2>
+            </div>
+            <p class="page-sub">
+              The first message sent to a new lead. Operators copy these straight from the
+              Tracker. Add variations to rotate wording; the top one is what the extension
+              copies by default, so drag the strongest to the top. Templates support
+              <code>{{first_name}}</code>, <code>{{company}}</code>, <code>{{title}}</code>.
+            </p>
+          </div>
+          <div id="init-list" class="cad-steps"><div class="loading">Loading messages…</div></div>
+          <button id="init-add" class="cad-add" type="button">+ Add variation</button>
+          <div class="cad-actions">
+            <button id="init-save" class="cad-save" type="button" disabled>Save</button>
+            <span id="init-feedback" class="cad-feedback"></span>
+          </div>
+        </div>
+
         <div class="cad-editor">
           <div class="cad-head">
             <div class="cad-head-row">
@@ -848,7 +873,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,links,attachments,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -8529,6 +8554,13 @@
         // and gets initialized off the same client fetch the editors use.
         mountSkipWeekendsToggle();
 
+        // Initial Message — the leftmost card. Not a cadence (no days, no
+        // enrollment), but it lives here because it is step zero of the same
+        // sequence and operators reason about it alongside the follow-ups.
+        // Must run after selectTab un-hid the panel or autoGrow sees
+        // scrollHeight 0 and every textarea collapses.
+        initInitialMessages();
+
         // Two independent editors: regular follow-up cadence (kicked
         // off by the initial 'message' event) and positive response
         // cadence (kicked off by a positive response). Same UI, same
@@ -9116,6 +9148,151 @@
             : `+ Add template`;
           // Fit each template's body to its content. selectTab un-hid the
           // panel before initTemplates ran, so scrollHeight is meaningful.
+          autoGrowAll(listEl, ".tmpl-body-d");
+        }
+      }
+
+      // Initial Message variations — the Cadence tab's first card.
+      // Deliberately NOT sharing clients.templates with the Assets card above:
+      // that column mixes cold outreach with retargeting and one-off replies,
+      // and the extension's Tracker copy control must only ever offer real
+      // message 1's. Same row markup and the same shared assetMove /
+      // assetMoveCtrls helpers, so the two look and behave identically.
+      function initInitialMessages() {
+        const listEl     = document.getElementById("init-list");
+        const addBtn     = document.getElementById("init-add");
+        const saveBtn    = document.getElementById("init-save");
+        const feedbackEl = document.getElementById("init-feedback");
+
+        // Working copy — decoupled from client.initial_messages so an
+        // in-progress edit doesn't mutate the source snapshot until Save wins.
+        let items = Array.isArray(client.initial_messages)
+          ? client.initial_messages.map(t => ({
+              name: typeof t?.name === "string" ? t.name : "",
+              body: typeof t?.body === "string" ? t.body : "",
+            })).slice(0, ASSET_MAX)
+          : [];
+
+        render();
+
+        addBtn.addEventListener("click", () => {
+          if (items.length >= ASSET_MAX) return;
+          items.push({ name: `Variation ${items.length + 1}`, body: "" });
+          setDirty(true);
+          render();
+        });
+
+        listEl.addEventListener("click", async (e) => {
+          const mv = e.target.closest(".asset-up-d, .asset-down-d");
+          if (mv) { if (assetMove(items, Number(mv.dataset.idx), mv.classList.contains("asset-up-d") ? -1 : 1)) { setDirty(true); render(); } return; }
+          const rm = e.target.closest(".tmpl-remove-d");
+          if (rm) {
+            items.splice(Number(rm.dataset.idx), 1);
+            setDirty(true);
+            render();
+            return;
+          }
+          const copy = e.target.closest(".tmpl-copy-d");
+          if (copy) {
+            const body = items[Number(copy.dataset.idx)]?.body || "";
+            try {
+              await navigator.clipboard.writeText(body);
+              copy.textContent = "Copied";
+              copy.classList.add("copied");
+              setTimeout(() => { copy.textContent = "Copy"; copy.classList.remove("copied"); }, 1400);
+            } catch (err) {
+              copy.textContent = "Failed";
+              setTimeout(() => { copy.textContent = "Copy"; }, 1400);
+            }
+          }
+        });
+
+        // In-place array update, no rerender — a rerender here would steal
+        // focus from whichever field is being typed into.
+        listEl.addEventListener("input", (e) => {
+          const el = e.target;
+          const idx = Number(el.dataset.idx);
+          if (!Number.isInteger(idx) || !items[idx]) return;
+          if (el.classList.contains("tmpl-name-d")) {
+            items[idx].name = el.value;
+            setDirty(true);
+          } else if (el.classList.contains("tmpl-body-d")) {
+            autoGrow(el);
+            items[idx].body = el.value;
+            setDirty(true);
+          }
+        });
+
+        saveBtn.addEventListener("click", save);
+
+        async function save() {
+          const payload = items.slice(0, ASSET_MAX).map((t, i) => ({
+            name: (t.name || "").trim() || `Variation ${i + 1}`,
+            body: (t.body || ""),
+          }));
+          saveBtn.disabled = true;
+          feedbackEl.className = "cad-feedback";
+          feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch(
+              `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+              {
+                method: "PATCH",
+                body:   JSON.stringify({ initial_messages: payload }),
+                headers:{ Prefer: "return=minimal" },
+              }
+            );
+            items = payload;
+            client.initial_messages = payload; // keep local snapshot fresh
+            saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok";
+            feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+            render();
+          } catch (err) {
+            saveBtn.disabled = false;
+            feedbackEl.className = "cad-feedback err";
+            feedbackEl.textContent = err.message || "Save failed";
+          }
+        }
+
+        function setDirty(v) {
+          saveBtn.disabled = !v;
+          if (v) {
+            feedbackEl.textContent = "";
+            feedbackEl.className = "cad-feedback";
+          }
+        }
+
+        function render() {
+          if (!items.length) {
+            listEl.innerHTML = `<div class="placeholder" style="padding:20px;">
+              <strong>No initial messages yet</strong>
+              Click <em>+ Add variation</em> to write the first message operators send.
+            </div>`;
+          } else {
+            // Row 0 is flagged because array order is load-bearing here: the
+            // extension copies index 0 unless the operator picks another from
+            // the dropdown, so "which one is on top" is a real setting.
+            listEl.innerHTML = items.map((t, i) => `
+              <div class="tmpl-row-d">
+                <div class="tmpl-row-head-d">
+                  ${assetMoveCtrls(i, items.length)}
+                  <input class="tmpl-name-d" type="text" data-idx="${i}"
+                         value="${esc(t.name || "")}" placeholder="Variation name" />
+                  ${i === 0 ? '<span class="init-default-d" title="The extension copies this one unless another is picked">Default</span>' : ""}
+                  <button type="button" class="tmpl-copy-d"   data-idx="${i}">Copy</button>
+                  <button type="button" class="tmpl-remove-d" data-idx="${i}" title="Remove variation">×</button>
+                </div>
+                <textarea class="tmpl-body-d" rows="3" data-idx="${i}"
+                          placeholder="Hey {{first_name}}, …">${esc(t.body || "")}</textarea>
+              </div>
+            `).join("");
+          }
+          addBtn.disabled = items.length >= ASSET_MAX;
+          addBtn.textContent = items.length >= ASSET_MAX
+            ? `+ Add variation (${ASSET_MAX} max)`
+            : `+ Add variation`;
           autoGrowAll(listEl, ".tmpl-body-d");
         }
       }

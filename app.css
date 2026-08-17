@@ -2071,10 +2071,16 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 
 /* ---- Cadence tab — side-by-side editors on desktop, stacked on
-   mobile. .cad-grid wraps the two .cad-editor cards. */
+   mobile. .cad-grid wraps the three .cad-editor cards:
+   Initial Message, Follow-up Cadence, Positive Response Cadence.
+   auto-fit rather than three fixed tracks: .cad-step-row is a flex row
+   with no wrap carrying a 72px day input and a right-aligned remove
+   button, and it starts crowding below ~300px of inner card width, so
+   the third column has to drop out before the tracks get that narrow.
+   320px is the same floor .assets-grid uses for its three cards. */
 .cad-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
   align-items: start;
 }
@@ -2082,11 +2088,6 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   /* Override the existing max-width: 720px cap so each card fills
      its column on desktop. */
   max-width: none;
-}
-@media (max-width: 1100px) {
-  .cad-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Positive editor accent — green top border. */
@@ -2732,6 +2733,25 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 .tmpl-name-d:hover { border-color: var(--border); }
 .tmpl-name-d:focus { border-color: var(--accent); background: #fff; }
+
+/* "Default" badge on the first Initial Message variation. Array order is a
+   real setting on that card — the extension copies index 0 — so the top row
+   is labelled rather than leaving the operator to infer it. flex:none keeps
+   it from stealing width from the name input beside it. */
+.init-default-d {
+  flex: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 3px;
+  color: #107a3e;
+  background: #e8f5ed;
+  border: 1px solid #b7e0c6;
+  line-height: 1.3;
+  white-space: nowrap;
+}
 
 .tmpl-copy-d, .tmpl-remove-d {
   background: #fff;
