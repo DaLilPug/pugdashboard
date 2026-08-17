@@ -2044,30 +2044,59 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 /* ---- Cadence tab "Skip weekends" rule row ─────────────────────────────
    Single per-client setting that governs both cadence cards below.
    Sits above .cad-grid as a compact toggle + description row. */
-.cad-skip-weekends-row {
+/* Cadence-tab preference line. One client-wide setting that is almost never
+   changed, so it sits quietly at the right above the cards instead of wearing
+   a full-width banner. It gets loud only in its non-default state (see
+   .is-calendar-days below), which is the one case an operator needs to catch. */
+.cad-prefs-row {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
-  margin-bottom: 18px;
-  background: #fff;
-  border: 1px solid var(--border, #dfe4ea);
-  border-radius: 8px;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+  min-height: 24px;
 }
-.cad-skip-weekends-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-.cad-skip-weekends-text strong {
-  font-weight: 600;
-  color: var(--text, #15212b);
-}
-.cad-skip-weekends-sub {
+.cad-prefs-note {
   font-size: 12px;
   color: var(--muted, #5b6673);
+  line-height: 1.3;
+}
+/* The label names the setting, so it stays muted in both states. Needs the
+   :checked in the selector to outrank the base
+   `.cad-toggle-input:checked ~ .cad-toggle-label` rule, which turns card
+   toggles green when on - green here would pull the eye straight back to the
+   thing we are trying to calm down. */
+.cad-prefs-row .cad-toggle-label,
+.cad-prefs-row .cad-toggle-input:checked ~ .cad-toggle-label {
+  font-size: 12px;
+  color: var(--muted, #5b6673);
+  font-weight: 500;
+  min-width: 0;
+}
+/* Smaller than the card toggles on purpose: this is a preference, and the
+   green switches inside the cards are the ones that gate real behavior.
+   Mirrors the base toggle exactly - `left` (not transform) and the general
+   sibling combinator `~` (not `+`), because the input is not adjacent to the
+   track in the markup. Every selector here carries the extra .cad-toggle-sm
+   class, so it beats the base rules on specificity regardless of where it
+   sits in the file. Geometry: 30 - 13 - 2 = 15px of travel. */
+.cad-toggle-sm .cad-toggle-track { width: 30px; height: 17px; }
+.cad-toggle-sm .cad-toggle-thumb { width: 13px; height: 13px; }
+.cad-toggle-sm .cad-toggle-input:checked ~ .cad-toggle-track .cad-toggle-thumb {
+  left: 15px;
+}
+/* Weekends included: the unusual state. Amber, not red - nothing is broken,
+   but every DAY number on this tab now means something different. */
+.cad-prefs-row.is-calendar-days .cad-prefs-note {
+  color: #8a6100;
+  background: #fff7e3;
+  border: 1px solid #efdca6;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-weight: 500;
+}
+@media (max-width: 700px) {
+  .cad-prefs-row { justify-content: flex-start; flex-wrap: wrap; }
 }
 
 /* ---- Cadence tab — side-by-side editors on desktop, stacked on

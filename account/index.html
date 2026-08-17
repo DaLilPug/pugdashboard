@@ -537,16 +537,21 @@
            below. ON = step day numbers count business days only (Mon-Fri).
            OFF = original calendar-day math. Defaults ON. See
            add_skip_weekends_in_cadence.sql for the view-level wiring. -->
-      <div class="cad-skip-weekends-row">
-        <label class="cad-toggle" title="When ON, cadence step days count business days only (Mon-Fri). When OFF, calendar days as before.">
+      <!-- Skip weekends is one client-wide preference governing every card below,
+           and it is almost never turned off. It used to be a full-width bordered
+           banner, which made the least interesting control on the tab the most
+           prominent. Now it is a quiet right-aligned line that only raises its
+           voice in the state worth noticing: when it is OFF, #cad-skip-weekends-row
+           gets .is-calendar-days and the note turns amber. Deliberately NOT
+           duplicated into each cadence card - it is a single setting, and a second
+           green toggle inside a card reads as that card's on/off state. -->
+      <div class="cad-prefs-row" id="cad-skip-weekends-row">
+        <span class="cad-prefs-note" id="cad-skip-weekends-note"></span>
+        <label class="cad-toggle cad-toggle-sm" title="When ON, cadence step days count business days only (Mon-Fri). When OFF, calendar days including weekends.">
           <input id="cad-skip-weekends" class="cad-toggle-input" type="checkbox" checked />
           <span class="cad-toggle-track" aria-hidden="true"><span class="cad-toggle-thumb"></span></span>
-          <span class="cad-toggle-label">On</span>
+          <span class="cad-toggle-label">Skip weekends</span>
         </label>
-        <div class="cad-skip-weekends-text">
-          <strong>Skip weekends</strong>
-          <span class="cad-skip-weekends-sub">Cadence step days count business days only. Applies to both cadences below.</span>
-        </div>
       </div>
 
       <div class="cad-grid">
@@ -8622,9 +8627,18 @@
             alert(`Couldn't ${v ? "enable" : "disable"} skip weekends: ${err.message || err}`);
           }
         });
+        // The toggle's own label stays static ("Skip weekends") - it names the
+        // setting, not its state, so it can't be misread as a cadence on/off.
+        // State lives in the note beside it, which is silent in the normal case
+        // and amber in the one worth noticing.
         function updateLabel() {
-          const lbl = el.closest(".cad-toggle")?.querySelector(".cad-toggle-label");
-          if (lbl) lbl.textContent = el.checked ? "On" : "Off";
+          const row  = document.getElementById("cad-skip-weekends-row");
+          const note = document.getElementById("cad-skip-weekends-note");
+          if (!row || !note) return;
+          row.classList.toggle("is-calendar-days", !el.checked);
+          note.textContent = el.checked
+            ? "Step days count business days"
+            : "Counting calendar days, weekends included";
         }
       }
 
