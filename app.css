@@ -7019,17 +7019,17 @@ body.header-drawer-open { overflow: hidden; }
    stack and text columns narrow so less panning is needed. */
 @media (max-width: 800px) {
   /* Section-head controls stack under the title. */
-  #panel-analysis .panel-card-head { align-items: flex-start; }
-  #panel-analysis .timeframe-wrap { justify-content: flex-start; }
-  #panel-analysis .timeframe-custom { flex-wrap: wrap; }
-  #panel-analysis .timeframe-custom .filter-date { min-width: 110px; }
+  .an-scope .panel-card-head { align-items: flex-start; }
+  .an-scope .timeframe-wrap { justify-content: flex-start; }
+  .an-scope .timeframe-custom { flex-wrap: wrap; }
+  .an-scope .timeframe-custom .filter-date { min-width: 110px; }
 
   /* All filters collapse behind the "+ Filters" toggle - the date
      pills / custom range in each head, and on Responses also the
      sentiment pills + search toolbar. Desktop never sees the toggle. */
-  #panel-analysis .an-filter-toggle { display: inline-flex; align-items: center; }
-  #panel-analysis .an-filters { display: none !important; }
-  #panel-analysis .an-filters-open .an-filters { display: flex !important; }
+  .an-scope .an-filter-toggle { display: inline-flex; align-items: center; }
+  .an-scope .an-filters { display: none !important; }
+  .an-scope .an-filters-open .an-filters { display: flex !important; }
 
   /* Benchmark tiles: two-up instead of five across. */
   .an-bench-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
@@ -7056,7 +7056,163 @@ body.header-drawer-open { overflow: hidden; }
    on .an-filters, so these have to come after it (and out-specify it)
    to fold the filter row away at every width. A collapsed card is just
    its title plus the "+" that opens it back up. */
-#panel-analysis .panel-card.an-collapsed .an-collapsible { display: none; }
-#panel-analysis .panel-card.an-collapsed .an-filters,
-#panel-analysis .panel-card.an-collapsed .an-filter-toggle { display: none !important; }
-#panel-analysis .panel-card.an-collapsed .panel-card-head { margin-bottom: 0; }
+.an-scope .panel-card.an-collapsed .an-collapsible { display: none; }
+.an-scope .panel-card.an-collapsed .an-filters,
+.an-scope .panel-card.an-collapsed .an-filter-toggle { display: none !important; }
+.an-scope .panel-card.an-collapsed .panel-card-head { margin-bottom: 0; }
+
+/* ── Internal-only tabs ────────────────────────────────────────────────────
+   Reply Instructions, Assets, Integrations and Analysis are hidden from the
+   public share link. For a signed-in operator they stay fully usable but wear
+   a light blue wash so it reads at a glance which tabs a client cannot see.
+   Deliberately a background tint rather than a colour change on the label:
+   .sub-tab already uses colour for hover and .active, and overloading that
+   would make an internal tab look selected. */
+.sub-tab[data-internal] {
+  background: #eaf2fb;
+}
+.sub-tab[data-internal]:hover {
+  background: #dfeaf7;
+}
+.sub-tab[data-internal].active {
+  background: #d8e7f6;
+}
+
+/* Share visitors never see these at all. The class goes on <body> in
+   initShare() once the session is known to belong to a share user. */
+body.is-share-view .sub-tab[data-internal] { display: none; }
+
+/* ---- Monthly Activity (Summary tab) --------------------------------
+   Reuses .period-table wholesale; these rules only add what months need
+   that days didn't. Two differences drive all of it: the table can grow
+   past the viewport once months are expanded (Daily Activity is always
+   exactly 7 columns), and month headers carry an expand control.
+
+   min-width is dropped to auto because an account with three months of
+   history would otherwise be stretched to 760px of mostly empty space. */
+.mon-table {
+  min-width: auto;
+}
+
+/* Pin the metric-label column so the row you're reading stays identified
+   while you scroll back through months. Both header and body cells need
+   their own background - a transparent sticky cell lets the scrolled
+   columns slide visibly underneath it. */
+.mon-table thead th:first-child,
+.mon-table tbody th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+}
+.mon-table tbody tr:hover th:first-child {
+  background: #fafbfc;
+}
+.mon-table tr.period-rate-row > th:first-child {
+  background: #f4f6f8;
+}
+.mon-table tr.period-section-row > th {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+/* Month header: label plus the +/- toggle. The button sits left of the
+   label rather than right, so the toggles line up in a column no matter
+   how wide each month's label renders. */
+.mon-table thead th.mon-month-col {
+  text-align: right;
+  white-space: nowrap;
+}
+.mon-head-label {
+  vertical-align: middle;
+}
+.mon-exp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid rgba(1, 58, 82, 0.18);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--navy, #013A52);
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+}
+.mon-exp:hover {
+  background: #eef4f8;
+  border-color: rgba(1, 58, 82, 0.35);
+}
+.mon-exp[aria-expanded="true"] {
+  background: var(--navy, #013A52);
+  border-color: var(--navy, #013A52);
+  color: #fff;
+}
+
+/* Days revealed inside an expanded month read as a nested group: tinted
+   band, and a rule down the left edge marking where the month it belongs
+   to ends. Lighter type keeps the month totals dominant. */
+.mon-table td.mon-day-col,
+.mon-table thead th.mon-day-col {
+  background: rgba(1, 58, 82, 0.022);
+  color: #5c6b78;
+  font-weight: 400;
+}
+.mon-table .mon-day-first {
+  border-left: 1px solid rgba(1, 58, 82, 0.12);
+}
+.mon-table thead th.mon-day-col {
+  font-size: 10px;
+}
+
+/* ---- Revenue Summary (Summary tab) --------------------------------- */
+.sum-revenue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.sum-rev-cell {
+  flex: 1 1 200px;
+  padding: 16px 18px;
+  border: 1px solid rgba(1, 58, 82, 0.10);
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+.sum-rev-label {
+  font-family: Montserrat, sans-serif;
+  font-size: 11px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #6e7a87;
+  font-weight: 700;
+}
+.sum-rev-val {
+  margin-top: 6px;
+  font-family: Montserrat, sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--navy, #013A52);
+  line-height: 1.15;
+}
+.sum-rev-val.sum-rev-closed {
+  color: #107a3e;
+}
+.sum-rev-sub {
+  margin-top: 4px;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  color: #8a95a1;
+}
+.sum-rev-empty {
+  flex: 1 1 100%;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  color: #8a95a1;
+}

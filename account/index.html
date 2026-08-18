@@ -88,22 +88,98 @@
     <div id="account-meta" class="account-meta"></div>
   </div>
 
+  <!-- Tab order here IS the on-screen order; nothing else drives it. Panels may
+       sit in any order in the document because only one is ever un-hidden.
+       data-internal marks the four tabs a client never sees on the public share
+       link. Two jobs: initShare() hides them for share visitors, and for a
+       signed-in operator they get a light blue tint so it is obvious at a glance
+       which tabs are internal. Keep the attribute and the initShare list in sync. -->
   <div class="sub-tabs" id="sub-tabs">
     <button class="sub-tab active" data-tab="summary"       type="button">Summary</button>
-    <button class="sub-tab"        data-tab="analysis"      type="button">Analysis</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
     <button class="sub-tab"        data-tab="followups"     type="button">Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"       type="button">Cadence</button>
-    <button class="sub-tab"        data-tab="replyinst"     type="button">Reply Instructions</button>
-    <button class="sub-tab"        data-tab="assets"        type="button">Assets</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
-    <button class="sub-tab"        data-tab="integrations"  type="button">Integrations</button>
+    <button class="sub-tab"        data-tab="replyinst"     type="button" data-internal>Reply Instructions</button>
+    <button class="sub-tab"        data-tab="assets"        type="button" data-internal>Assets</button>
+    <button class="sub-tab"        data-tab="meetings"      type="button">Meetings</button>
+    <button class="sub-tab"        data-tab="responses"     type="button">Responses</button>
+    <button class="sub-tab"        data-tab="integrations"  type="button" data-internal>Integrations</button>
+    <button class="sub-tab"        data-tab="analysis"      type="button" data-internal>Analysis</button>
   </div>
 
   <main class="main main-wide">
 
     <!-- =================== SUMMARY ==================== -->
     <section id="panel-summary" class="sub-panel">
+      <!-- Monthly Activity: the same metric rows as Daily Activity, bucketed by
+           month instead of by day. Current month is the LEFTMOST month column and
+           older months run to the right, which is the reverse of the tracker
+           spreadsheets and is deliberate - the month you care about is the one you
+           are in. Each month header carries a + that expands to the individual days
+           inside that month.
+           Built entirely from the all-time daily_buckets array the Summary RPC
+           already returns; it is NOT a per-month refetch. Calling the RPC once per
+           month would misclassify positive-cadence follow-ups, because the
+           regular/positive split depends on a window-scoped anchors CTE - the
+           numbers would then disagree with Period Comparison on this same page. -->
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Monthly Activity</h2>
+        </div>
+        <div class="panel-card-sub">Every month with activity. Click <strong>+</strong> on a month to break it out by day.</div>
+        <div id="sum-monthly" class="period-wrap"><div class="loading">Loading…</div></div>
+      </section>
+
+      <!-- Totals of the Opportunity value and Revenue closed columns operators fill
+           in on the Meetings tab. Summed over DISTINCT prospects, not over meeting
+           rows: the money lives on the prospect while Meetings has one row per
+           booking, and 611 prospects currently hold more than one booking, so
+           summing rows would count those twice. -->
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Revenue Summary</h2>
+        </div>
+        <div id="sum-revenue" class="sum-revenue"><div class="loading">Loading…</div></div>
+      </section>
+
+      <!-- Danger zone: only rendered for archived accounts AND only
+           when the signed-in operator is admin of this account's
+           org (or platform admin). Reveal logic + click handlers
+           live in the main IIFE near startRenameAccount. -->
+      <section id="danger-zone" class="panel-card panel-card-danger hidden">
+        <div class="panel-card-head">
+          <h2>Danger zone</h2>
+          <span class="panel-card-sub">This account is archived. These actions are permanent.</span>
+        </div>
+        <div class="danger-actions">
+          <div class="danger-action">
+            <div class="danger-action-text">
+              <h3>Delete account</h3>
+              <p>Permanently deletes this account and all of its prospect and outreach data. The audit log keeps a record of who did it.</p>
+            </div>
+            <button id="dz-delete-btn" class="btn-danger" type="button">Delete account</button>
+          </div>
+          <div class="danger-action">
+            <div class="danger-action-text">
+              <h3>Transfer data</h3>
+              <p>Move this account to a different organization. The recipient must already have an Uptown account and be an admin of another organization.</p>
+            </div>
+            <button id="dz-transfer-btn" class="btn-danger-soft" type="button">Transfer data</button>
+          </div>
+          <div class="danger-action">
+            <div class="danger-action-text">
+              <h3>Merge into another account</h3>
+              <p>Move all prospects and outreach into a different active account in this organization. This account is deleted when the merge completes.</p>
+            </div>
+            <button id="dz-merge-btn" class="btn-danger-soft" type="button">Merge into…</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- =================== ANALYSIS ===================== -->
+    <section id="panel-analysis" class="sub-panel hidden an-scope">
       <section class="panel-card summary-panel">
         <div class="panel-card-head">
           <h2>Summary</h2>
@@ -178,44 +254,50 @@
         </div>
       </section>
 
-      <!-- Danger zone: only rendered for archived accounts AND only
-           when the signed-in operator is admin of this account's
-           org (or platform admin). Reveal logic + click handlers
-           live in the main IIFE near startRenameAccount. -->
-      <section id="danger-zone" class="panel-card panel-card-danger hidden">
+      <section class="panel-card">
         <div class="panel-card-head">
-          <h2>Danger zone</h2>
-          <span class="panel-card-sub">This account is archived. These actions are permanent.</span>
-        </div>
-        <div class="danger-actions">
-          <div class="danger-action">
-            <div class="danger-action-text">
-              <h3>Delete account</h3>
-              <p>Permanently deletes this account and all of its prospect and outreach data. The audit log keeps a record of who did it.</p>
+          <h2>Title performance</h2>
+          <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
+          <div class="timeframe-wrap an-filters">
+            <div class="fu-view-toggle" role="group" aria-label="Group titles by">
+              <button class="fu-view-btn active" data-an-titleview="seniority" type="button">By seniority</button>
+              <button class="fu-view-btn" data-an-titleview="title" type="button">By exact title</button>
             </div>
-            <button id="dz-delete-btn" class="btn-danger" type="button">Delete account</button>
-          </div>
-          <div class="danger-action">
-            <div class="danger-action-text">
-              <h3>Transfer data</h3>
-              <p>Move this account to a different organization. The recipient must already have an Uptown account and be an admin of another organization.</p>
+            <div class="timeframe-pills" id="an-pills">
+              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
+              <button class="timeframe-pill" data-tf="all" type="button">All Time</button>
             </div>
-            <button id="dz-transfer-btn" class="btn-danger-soft" type="button">Transfer data</button>
-          </div>
-          <div class="danger-action">
-            <div class="danger-action-text">
-              <h3>Merge into another account</h3>
-              <p>Move all prospects and outreach into a different active account in this organization. This account is deleted when the merge completes.</p>
+            <div class="timeframe-custom">
+              <input type="date" class="filter-date" id="an-from" aria-label="Analysis from date">
+              <span class="timeframe-custom-sep">to</span>
+              <input type="date" class="filter-date" id="an-to" aria-label="Analysis to date">
             </div>
-            <button id="dz-merge-btn" class="btn-danger-soft" type="button">Merge into…</button>
           </div>
         </div>
+        <div class="panel-card-sub">Who accepts, who replies, and who books - by job title, in the selected window. Each prospect counts once. Acceptance is measured only over prospects who received a connection request.</div>
+        <div id="an-title-callouts"></div>
+        <div id="an-titles"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Health check</h2>
+        </div>
+        <div class="panel-card-sub">The funnel scored against Uptown's benchmarks, over the timeframe selected in Title performance above, with the diagnosis and the lever to pull. <a href="/guides/#benchmarks" target="_blank" rel="noopener">How the benchmarks work</a></div>
+        <div id="an-bench" class="an-bench-grid"><div class="loading">Loading…</div></div>
+        <div id="an-diagnosis"></div>
+        <div class="panel-card-sub" id="an-resp-lag"></div>
       </section>
     </section>
 
-    <!-- =================== ANALYSIS ===================== -->
-    <section id="panel-analysis" class="sub-panel hidden">
-
+    <!-- =================== MEETINGS ===================== -->
+    <section id="panel-meetings" class="sub-panel hidden an-scope">
       <section class="panel-card" data-an-card="meet">
         <div class="panel-card-head">
           <h2>Meetings</h2>
@@ -249,7 +331,10 @@
         </div>
         <div id="an-meetings" class="an-collapsible"><div class="loading">Loading…</div></div>
       </section>
+    </section>
 
+    <!-- =================== RESPONSES ==================== -->
+    <section id="panel-responses" class="sub-panel hidden an-scope">
       <section class="panel-card" data-an-card="resp">
         <div class="panel-card-head">
           <h2>Responses</h2>
@@ -296,48 +381,6 @@
         </div>
         <div id="an-responses" class="an-collapsible"><div class="loading">Loading…</div></div>
       </section>
-
-      <section class="panel-card">
-        <div class="panel-card-head">
-          <h2>Title performance</h2>
-          <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
-          <div class="timeframe-wrap an-filters">
-            <div class="fu-view-toggle" role="group" aria-label="Group titles by">
-              <button class="fu-view-btn active" data-an-titleview="seniority" type="button">By seniority</button>
-              <button class="fu-view-btn" data-an-titleview="title" type="button">By exact title</button>
-            </div>
-            <div class="timeframe-pills" id="an-pills">
-              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
-              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
-              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
-              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
-              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
-              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
-              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
-              <button class="timeframe-pill" data-tf="all" type="button">All Time</button>
-            </div>
-            <div class="timeframe-custom">
-              <input type="date" class="filter-date" id="an-from" aria-label="Analysis from date">
-              <span class="timeframe-custom-sep">to</span>
-              <input type="date" class="filter-date" id="an-to" aria-label="Analysis to date">
-            </div>
-          </div>
-        </div>
-        <div class="panel-card-sub">Who accepts, who replies, and who books - by job title, in the selected window. Each prospect counts once. Acceptance is measured only over prospects who received a connection request.</div>
-        <div id="an-title-callouts"></div>
-        <div id="an-titles"><div class="loading">Loading…</div></div>
-      </section>
-
-      <section class="panel-card">
-        <div class="panel-card-head">
-          <h2>Health check</h2>
-        </div>
-        <div class="panel-card-sub">The funnel scored against Uptown's benchmarks, over the timeframe selected in Title performance above, with the diagnosis and the lever to pull. <a href="/guides/#benchmarks" target="_blank" rel="noopener">How the benchmarks work</a></div>
-        <div id="an-bench" class="an-bench-grid"><div class="loading">Loading…</div></div>
-        <div id="an-diagnosis"></div>
-        <div class="panel-card-sub" id="an-resp-lag"></div>
-      </section>
-
     </section>
 
     <!-- =================== PROSPECTS ===================== -->
@@ -916,6 +959,10 @@
       // synthetic user; the existing RLS enforces the scope). Hidden from
       // share-link visitors, who are themselves access-holders (share-admin
       // also rejects them server-side).
+      // Tabs stripped for a share visitor; empty for a signed-in operator.
+      // Declared with let, above the call, because initShare() runs before
+      // the tab plumbing that consumes it.
+      let shareHiddenTabs = [];
       initShare();
       function initShare() {
         const sess = sb.getSession();
@@ -932,6 +979,31 @@
           document.getElementById("user-email")?.classList.add("hidden");
           document.getElementById("team-link")?.classList.add("hidden");
           document.getElementById("guides-link")?.classList.add("hidden");
+
+          // Drop the internal-only tabs. The buttons are REMOVED, not just
+          // hidden in CSS, because mobile-nav.js mirrors every .sub-tab into a
+          // <select> below 800px and doesn't skip hidden ones - a CSS-only hide
+          // would leave all four reachable from the mobile dropdown. Which of
+          // the two runs first isn't guaranteed (mobile-nav is deferred, this
+          // is behind an await), so both orders are handled: remove the
+          // buttons, and strip the options if the select is already built.
+          //
+          // shareHiddenTabs is read again further down, once VALID_TABS exists,
+          // to keep a hand-typed #analysis from opening the panel anyway. It
+          // can't be done here - VALID_TABS is a const declared below this
+          // call, so touching it now is a temporal-dead-zone ReferenceError.
+          //
+          // This is presentation, not an access boundary: a share session still
+          // passes has_client_access, so the data behind these tabs stays
+          // fetchable. Austin's call - clients aren't expected to go digging.
+          document.body.classList.add("is-share-view");
+          const strip = document.getElementById("sub-tabs");
+          shareHiddenTabs = [...strip.querySelectorAll(".sub-tab[data-internal]")]
+            .map(b => { const t = b.dataset.tab; b.remove(); return t; });
+          const mobSel = strip.nextElementSibling;
+          if (mobSel && mobSel.classList.contains("mobile-pill-select")) {
+            [...mobSel.options].forEach(o => { if (shareHiddenTabs.includes(o.value)) o.remove(); });
+          }
         }
 
         // Never show the Share control to a share-link visitor.
@@ -1047,7 +1119,30 @@
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, analysis: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false };
+      const loaded = { summary: false, analysis: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false, meetings: false, responses: false };
+
+      // Three tabs (Analysis, Meetings, Responses) are served by the ONE
+      // initAnalysis() closure - its four cards share a single anState, one
+      // fetch and one set of delegated listeners, so splitting the closure
+      // would have meant untangling all of that. The cards live on different
+      // panels now; the code behind them did not move. Likewise Summary's cards
+      // moved onto Analysis, so initSummary() has to be reachable from both.
+      // These two flags make each initialiser run exactly once no matter which
+      // of its tabs the operator opens first - `loaded` alone cannot do that,
+      // since it is keyed per tab.
+      let analysisInited = false;
+      let summaryInited  = false;
+
+      // Set by initSummary. The trend chart now lives on the Analysis panel
+      // while initSummary also runs for the Summary tab, so it can be built
+      // inside a display:none panel - where the canvas measures 0x0 and
+      // Chart.js lays it out at zero height. Whether its ResizeObserver would
+      // recover on reveal is not something to leave to chance; an explicit
+      // resize() once the panel is visible restores it (measured: 0 -> full
+      // height) and is a no-op if Chart.js already handled it.
+      let resizeSummaryChart = null;
+      function initAnalysisOnce() { if (!analysisInited) { analysisInited = true; initAnalysis(); } }
+      function initSummaryOnce()  { if (!summaryInited)  { summaryInited  = true; initSummary();  } }
 
       tabs.addEventListener("click", (e) => {
         const btn = e.target.closest(".sub-tab");
@@ -1058,6 +1153,9 @@
       // Whitelist of valid tab names — used for sanitizing the URL
       // hash on page load. Anything outside this falls back to summary.
       const VALID_TABS = new Set(Object.keys(loaded));
+      // A share visitor has no button for these, but the hash is theirs to
+      // type. Dropping them from the whitelist sends #analysis to Summary.
+      shareHiddenTabs.forEach(t => VALID_TABS.delete(t));
 
       function selectTab(name) {
         tabs.querySelectorAll(".sub-tab").forEach(b =>
@@ -1067,8 +1165,12 @@
           p.classList.toggle("hidden", p.id !== `panel-${name}`)
         );
         if (!loaded[name]) {
-          if      (name === "summary")   initSummary();
-          else if (name === "analysis")  initAnalysis();
+          if      (name === "summary")   initSummaryOnce();
+          // Analysis now carries Summary's cards above its own Health check,
+          // so it needs both initialisers.
+          else if (name === "analysis")  { initSummaryOnce(); initAnalysisOnce(); }
+          else if (name === "meetings")  initAnalysisOnce();
+          else if (name === "responses") initAnalysisOnce();
           else if (name === "prospects") initProspects();
           else if (name === "followups") initFollowups();
           else if (name === "assets") initAssets();
@@ -1087,6 +1189,10 @@
         if (location.hash !== newHash) {
           history.replaceState(null, "", location.pathname + location.search + newHash);
         }
+        // After the panel is visible, not before - resize() measures the
+        // canvas's parent. No-op if the chart hasn't been built yet; the
+        // fetch that builds it will then do so against a visible canvas.
+        if (name === "analysis" && resizeSummaryChart) resizeSummaryChart();
       }
 
       // Resolve the initial tab: URL hash if present and recognized,
@@ -1119,6 +1225,13 @@
         const trendsEl  = document.getElementById("sum-trends");
         const compareEl = document.getElementById("sum-compare");
         const dailyEl   = document.getElementById("sum-daily");
+        const monthlyEl = document.getElementById("sum-monthly");
+        const revenueEl = document.getElementById("sum-revenue");
+
+        // Months the operator has expanded into days, as "YYYY-MM". Lives
+        // here rather than in the renderer so a re-render (which rebuilds
+        // the whole table's innerHTML) keeps whatever was open.
+        const monthlyExpanded = new Set();
 
         // Daily Activity state. weekStart is a YYYY-MM-DD string for
         // the Sunday of the visible week (in America/Chicago, matching
@@ -1136,6 +1249,7 @@
         // re-renders from cache — no refetch.
         let summaryByTf = null;
         let chart;
+        resizeSummaryChart = () => { if (chart) chart.resize(); };
 
         pillsEl.addEventListener("click", (e) => {
           const btn = e.target.closest(".timeframe-pill");
@@ -1220,6 +1334,7 @@
             kpiEl.innerHTML     = `<div class="placeholder"><strong>Couldn't load summary</strong>${esc(err.message || "")}</div>`;
             trendsEl.innerHTML  = "";
             compareEl.innerHTML = "";
+            monthlyEl.innerHTML = "";
             return;
           }
 
@@ -1232,6 +1347,7 @@
           renderTrendsByPeriodCached(trendsEl, summaryByTf);
           renderPeriodComparisonCached(compareEl, summaryByTf);
           renderDailyActivityCached(dailyEl, summaryByTf, dailyWeekStart);
+          renderMonthlyActivityCached(monthlyEl, summaryByTf, monthlyExpanded);
         }
 
         // Wire prev / next / today navigation. Buttons live in the
@@ -1247,6 +1363,64 @@
             renderDailyActivityCached(dailyEl, summaryByTf, dailyWeekStart);
           });
         });
+
+        // Month expand / collapse. Delegated because the table is rebuilt
+        // wholesale on every toggle.
+        monthlyEl.addEventListener("click", (e) => {
+          const btn = e.target.closest("[data-mon-exp]");
+          if (!btn || !summaryByTf) return;
+          const key = btn.dataset.monExp;
+          if (monthlyExpanded.has(key)) monthlyExpanded.delete(key);
+          else monthlyExpanded.add(key);
+          renderMonthlyActivityCached(monthlyEl, summaryByTf, monthlyExpanded);
+        });
+
+        loadRevenueSummary();
+
+        // Opportunity value / revenue closed, totalled across the account.
+        // Read straight off prospects rather than off the Meetings rows: the
+        // money is stored on the prospect, and a prospect with two bookings
+        // would otherwise be counted twice. One row per prospect here, so
+        // "distinct" is structural. Its own fetch, not anState's, so the
+        // card fills in whether or not the operator ever opens Meetings.
+        async function loadRevenueSummary() {
+          let rows;
+          try {
+            rows = await sb.sbFetchAll(
+              `/rest/v1/prospects?client_id=eq.${encodeURIComponent(clientId)}` +
+              `&select=opportunity_value,revenue_closed` +
+              `&or=(opportunity_value.not.is.null,revenue_closed.not.is.null)`
+            );
+          } catch (err) {
+            revenueEl.innerHTML = `<div class="placeholder"><strong>Couldn't load revenue</strong>${esc(err.message || "")}</div>`;
+            return;
+          }
+
+          // Only positive amounts count toward either total. A 0 is an
+          // operator explicitly recording "no value", not a missing entry,
+          // and including it in the count would overstate how many deals
+          // actually carry a number.
+          let opp = 0, rev = 0, oppCount = 0, revCount = 0;
+          for (const r of rows) {
+            const o = Number(r.opportunity_value), v = Number(r.revenue_closed);
+            if (o > 0) { opp += o; oppCount++; }
+            if (v > 0) { rev += v; revCount++; }
+          }
+
+          const cell = (label, total, count, cls) => `
+            <div class="sum-rev-cell">
+              <div class="sum-rev-label">${esc(label)}</div>
+              <div class="sum-rev-val ${cls}">${esc(fmtMoney(total))}</div>
+              <div class="sum-rev-sub">${fmtInt(count)} ${count === 1 ? "prospect" : "prospects"}</div>
+            </div>`;
+
+          revenueEl.innerHTML =
+            cell("Opportunity Value", opp, oppCount, "") +
+            cell("Revenue Closed",    rev, revCount, "sum-rev-closed") +
+            (oppCount || revCount
+              ? ""
+              : `<div class="sum-rev-empty">No amounts recorded yet. Add them on the Meetings tab.</div>`);
+        }
 
         // Fetch one timeframe via the client_summary_for_period RPC.
         // Returns { metrics, dailyBuckets } in the shape the renderers
@@ -1640,7 +1814,21 @@
         const respLagEl  = document.getElementById("an-resp-lag");
         const respRoot   = document.getElementById("an-responses");
         const meetRoot   = document.getElementById("an-meetings");
-        const panelEl    = document.getElementById("panel-analysis");
+        // The four Analysis cards now live across three panels (Analysis,
+        // Meetings, Responses). They still share one closure and one anState,
+        // so every delegated listener and every cross-card query has to span
+        // all three roots instead of a single #panel-analysis element.
+        //   anPanels  - the roots to bind listeners on
+        //   anQuery   - querySelector across them
+        //   anQueryAll- querySelectorAll across them
+        const anPanels = ["panel-analysis", "panel-meetings", "panel-responses"]
+          .map(id => document.getElementById(id))
+          .filter(Boolean);
+        const anQuery    = (sel) => { for (const r of anPanels) { const el = r.querySelector(sel); if (el) return el; } return null; };
+        const anQueryAll = (sel) => anPanels.flatMap(r => [...r.querySelectorAll(sel)]);
+        const panelEl    = { addEventListener: (t, fn, o) => anPanels.forEach(r => r.addEventListener(t, fn, o)),
+                             querySelector: anQuery,
+                             querySelectorAll: anQueryAll };
 
         const AN_TF_KEY = `account_${clientId}_an_tf`;
         let anTf = localStorage.getItem(AN_TF_KEY) || "3m";
@@ -2319,16 +2507,8 @@
         }
 
         // ---- money fields (Meetings table) ---------------------------
-        // Whole dollars print clean; cents only appear when they exist.
-        const fmtMoney = (n) => {
-          const v = Number(n);
-          if (!isFinite(v)) return "—";
-          return v.toLocaleString("en-US", {
-            style: "currency", currency: "USD",
-            minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
-            maximumFractionDigits: 2,
-          });
-        };
+        // fmtMoney lives with the other shared formatters now - Revenue
+        // Summary on the Summary tab totals the same two columns.
         const MONEY_LABEL = {
           opportunity_value: "opportunity value",
           revenue_closed:    "revenue closed",
@@ -7256,6 +7436,164 @@
         `;
       }
 
+      // Monthly Activity — Daily Activity's metric rows, bucketed by month.
+      //
+      // Reads the SAME all-time daily_buckets array Daily Activity slices a
+      // week out of, so the two tables can never disagree and no extra RPC
+      // runs. Months are summed from days; rate rows are recomputed from the
+      // summed counts (never averaged from the daily rates, which would
+      // weight a 1-connection day the same as a 200-connection one).
+      //
+      // Newest first, left to right, for months AND for the days inside an
+      // expanded month - so the whole table reads consistently backwards in
+      // time. Only days that actually have activity get a column; the buckets
+      // are sparse and a full 31-column month would be mostly empty cells.
+      function renderMonthlyActivityCached(root, summaryByTf, expanded) {
+        const allEntry = summaryByTf?.all
+          || Object.values(summaryByTf || {}).find(e => e?.dailyBuckets?.length);
+        const buckets = allEntry?.dailyBuckets || [];
+
+        if (!buckets.length) {
+          root.innerHTML = `<div class="placeholder"><strong>No activity yet</strong>Once outreach is logged it'll break out by month here.</div>`;
+          return;
+        }
+
+        const readBucket = (b) => ({
+          conn:   Number(b.connection)   || 0,
+          msg:    Number(b.message)      || 0,
+          resp:   Number(b.response)     || 0,
+          pos:    Number(b.positive)     || 0,
+          meet:   Number(b.meeting)      || 0,
+          regFu:  Number(b.reg_followup) || 0,
+          posFu:  Number(b.pos_followup) || 0,
+          inmail: Number(b.inmail)       || 0,
+          retgt:  Number(b.retargeting)  || 0,
+        });
+        const COUNT_KEYS = ["conn","msg","resp","pos","meet","regFu","posFu","inmail","retgt"];
+        const zero = () => COUNT_KEYS.reduce((a, k) => (a[k] = 0, a), {});
+        const addInto = (acc, v) => { for (const k of COUNT_KEYS) acc[k] += v[k]; return acc; };
+
+        // Group days under their month, keeping each day so an expanded
+        // month can render them without a second pass over the buckets.
+        const byMonth = new Map();
+        for (const b of buckets) {
+          if (!b.day) continue;
+          const key = String(b.day).slice(0, 7);
+          let m = byMonth.get(key);
+          if (!m) { m = { key, totals: zero(), days: [] }; byMonth.set(key, m); }
+          const v = readBucket(b);
+          addInto(m.totals, v);
+          m.days.push({ dayStr: b.day, ...v });
+        }
+
+        const months = [...byMonth.values()].sort((a, b) => b.key.localeCompare(a.key));
+        for (const m of months) m.days.sort((a, b) => b.dayStr.localeCompare(a.dayStr));
+
+        const grand = months.reduce((acc, m) => addInto(acc, m.totals), zero());
+
+        // Column list drives both the header and every body row, so the two
+        // can't drift out of alignment as months expand and collapse.
+        const cols = [];
+        for (const m of months) {
+          const isOpen = expanded.has(m.key);
+          cols.push({ kind: "month", key: m.key, isOpen, vals: m.totals });
+          if (isOpen) {
+            // first:true draws the rule that separates a month's day group
+            // from the month column it belongs to. It has to be flagged here
+            // rather than in CSS - :first-of-type matches the first cell of
+            // that element type in the row, not the first one carrying the
+            // class, so it would land on a month column instead.
+            m.days.forEach((d, i) => cols.push({ kind: "day", dayStr: d.dayStr, vals: d, first: i === 0 }));
+          }
+        }
+
+        const valFor = (v, key) => {
+          if (key === "accRate")     return rate(v.msg,  v.conn);
+          if (key === "respRate")    return rate(v.resp, v.msg);
+          if (key === "posRespRate") return rate(v.pos,  v.resp);
+          if (key === "posBookRate") return rate(v.meet, v.pos);
+          return v[key];
+        };
+
+        const rowDefs = [
+          { label: "Connections Sent",    key: "conn",        isRate: false },
+          { label: "Messages Sent",       key: "msg",         isRate: false },
+          { label: "Acceptance Rate",     key: "accRate",     isRate: true  },
+          { label: "Responses",           key: "resp",        isRate: false },
+          { label: "Response Rate",       key: "respRate",    isRate: true  },
+          { label: "Positives",           key: "pos",         isRate: false },
+          { label: "Pos. Response Rate",  key: "posRespRate", isRate: true  },
+          { label: "Meetings Booked",     key: "meet",        isRate: false },
+          { label: "Pos. Booking Rate",   key: "posBookRate", isRate: true  },
+          { sectionHeader: "Additional Outreach" },
+          { label: "Regular Follow Ups",  key: "regFu",       isRate: false },
+          { label: "Positive Follow Ups", key: "posFu",       isRate: false },
+          { label: "InMails",             key: "inmail",      isRate: false },
+          { label: "Retargeting",         key: "retgt",       isRate: false },
+        ];
+
+        const buildRow = (def) => {
+          if (def.sectionHeader) {
+            return `<tr class="period-section-row"><th colspan="${cols.length + 2}">${esc(def.sectionHeader)}</th></tr>`;
+          }
+          const { label, key, isRate } = def;
+          const cells = cols.map(c => {
+            const v = valFor(c.vals, key);
+            const display = isRate ? fmtPct(v) : fmtInt(v);
+            const cls = [
+              c.kind === "day" ? "mon-day-col" : "mon-month-col",
+              c.first ? "mon-day-first" : "",
+              isRate ? rateClass(v) : "",
+            ].filter(Boolean).join(" ");
+            return `<td class="${cls}"><div class="period-cell"><span class="period-cell-val">${display}</span></div></td>`;
+          }).join("");
+
+          const gv = valFor(grand, key);
+          const gCls = ["period-all", isRate ? rateClass(gv) : ""].filter(Boolean).join(" ");
+
+          const shortLabel = label
+            .replace(/\bRate\b/g, "%")
+            .replace(/Follow Ups/g, "FU's")
+            .replace(/ Sent\b/g, "")
+            .replace(/ Booked\b/g, "");
+
+          return `<tr class="${isRate ? "period-rate-row" : ""}">
+            <th><span class="period-label-full">${esc(label)}</span><span class="period-label-short">${esc(shortLabel)}</span></th>
+            ${cells}
+            <td class="${gCls}"><div class="period-cell"><span class="period-cell-val">${isRate ? fmtPct(gv) : fmtInt(gv)}</span></div></td>
+          </tr>`;
+        };
+
+        const headCells = cols.map(c => {
+          if (c.kind === "day") {
+            return `<th class="mon-day-col${c.first ? " mon-day-first" : ""}">${esc(fmtDayHeader(c.dayStr))}</th>`;
+          }
+          const label = fmtMonthHeader(c.key);
+          const sign  = c.isOpen ? "&minus;" : "+";
+          const title = `${c.isOpen ? "Collapse" : "Expand"} ${label} by day`;
+          return `<th class="mon-month-col">
+            <button class="mon-exp" data-mon-exp="${esc(c.key)}" type="button"
+                    aria-expanded="${c.isOpen}" title="${esc(title)}" aria-label="${esc(title)}">${sign}</button>
+            <span class="mon-head-label">${esc(label)}</span>
+          </th>`;
+        }).join("");
+
+        root.innerHTML = `
+          <table class="period-table mon-table">
+            <thead>
+              <tr><th></th>${headCells}<th class="period-all">All</th></tr>
+            </thead>
+            <tbody>${rowDefs.map(buildRow).join("")}</tbody>
+          </table>
+        `;
+      }
+
+      function fmtMonthHeader(yyyymm) {
+        const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const [y, m] = yyyymm.split("-").map(Number);
+        return `${MONTHS[m - 1]} ${y}`;
+      }
+
       // ================= FOLLOW-UPS ===================================
 
       // Followups state — view toggle (cards | list) + per-row
@@ -10435,6 +10773,16 @@
       function rate(num, den) { return den ? num / den : null; }
       function fmtInt(n) { return n == null ? "—" : n.toLocaleString(); }
       function fmtPct(r) { return r == null ? "—" : (r * 100).toFixed(1) + "%"; }
+      // Whole dollars print clean; cents only appear when they exist.
+      function fmtMoney(n) {
+        const v = Number(n);
+        if (!isFinite(v)) return "—";
+        return v.toLocaleString("en-US", {
+          style: "currency", currency: "USD",
+          minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+          maximumFractionDigits: 2,
+        });
+      }
 
       function esc(s) {
         return String(s ?? "").replace(/[&<>"']/g, c =>
