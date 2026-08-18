@@ -646,19 +646,21 @@
             <li><a href="#dash-login">Logging in</a></li>
             <li><a href="#dash-toplevel">Top-level Account dashboard</a></li>
             <li><a href="#dash-summary">Summary</a></li>
+            <li><a href="#dash-meetings">Meetings</a></li>
+            <li><a href="#dash-responses">Responses</a></li>
             <li><a href="#dash-prospects">Prospects</a></li>
+            <li><a href="#dash-meeting">Meeting Links</a></li>
             <li><a href="#dash-followups">Follow-ups</a></li>
             <li><a href="#dash-cadence">Cadence</a></li>
             <li><a href="#dash-replyinst">Reply Instructions</a></li>
             <li><a href="#dash-assets">Assets</a></li>
-            <li><a href="#dash-meeting">Meeting Links</a></li>
-            <li><a href="#dash-team">Team page</a></li>
+            <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
+            <li><a href="#dash-analysis">Analysis</a></li>
+            <li><a href="#dash-hubspot-sync">Native HubSpot sync</a></li>
+            <li><a href="#dash-team">Team page (admins + members)</a></li>
             <li><a href="#dash-billing">Billing</a></li>
             <li><a href="#dash-enrichment-section">Enrichment</a></li>
-            <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
-            <li><a href="#dash-hubspot-sync">Native HubSpot sync</a></li>
-            <li><a href="#dash-share">Sharing an account</a></li>
-            <li><a href="#dash-analysis">Analysis</a></li>
+            <li><a href="#dash-share">Sharing an account with a link</a></li>
           </ol>
         </li>
         <li><a href="#extension">Extension reference (Tracker UI)</a>
@@ -772,7 +774,7 @@
             one (Connection Requests) is where you'll spend most of your filter time;
             the others lean on the lead lists you just built.</li>
         <li><strong>Write your initial message</strong>
-            (<a href="#dash-cadence">section 8.6</a>) - the Initial Message card
+            (<a href="#dash-cadence">section 8.9</a>) - the Initial Message card
             on the Cadence tab holds up to 10 variations, and the first one is
             the default. It's what the extension copies for you, name and
             company already filled in, when you work the Message 1 queue in
@@ -904,7 +906,7 @@
         each conversation label ("Jun 14" / "Today") shows when that message
         was actually sent or received, read straight from the thread - and
         those true dates are what gets logged (see
-        <a href="#dash-prospects">8.4</a> for how they show up on the
+        <a href="#dash-prospects">8.6</a> for how they show up on the
         dashboard). And when the person on screen matches a prospect already
         tracked in your account, a collapsible <strong>View N events</strong>
         row appears under the person card: expand it for their recent outreach
@@ -1122,7 +1124,7 @@
         The on/off toggle only controls <em>new</em> enrollments. Flip it
         off and prospects already mid-sequence keep getting their remaining
         steps - to stop one of those, cancel that prospect's cadence. See
-        <a href="#dash-cadence">8.6</a>.
+        <a href="#dash-cadence">8.9</a>.
       </p>
       <p>
         The cadence <strong>stops automatically</strong> when:
@@ -1271,7 +1273,7 @@
         Two more controls sit on every task: click the <strong>due date</strong>
         to reschedule, or the <strong>&times;</strong> to drop it. Both behave
         differently on a cadence task than on a manual one, so check
-        <a href="#dash-followups">8.5</a> before you use them on someone
+        <a href="#dash-followups">8.8</a> before you use them on someone
         mid-sequence.
       </p>
 
@@ -1890,6 +1892,26 @@
         deep per-account drill-in.
       </p>
 
+      <h4>Which tabs a client sees</h4>
+      <p>
+        A per-account page has eleven tabs. The first five - <strong>Summary,
+        Meetings, Responses, Prospects, Meeting Links</strong> - are
+        client-facing. The remaining six - <strong>Follow-ups, Cadence, Reply
+        Instructions, Assets, Integrations, Analysis</strong> - are internal, and
+        carry a light blue tint so you can tell at a glance which is which. Open
+        a <a href="#dash-share">share link</a> and the internal six aren't there
+        at all.
+      </p>
+      <div class="callout warn">
+        <div class="callout-title">The tint is a reminder, not a lock</div>
+        <p>
+          Hiding those tabs keeps a client out of your working views; it isn't a
+          security boundary. A share link still has full edit access to the
+          account, so treat it the way you'd treat a document you handed over -
+          see <a href="#dash-share">Sharing an account with a link</a>.
+        </p>
+      </div>
+
       <h3 id="dash-login">8.1 - Logging in</h3>
       <p>
         <a href="https://app.uptown.com">app.uptown.com</a> is a logo and a
@@ -2011,55 +2033,138 @@
       <h3 id="dash-summary">8.3 - Per-account: Summary</h3>
       <p>
         Click any row to land on the per-account view. The account name shows
-        as the page heading with a small ✎ pencil to its right; admins click
+        as the page heading with a small &#9998; pencil to its right; admins click
         the pencil to rename the account inline. The default tab is
-        <strong>Summary</strong>:
+        <strong>Summary</strong>, and it answers one question: how much went out,
+        and what came back, month by month.
       </p>
 
       <ul>
-        <li><strong>Timeframe pills</strong> - 1 Week through 3 Months, This Year
-            and All Time. This tab defaults to <em>All Time</em> (the top-level
-            dashboard defaults to This Year), and your choice is remembered per
-            account. Next to the pills, a <strong>From / To</strong> date pair
-            scopes the tiles and chart to any custom range - picking a preset
-            pill clears it.</li>
-        <li><strong>KPI strip</strong> - the headline funnel numbers (Connections,
-            Messages, Acc. rate, Responses, Resp. rate, Positives, Pos. resp. rate,
-            Meetings, Pos. booking rate) for the selected timeframe.</li>
-        <li><strong>Cumulative chart</strong> - a line per metric over the
-            timeframe. Four series are hidden by default behind the
-            <strong>+</strong> pill in the legend (Regular FU, Positive FU, InMails,
-            Retargeting); click to expand inline.</li>
-        <li><strong>Trends by Period</strong> - four rate charts (Acceptance,
-            Response, Pos. Response, Pos. Booking). Each one shows the All Time
-            rate big, a bar per period underneath, and a 2W-vs-All-Time arrow so
-            you can see whether the last two weeks are running above or below the
-            account's lifetime average.</li>
-        <li><strong>Period Comparison</strong> - the full table: every metric as a
-            row, every period as a column (1W → 2W → 3W → 1M → 2M → 3M → YTD →
-            All Time), with a delta chip in each cell. The four rate rows are what
-            you watch week-over-week to see whether a change moved the needle.
-            Additional Outreach (Regular FU, Positive FU, InMails, Retargeting)
-            sits below a divider.</li>
-        <li><strong>Daily Activity</strong> - the same metric rows, one column per
-            day of a single week. Use <em>&lt;</em> / <em>&gt;</em> /
-            <em>Today</em> to move between weeks. This is where you check whether
-            the volume actually went out across the days it was supposed to,
-            rather than landing in one Friday dump.</li>
+        <li><strong>Monthly Activity</strong> - the same metric rows as
+            <a href="#dash-analysis">Daily Activity</a>, bucketed by month.
+            <em>All Time</em> is the leftmost column, then the current month, then
+            each earlier month running to the right. Click the <strong>+</strong>
+            on any month header to break that month out into its individual days
+            (also newest first), and <strong>&minus;</strong> to fold it back up.
+            Only days with activity get a column. The four rate rows are
+            recalculated from each month's totals rather than averaged from the
+            daily rates, so a 200-connection day can't be outweighed by a
+            1-connection one.</li>
+        <li><strong>Revenue Summary</strong> - the <em>Opportunity value</em> and
+            <em>Revenue closed</em> figures from the
+            <a href="#dash-meetings">Meetings tab</a>, totalled. Both count each
+            prospect once, so a prospect who books twice contributes their number
+            once, not twice. Blank until someone starts filling those fields in.</li>
       </ul>
 
       <div class="callout note">
-        <div class="callout-title">Period-comparison cell colors</div>
+        <div class="callout-title">Where the charts went</div>
         <p>
-          Rate cells use one shared scale - green at 30% and up, yellow from 15%,
-          red below - applied to every rate row, not to each metric's own
-          <a href="#benchmarks">benchmark target</a>. So treat the colors as a
-          quick scan for clusters, and read the actual numbers against the
-          benchmarks in section 10 before drawing a conclusion.
+          The KPI strip, cumulative chart, Trends by Period, Period Comparison
+          and Daily Activity now live on the
+          <a href="#dash-analysis">Analysis tab</a>, above Health check. Summary
+          is the month-by-month view; Analysis is where you go to diagnose.
         </p>
       </div>
 
-      <h3 id="dash-prospects">8.4 - Per-account: Prospects</h3>
+      <h3 id="dash-meetings">8.4 - Per-account: Meetings</h3>
+      <p>
+        Every booked meeting for the account, spreadsheet-style. This is a
+        client-facing tab - one of the five a
+        <a href="#dash-share">share link</a> shows.
+      </p>
+      <ul>
+        <li><strong>The columns</strong> - <em>Booked</em> (when the booking was
+            logged) and <em>Meeting date</em> (when the meeting happens), both
+            click-to-edit, then the prospect with their title and company,
+            LinkedIn / Sales Nav links, the two money fields, your prospect notes,
+            and the highlight dot. Meeting dates fill automatically from Calendly
+            and HubSpot bookings; meetings logged before Jul 16, 2026 have a blank
+            meeting date until you set one.</li>
+        <li><strong>Opportunity value and Revenue closed</strong> - two optional
+            dollar fields. Click <em>+ Add</em> in either column, type a number,
+            and press Enter; clearing the box removes the value. Both attach to
+            the prospect rather than the individual meeting, so a prospect who
+            books twice is one deal carrying one number, shown on both rows.
+            Leave them empty if you don't track deal size here. Their totals are
+            what <a href="#dash-summary">Revenue Summary</a> on the Summary tab
+            adds up.</li>
+        <li><strong>Sorting</strong> - click <em>Booked</em> or <em>Meeting
+            date</em> to sort by it. The first click puts newest first, the next
+            flips to oldest first, and the caret shows which way it's pointing.
+            Rows with no meeting date set stay at the bottom either way.</li>
+        <li><strong>Filters</strong> - timeframe pills plus a custom From / To
+            pair, a <em>Notes</em> filter (<em>Has notes</em> / <em>No notes</em>),
+            and a <em>Highlight</em> filter. On narrow screens they collapse
+            behind a <em>+ Filters</em> button. The <strong>&minus;</strong> button
+            next to the heading folds the whole table away, and the tab remembers
+            which way you left it for that account.</li>
+      </ul>
+      <p>
+        Row highlights and <em>Copy for Excel</em> work identically here and on
+        <a href="#dash-responses">Responses</a> - both are described in the next
+        section.
+      </p>
+
+      <h3 id="dash-responses">8.5 - Per-account: Responses</h3>
+      <p>
+        Every reply the account has received. Like Meetings, this is one of the
+        five tabs a <a href="#dash-share">share link</a> shows. It's the table to
+        open when a diagnosis says "read 20-30 negative replies and tag the
+        patterns."
+      </p>
+      <ul>
+        <li><strong>The columns</strong> - date received, the date your message
+            was sent, the reply lag between them (tracked since Jul 8, 2026),
+            the prospect with title and company, LinkedIn / Sales Nav links, the
+            message you sent, the full reply text, sentiment (editable, positives
+            show green), your prospect notes (click to edit, saves on blur), and
+            the highlight dot. Long sent messages clamp to a few lines - click one
+            to expand it.</li>
+        <li><strong>Meeting booked flag</strong> - when the prospect has a meeting
+            on the books, a green <em>Meeting booked</em> flag sits under their
+            sentiment; hover it for the booked date and the meeting date. The flag
+            marks the prospect, not the single reply, so someone who replied three
+            times carries it on all three.</li>
+        <li><strong>Filters</strong> - timeframe pills and a From / To pair,
+            <em>Notes</em>, <em>Highlight</em>, sentiment, and a search box. The
+            count above the table reads "X of Y" so you can always see how much
+            the filters are hiding.</li>
+        <li><strong>Sorting</strong> - click <em>Received</em> to flip between
+            newest and oldest first.</li>
+      </ul>
+
+      <h4>Row highlights</h4>
+      <p>
+        Each row on <strong>both</strong> Meetings and Responses has a highlight
+        dot in the last column. Click it to tint the row yellow, blue, purple,
+        green or red. The <em>Highlight</em> filter next to Notes then narrows to
+        any color, one color, or the unmarked rows, and the color rides along as
+        its own column in <em>Copy for Excel</em>. The two tables keep their own
+        filter setting, and marking a reply does not mark that prospect's meeting.
+      </p>
+      <div class="callout note">
+        <div class="callout-title">Highlights live in your browser</div>
+        <p>
+          They mark a review pass rather than the prospect, so they're stored
+          locally instead of on the record: a teammate on another machine sees the
+          table unmarked, and clearing your browser data clears them.
+        </p>
+      </div>
+
+      <h4>Copying into Excel</h4>
+      <p>
+        Both tables have row checkboxes; the header checkbox selects every
+        filtered row, not just the page on screen. <em>Copy for Excel</em> puts
+        the selection on the clipboard as a table that pastes straight into Excel
+        or Sheets, multi-line replies included. The selection bar also has
+        <em>Delete</em>, which removes just those logged activities - the
+        prospects stay, and their status recalculates from what's left. Long lists
+        show 50 rows at a time with <em>Show 50 more</em> / <em>Show all</em> at
+        the bottom.
+      </p>
+
+      <h3 id="dash-prospects">8.6 - Per-account: Prospects</h3>
       <p>
         The Prospects tab is a spreadsheet view of every distinct person this
         account has touched, auto-clustered across name / LinkedIn ID / email /
@@ -2077,7 +2182,7 @@
             InMail, checked in that order, so a booked meeting keeps reading
             Meeting even after later touches. Prospects with a booked meeting
             show the <em>meeting date</em> under the chip when it's known (see
-            <a href="#dash-analysis">8.16 - Analysis</a> for where meeting dates
+            <a href="#dash-analysis">8.13 - Analysis</a> for where meeting dates
             come from and how to edit them).</li>
         <li><strong>Sentiment</strong> - most recent response sentiment (positive
             / neutral / negative). Inline-editable via the small pill.</li>
@@ -2193,13 +2298,67 @@
         prospect's status moves into Messaged, Responded, or Meeting.
       </p>
       <p>
-        See <a href="#dash-enrichment-section">8.12 - Enrichment</a> for the
+        See <a href="#dash-enrichment-section">8.17 - Enrichment</a> for the
         full setup walkthrough (getting an Apollo account, finding your API
         key, wiring it up on the Team page) plus details on cost, match
         rates, and the auto-enrich behavior.
       </p>
 
-      <h3 id="dash-followups">8.5 - Per-account: Follow-ups</h3>
+      <h3 id="dash-meeting">8.7 - Per-account: Meeting Links</h3>
+      <p>
+        Per-account meeting links you can copy into LinkedIn DMs, up to 10 per
+        account. They also show up in the extension popup's Meeting Links drawer
+        for copying, each with an <em>integrated</em> badge so you know whether a
+        booking will auto-log. Connecting Calendly or HubSpot has to be done here
+        on the dashboard, though, since the OAuth round-trip needs a page that
+        stays open and the popup closes the moment you click away. Two flavors:
+      </p>
+
+      <ul>
+        <li><strong>Plain link</strong> - paste-ready URL with a display name. No
+            integration; bookings won't auto-log.</li>
+        <li><strong>Integrated link</strong> - connect Calendly or HubSpot via OAuth.
+            Bookings on the linked event type / matching meeting title auto-log
+            as <code>meeting_booked</code> outreach events, attached to the right
+            prospect by name match.</li>
+      </ul>
+
+      <h4>Connecting Calendly</h4>
+      <ol class="steps">
+        <li>Click <strong>Connect Calendly</strong> on a meeting link row.</li>
+        <li>OAuth into Calendly. Pick which event type this link should listen on.</li>
+        <li>Save. Future bookings on that event type fire a webhook into Uptown Tracker
+            and create a <code>meeting_booked</code> event for the matching prospect.</li>
+      </ol>
+
+      <h4>Connecting HubSpot</h4>
+      <ol class="steps">
+        <li>Click <strong>Connect HubSpot</strong> and OAuth in.</li>
+        <li>Type a unique substring that matches the meeting title for this
+            account (e.g. <code>Acme Corp intro call</code>). One HubSpot org can
+            route to multiple Uptown Tracker accounts via different match
+            strings.</li>
+        <li>Save. Uptown then shows you a webhook URL and the exact HubSpot
+            steps, because you have to build the Workflow yourself:
+            <strong>Automation → Workflows → Create workflow → From scratch →
+            Contact-based</strong>, trigger <em>"When a meeting is booked"</em>,
+            action <strong>Send a webhook</strong> (POST to the URL shown), and
+            include the contact's <code>firstname</code>, <code>lastname</code>,
+            <code>email</code> and <code>phone</code> in the body.</li>
+        <li>Activate the workflow. Bookings whose titles contain your match text
+            land in this account's funnel within about 10 seconds. Test it by
+            booking a meeting on yourself.</li>
+      </ol>
+
+      <div class="callout warn">
+        <div class="callout-title">HubSpot plan requirement</div>
+        <p>
+          HubSpot Workflows require Marketing Hub Professional or higher. If the
+          client is on a lower tier, use Calendly or a plain link instead.
+        </p>
+      </div>
+
+      <h3 id="dash-followups">8.8 - Per-account: Follow-ups</h3>
       <p>
         The Follow-ups tab is the per-account version of the daily queue. It
         shows every queued follow-up task across all three sources (regular
@@ -2240,7 +2399,7 @@
             Manual tasks move on their own.</li>
       </ul>
 
-      <h3 id="dash-cadence">8.6 - Per-account: Cadence</h3>
+      <h3 id="dash-cadence">8.9 - Per-account: Cadence</h3>
       <p>
         The Cadence tab holds three cards, left to right in the order you
         actually work: the message you open with, the follow-ups it triggers, and
@@ -2322,7 +2481,7 @@
         queued on both cadences.
       </p>
 
-      <h3 id="dash-replyinst">8.7 - Per-account: Reply Instructions</h3>
+      <h3 id="dash-replyinst">8.10 - Per-account: Reply Instructions</h3>
       <p>
         A free-form text box that guides the AI suggested replies in the
         extension sidebar. When it drafts a reply, the AI reads these
@@ -2359,7 +2518,7 @@
         in the extension, and the next blurb picks up your changes right away.
       </p>
 
-      <h3 id="dash-assets">8.8 - Per-account: Assets</h3>
+      <h3 id="dash-assets">8.11 - Per-account: Assets</h3>
       <p>
         Assets are the per-account library your team pastes from while working
         outreach. Three kinds, each capped at 10 and reorderable with the ↑↓
@@ -2398,303 +2557,7 @@
         </p>
       </div>
 
-      <h3 id="dash-meeting">8.9 - Per-account: Meeting Links</h3>
-      <p>
-        Per-account meeting links you can copy into LinkedIn DMs, up to 10 per
-        account. They also show up in the extension popup's Meeting Links drawer
-        for copying, each with an <em>integrated</em> badge so you know whether a
-        booking will auto-log. Connecting Calendly or HubSpot has to be done here
-        on the dashboard, though, since the OAuth round-trip needs a page that
-        stays open and the popup closes the moment you click away. Two flavors:
-      </p>
-
-      <ul>
-        <li><strong>Plain link</strong> - paste-ready URL with a display name. No
-            integration; bookings won't auto-log.</li>
-        <li><strong>Integrated link</strong> - connect Calendly or HubSpot via OAuth.
-            Bookings on the linked event type / matching meeting title auto-log
-            as <code>meeting_booked</code> outreach events, attached to the right
-            prospect by name match.</li>
-      </ul>
-
-      <h4>Connecting Calendly</h4>
-      <ol class="steps">
-        <li>Click <strong>Connect Calendly</strong> on a meeting link row.</li>
-        <li>OAuth into Calendly. Pick which event type this link should listen on.</li>
-        <li>Save. Future bookings on that event type fire a webhook into Uptown Tracker
-            and create a <code>meeting_booked</code> event for the matching prospect.</li>
-      </ol>
-
-      <h4>Connecting HubSpot</h4>
-      <ol class="steps">
-        <li>Click <strong>Connect HubSpot</strong> and OAuth in.</li>
-        <li>Type a unique substring that matches the meeting title for this
-            account (e.g. <code>Acme Corp intro call</code>). One HubSpot org can
-            route to multiple Uptown Tracker accounts via different match
-            strings.</li>
-        <li>Save. Uptown then shows you a webhook URL and the exact HubSpot
-            steps, because you have to build the Workflow yourself:
-            <strong>Automation → Workflows → Create workflow → From scratch →
-            Contact-based</strong>, trigger <em>"When a meeting is booked"</em>,
-            action <strong>Send a webhook</strong> (POST to the URL shown), and
-            include the contact's <code>firstname</code>, <code>lastname</code>,
-            <code>email</code> and <code>phone</code> in the body.</li>
-        <li>Activate the workflow. Bookings whose titles contain your match text
-            land in this account's funnel within about 10 seconds. Test it by
-            booking a meeting on yourself.</li>
-      </ol>
-
-      <div class="callout warn">
-        <div class="callout-title">HubSpot plan requirement</div>
-        <p>
-          HubSpot Workflows require Marketing Hub Professional or higher. If the
-          client is on a lower tier, use Calendly or a plain link instead.
-        </p>
-      </div>
-
-      <h3 id="dash-team">8.10 - Team page (admins + members)</h3>
-      <p>
-        Admins see a <strong>Team</strong> link in the top-right header.
-        The page heading shows the organization name with a ✎ pencil next to
-        it (admins click to rename); below that you'll find:
-      </p>
-
-      <ul>
-        <li><strong>Invite members and admins</strong> (admin-only) - paste their
-            email and pick a role. We email the invite for you. If they're new
-            to Uptown you also get a copyable signup link to drop into Slack; if
-            they already have an Uptown login there's no link to share - they
-            see an Accept / Decline banner on their own dashboard the next time
-            they sign in. For member-role invites you can pre-pick which
-            accounts they'll see before they accept (<em>Manage access</em> on
-            the pending row). Each Uptown login belongs to one organization at a
-            time; invites to someone already in another org are rejected with a
-            "they need to leave their current org first" message.
-            Admins see all accounts; members only see what you grant them.</li>
-        <li><strong>Pending invites</strong> - everyone you've invited who
-            hasn't joined yet, with <em>Resend</em> and <em>Revoke</em> on each
-            row.</li>
-        <li><strong>Manage access</strong> (admin-only) - for each member, click
-            <em>Manage access</em> to pick which accounts they can see.</li>
-        <li><strong>Change a role</strong> (admin-only) - click the
-            <em>Admin</em> / <em>Member</em> badge in a member's Role column to
-            promote or demote them; you'll get a confirm first. Your own row
-            shows the badge without a button - you can't change your own
-            role.</li>
-        <li><strong>Recent activity</strong> - an audit log of the last 50 events
-            in this org: invites, members joined/left/removed, role changes,
-            organization renames, accounts created/archived/unarchived/deleted/
-            transferred/merged, seat-cap changes, outreach and prospect edits,
-            merges, splits and deletions, per-account toggle flips (follow-up
-            cadence, positive cadence, auto-enrich), and integration connects
-            and disconnects (HubSpot sync, Calendly and HubSpot meeting
-            links).</li>
-        <li><strong>Billing card</strong> (admin-only, just above Enrichment) -
-            add seat / remove seat / switch monthly↔annual / manage payment
-            &amp; invoices. See <a href="#dash-billing">8.11</a>.</li>
-        <li><strong>Leave organization</strong> (anyone) - at the very bottom.
-            Members can always leave; admins can leave only if at least one
-            other admin remains, or - if they're the last person - only after
-            transferring/deleting all accounts and cancelling any active Stripe
-            subscription. See the FAQ entry on
-            <a href="#faq">leaving an org to join another</a>.</li>
-      </ul>
-
-      <h3 id="dash-billing">8.11 - Billing</h3>
-      <p>
-        Uptown Tracker bills <strong>$15 per seat per month</strong> or
-        <strong>$120 per seat per year</strong> (33% off when billed annually).
-        Each seat is one LinkedIn account being run through Uptown Tracker. The first
-        seat you buy comes with a <strong>7-day free trial</strong>.
-      </p>
-
-      <h4>Where the controls live</h4>
-      <ul>
-        <li><strong>Adding your first seat / paying for a trial</strong> - clicking
-            <em>+ Add new account</em> when you have no paid seats opens the Stripe
-            purchase modal directly.</li>
-        <li><strong>Adding seats at-cap</strong> - clicking <em>+ Add new account</em>
-            when you're at your seat cap routes admins to the purchase modal;
-            members get an "ask your admin" prompt.</li>
-        <li><strong>Routine seat management</strong> - the Team page billing card.
-            Add seat, remove seat, switch interval, open the Stripe Customer
-            Portal to manage card and invoices.</li>
-        <li><strong>From the extension</strong> - at-cap admins clicking + Add
-            account in the popup get sent to
-            <code>app.uptown.com/dashboard/?action=add-seat</code>,
-            which auto-opens the purchase modal on arrival (the popup is too
-            narrow to fit Stripe Elements inline).</li>
-      </ul>
-
-      <div class="callout warn">
-        <div class="callout-title">What happens if a payment fails</div>
-        <p>
-          Stripe retries failed payments per its standard schedule, and we email
-          you when one fails. If the retries all fail and Stripe cancels the
-          subscription, your paid seats drop to zero and Uptown Tracker
-          automatically archives accounts, newest-first, until the active count
-          fits the remaining cap. Nothing is deleted - archived accounts keep
-          every event and prospect. Buy seats again from the Team page billing
-          card, then bring the accounts back from <em>Show archived</em> on the
-          dashboard.
-        </p>
-      </div>
-
-      <h3 id="dash-enrichment-section">8.12 - Enrichment</h3>
-      <p>
-        Uptown Tracker integrates with <strong>Apollo</strong> to enrich
-        prospect emails directly inside the Prospects tab. Connection requests
-        you sent on Sales Navigator usually leave you without an email address;
-        once a prospect responds (or you book a meeting via your meeting link),
-        you get one - but the gap between "they accepted" and "I have their
-        email" is exactly the window where enrichment helps. One click pulls
-        their email from Apollo's database via the API; we never charge for
-        enrichment, you pay Apollo directly.
-      </p>
-
-      <h4>Don't have Apollo yet? Sign up via our affiliate link</h4>
-      <p>
-        We're an Apollo agency partner. If you don't already have an Apollo
-        account, sign up here:
-        <a href="https://get.apollo.io/UptownCreation" target="_blank" rel="noopener">https://get.apollo.io/UptownCreation</a>
-      </p>
-      <p>
-        Apollo offers a free tier with limited credits, plus paid tiers that
-        unlock more email reveals per month. The integration works regardless
-        of plan - you'll only run up against limits if you bulk-enrich at
-        volume.
-      </p>
-
-      <h4>Getting your Apollo API key</h4>
-      <ol>
-        <li>Sign in to Apollo.</li>
-        <li>Click your profile in the upper-right → <strong>Settings</strong>.</li>
-        <li>Scroll the left sidebar to <strong>Integrations</strong> →
-            <strong>API</strong>.</li>
-        <li>Click <strong>Create new key</strong>. Give it a name like
-            "Uptown Tracker" so future-you can identify it.</li>
-        <li>Copy the key. You'll only see it once - Apollo doesn't show it
-            again after you close the panel.</li>
-      </ol>
-      <div class="callout note">
-        <div class="callout-title">Treat the key like a password</div>
-        <p>
-          Anyone with your API key can spend your Apollo credits. Don't paste
-          it into Slack, screenshots, or anywhere outside Uptown's
-          integration form. We store it encrypted at rest and never display
-          it back - once it's saved, all the Team page shows is
-          <em>Connected</em>, plus a line reading "Apollo · key set 3 days ago
-          by you@company.com".
-        </p>
-      </div>
-
-      <h4>Adding the key on the Team page</h4>
-      <ol>
-        <li>Go to <a href="/team/">Team</a> (admin only).</li>
-        <li>Scroll down to the <strong>Enrichment</strong> section.</li>
-        <li>Paste your Apollo API key into the form and click
-            <em>Connect Apollo</em>.</li>
-        <li>Status flips to "Connected" and a usage widget appears showing
-            last-30-days API calls + matched emails + credits charged.</li>
-      </ol>
-      <p>
-        Once connected, the card also gives you <em>Replace key</em> (rotate to
-        a new Apollo key in place), <em>Disconnect</em> (future calls stop;
-        emails already on prospects stay put), and <em>View detailed log ↗</em>
-        - a per-call audit trail of the last 100 enrichment calls, which is
-        where to look when one prospect won't resolve.
-      </p>
-
-      <h4>Using enrichment</h4>
-      <p>
-        Once connected, the <strong>Email</strong> column on every account's
-        Prospects tab gains an <em>Enrich ↗</em> button on empty cells.
-        There are three trigger paths:
-      </p>
-      <ul>
-        <li><strong>Per-row enrichment</strong>: click <em>Enrich ↗</em> on a
-            single empty Email cell. One Apollo credit, email returns within
-            a second or two. Admin only.</li>
-        <li><strong>Bulk enrichment</strong>: select multiple prospects via
-            the row checkboxes, then click <em>Enrich N</em> in the bulk
-            action bar. <em>N</em> is the actionable count - selected
-            prospects missing email AND with name + company set. Bulk sticks
-            to that stricter bar on purpose: a prospect with no company but a
-            clean <code>/in/&lt;slug&gt;</code> LinkedIn URL gets skipped by
-            bulk, even though the per-row <em>Enrich ↗</em> button will still
-            find them. Admin only.</li>
-        <li><strong>Auto-enrich on acceptance</strong>: per-account toggle
-            (off by default). Click the <em>Auto-enrich: off ▾</em> pill at
-            the top of the Prospects tab and check the box. From then on,
-            whenever a prospect's status moves into Messaged, Responded, or
-            Meeting (i.e. they accepted your connection request), Apollo
-            fires automatically if the email is unknown. Admin only.</li>
-      </ul>
-
-      <h4>What you'll see</h4>
-      <ul>
-        <li><strong>Match found</strong>: the email replaces the
-            <em>Enrich ↗</em> button as plain click-to-copy text.</li>
-        <li><strong>No match</strong>: the cell shows <em>N/A</em> - Apollo
-            doesn't have this prospect in its database. Click N/A to retry
-            (clears the attempted-flag and runs a fresh call) - useful if
-            you've since updated their company or LinkedIn URL.</li>
-        <li><strong>Already had email</strong>: enrichment skips entirely
-            (no credit charged, no overwrite) so existing emails from
-            outreach event identity propagation or your meeting link
-            integrations stay put.</li>
-      </ul>
-
-      <p>
-        As a free side effect: when Apollo returns a clean canonical
-        LinkedIn URL (the <code>/in/&lt;slug&gt;</code> vanity form), your
-        prospect's <code>profile_url</code> gets upgraded silently from the
-        URN-encoded form Sales Nav gives us. Improves match rates for
-        future enrichments and makes the LinkedIn link in the prospect row
-        click cleaner.
-      </p>
-
-      <h4>Match rates + cost</h4>
-      <p>
-        Match rates depend on the prospect's public web presence - Apollo
-        typically returns email for ~70-85% of well-known professionals.
-        Every call that reaches Apollo costs roughly 1 Apollo credit, whether
-        or not it finds a match. Calls that never reach Apollo don't charge:
-        no key configured, the prospect already has an email, or not enough to
-        match on. Failed calls (Apollo down, bad API key, etc.) are flagged in
-        the log but don't charge either.
-      </p>
-      <p>
-        The <a href="/team/">Team page</a> usage widget shows last-30-days
-        rollups: total API calls, emails matched, credits charged - the credit
-        count includes no-matches, for the reason above. For
-        exact charges + remaining credits, check Apollo's own usage
-        dashboard.
-      </p>
-
-      <div class="callout note">
-        <div class="callout-title">Enrichment doesn't move funnel data</div>
-        <p>
-          Enrichment writes to the Email column, and backfills Title, Company
-          and the canonical LinkedIn URL when ours are blank or URN-encoded -
-          never overwriting a value you typed or the extension scraped.
-          It never touches
-          Last touch, Status, Sentiment, Event count, or any rollup - 
-          those are activity-driven only. Same wall as Rating + Notes.
-        </p>
-      </div>
-
-      <p>
-        <em>Phone enrichment isn't part of this integration.</em>
-        Apollo's sync response only returns the company main line (not
-        personal mobiles), and the paid async reveal path was unreliable
-        in our testing. If a prospect shares a phone in a reply or
-        meeting, it shows up in their <strong>Edit info</strong> form via
-        the timeline expansion - there's just no enrichment-driven Phone
-        column on the table.
-      </p>
-
-      <h3 id="dash-integrations">8.13 - Per-account: Integrations (API keys + Zapier)</h3>
+      <h3 id="dash-integrations">8.12 - Per-account: Integrations (API keys + Zapier)</h3>
       <p>
         Per-account credentials for plugging Uptown Tracker into outside tools.
         Anyone with access to the account (admins always; members only when
@@ -3095,6 +2958,79 @@
         </tbody>
       </table>
 
+      <h3 id="dash-analysis">8.13 - Per-account: Analysis</h3>
+      <p>
+        Analysis reads the account's data and tells you what to change. Top to
+        bottom: Summary, Trends by Period, Period Comparison, Daily Activity,
+        Title performance, Health check. It's an internal tab - clients on a
+        <a href="#dash-share">share link</a> never see it.
+      </p>
+
+      <ul>
+        <li><strong>Summary</strong> - timeframe pills (1 Week through 3 Months,
+            This Year, All Time) with a custom <strong>From / To</strong> pair
+            beside them; picking a preset clears the dates. This tab defaults to
+            <em>All Time</em> where the top-level dashboard defaults to This Year,
+            and your choice is remembered per account. Underneath sit the headline
+            funnel numbers (Connections, Messages, Acc. rate, Responses, Resp.
+            rate, Positives, Pos. resp. rate, Meetings, Pos. booking rate) and a
+            cumulative line chart. Four chart series are hidden by default behind
+            the <strong>+</strong> pill in the legend (Regular FU, Positive FU,
+            InMails, Retargeting); click to expand inline.</li>
+        <li><strong>Trends by Period</strong> - four rate charts (Acceptance,
+            Response, Pos. Response, Pos. Booking). Each shows the All Time rate
+            big, a bar per period underneath, and a 2W-vs-All-Time arrow so you
+            can see whether the last two weeks are running above or below the
+            account's lifetime average.</li>
+        <li><strong>Period Comparison</strong> - the full table: every metric as a
+            row, every period as a column (1W &rarr; 2W &rarr; 3W &rarr; 1M &rarr;
+            2M &rarr; 3M &rarr; YTD &rarr; All Time), with a delta chip in each
+            cell. The four rate rows are what you watch week-over-week to see
+            whether a change moved the needle. Additional Outreach (Regular FU,
+            Positive FU, InMails, Retargeting) sits below a divider.</li>
+        <li><strong>Daily Activity</strong> - the same metric rows, one column per
+            day of a single week. Use <em>&lt;</em> / <em>&gt;</em> /
+            <em>Today</em> to move between weeks. This is where you check whether
+            the volume actually went out across the days it was supposed to,
+            rather than landing in one Friday dump. For the month-level view of
+            the same rows, see <a href="#dash-summary">Monthly Activity</a> on
+            Summary.</li>
+        <li><strong>Title performance</strong> - the funnel by job title
+            (grouped by seniority, or exact titles - the exact-title view
+            hides any title with fewer than 3 prospects and tells you how many
+            it dropped), each prospect counted once. Callouts above the table flag
+            title groups that accept, go positive, or book meaningfully better or
+            worse than the account average - with minimum sample sizes so a hot
+            streak on four prospects never drives a strategy call. Its timeframe
+            pills scope Title performance and Health check together.</li>
+        <li><strong>Health check</strong> - the five benchmark tiles
+            (acceptance, response, positive, booking, meetings per month),
+            plus an <em>Opportunity value</em> and a <em>Revenue closed</em>
+            total whenever those fields have been filled in. The money
+            tiles are totals you typed, not rates measured against a
+            target, so they carry no pass-or-fail color, and each one is
+            left out entirely when it adds up to nothing. Both count each
+            prospect once and cover the same window as the rest of the
+            card. The five rate tiles are scored against the targets in
+            <a href="#benchmarks">section 10</a>, plus the matched issue
+            pattern with the likely cause, what to try, and which lever it
+            sits on - <em>Targeting</em>, <em>Messaging</em>, <em>Targeting +
+            Messaging</em>, <em>Data</em>, or <em>Hold</em>. A low-volume
+            banner appears when the window is too thin to diagnose
+            confidently.</li>
+      </ul>
+
+      <div class="callout note">
+        <div class="callout-title">Period-comparison cell colors</div>
+        <p>
+          Rate cells use one shared scale - green at 30% and up, yellow from 15%,
+          red below - applied to every rate row, not to each metric's own
+          <a href="#benchmarks">benchmark target</a>. So treat the colors as a
+          quick scan for clusters, and read the actual numbers against the
+          benchmarks in section 10 before drawing a conclusion.
+        </p>
+      </div>
+
       <h3 id="dash-hubspot-sync">8.14 - Per-account: Native HubSpot sync</h3>
       <p>
         On the same Integrations tab, a separate card lets you connect HubSpot
@@ -3271,7 +3207,249 @@
         </p>
       </div>
 
-      <h3 id="dash-share">8.15 - Sharing an account with a link</h3>
+      <h3 id="dash-team">8.15 - Team page (admins + members)</h3>
+      <p>
+        Admins see a <strong>Team</strong> link in the top-right header.
+        The page heading shows the organization name with a ✎ pencil next to
+        it (admins click to rename); below that you'll find:
+      </p>
+
+      <ul>
+        <li><strong>Invite members and admins</strong> (admin-only) - paste their
+            email and pick a role. We email the invite for you. If they're new
+            to Uptown you also get a copyable signup link to drop into Slack; if
+            they already have an Uptown login there's no link to share - they
+            see an Accept / Decline banner on their own dashboard the next time
+            they sign in. For member-role invites you can pre-pick which
+            accounts they'll see before they accept (<em>Manage access</em> on
+            the pending row). Each Uptown login belongs to one organization at a
+            time; invites to someone already in another org are rejected with a
+            "they need to leave their current org first" message.
+            Admins see all accounts; members only see what you grant them.</li>
+        <li><strong>Pending invites</strong> - everyone you've invited who
+            hasn't joined yet, with <em>Resend</em> and <em>Revoke</em> on each
+            row.</li>
+        <li><strong>Manage access</strong> (admin-only) - for each member, click
+            <em>Manage access</em> to pick which accounts they can see.</li>
+        <li><strong>Change a role</strong> (admin-only) - click the
+            <em>Admin</em> / <em>Member</em> badge in a member's Role column to
+            promote or demote them; you'll get a confirm first. Your own row
+            shows the badge without a button - you can't change your own
+            role.</li>
+        <li><strong>Recent activity</strong> - an audit log of the last 50 events
+            in this org: invites, members joined/left/removed, role changes,
+            organization renames, accounts created/archived/unarchived/deleted/
+            transferred/merged, seat-cap changes, outreach and prospect edits,
+            merges, splits and deletions, per-account toggle flips (follow-up
+            cadence, positive cadence, auto-enrich), and integration connects
+            and disconnects (HubSpot sync, Calendly and HubSpot meeting
+            links).</li>
+        <li><strong>Billing card</strong> (admin-only, just above Enrichment) -
+            add seat / remove seat / switch monthly↔annual / manage payment
+            &amp; invoices. See <a href="#dash-billing">8.16</a>.</li>
+        <li><strong>Leave organization</strong> (anyone) - at the very bottom.
+            Members can always leave; admins can leave only if at least one
+            other admin remains, or - if they're the last person - only after
+            transferring/deleting all accounts and cancelling any active Stripe
+            subscription. See the FAQ entry on
+            <a href="#faq">leaving an org to join another</a>.</li>
+      </ul>
+
+      <h3 id="dash-billing">8.16 - Billing</h3>
+      <p>
+        Uptown Tracker bills <strong>$15 per seat per month</strong> or
+        <strong>$120 per seat per year</strong> (33% off when billed annually).
+        Each seat is one LinkedIn account being run through Uptown Tracker. The first
+        seat you buy comes with a <strong>7-day free trial</strong>.
+      </p>
+
+      <h4>Where the controls live</h4>
+      <ul>
+        <li><strong>Adding your first seat / paying for a trial</strong> - clicking
+            <em>+ Add new account</em> when you have no paid seats opens the Stripe
+            purchase modal directly.</li>
+        <li><strong>Adding seats at-cap</strong> - clicking <em>+ Add new account</em>
+            when you're at your seat cap routes admins to the purchase modal;
+            members get an "ask your admin" prompt.</li>
+        <li><strong>Routine seat management</strong> - the Team page billing card.
+            Add seat, remove seat, switch interval, open the Stripe Customer
+            Portal to manage card and invoices.</li>
+        <li><strong>From the extension</strong> - at-cap admins clicking + Add
+            account in the popup get sent to
+            <code>app.uptown.com/dashboard/?action=add-seat</code>,
+            which auto-opens the purchase modal on arrival (the popup is too
+            narrow to fit Stripe Elements inline).</li>
+      </ul>
+
+      <div class="callout warn">
+        <div class="callout-title">What happens if a payment fails</div>
+        <p>
+          Stripe retries failed payments per its standard schedule, and we email
+          you when one fails. If the retries all fail and Stripe cancels the
+          subscription, your paid seats drop to zero and Uptown Tracker
+          automatically archives accounts, newest-first, until the active count
+          fits the remaining cap. Nothing is deleted - archived accounts keep
+          every event and prospect. Buy seats again from the Team page billing
+          card, then bring the accounts back from <em>Show archived</em> on the
+          dashboard.
+        </p>
+      </div>
+
+      <h3 id="dash-enrichment-section">8.17 - Enrichment</h3>
+      <p>
+        Uptown Tracker integrates with <strong>Apollo</strong> to enrich
+        prospect emails directly inside the Prospects tab. Connection requests
+        you sent on Sales Navigator usually leave you without an email address;
+        once a prospect responds (or you book a meeting via your meeting link),
+        you get one - but the gap between "they accepted" and "I have their
+        email" is exactly the window where enrichment helps. One click pulls
+        their email from Apollo's database via the API; we never charge for
+        enrichment, you pay Apollo directly.
+      </p>
+
+      <h4>Don't have Apollo yet? Sign up via our affiliate link</h4>
+      <p>
+        We're an Apollo agency partner. If you don't already have an Apollo
+        account, sign up here:
+        <a href="https://get.apollo.io/UptownCreation" target="_blank" rel="noopener">https://get.apollo.io/UptownCreation</a>
+      </p>
+      <p>
+        Apollo offers a free tier with limited credits, plus paid tiers that
+        unlock more email reveals per month. The integration works regardless
+        of plan - you'll only run up against limits if you bulk-enrich at
+        volume.
+      </p>
+
+      <h4>Getting your Apollo API key</h4>
+      <ol>
+        <li>Sign in to Apollo.</li>
+        <li>Click your profile in the upper-right → <strong>Settings</strong>.</li>
+        <li>Scroll the left sidebar to <strong>Integrations</strong> →
+            <strong>API</strong>.</li>
+        <li>Click <strong>Create new key</strong>. Give it a name like
+            "Uptown Tracker" so future-you can identify it.</li>
+        <li>Copy the key. You'll only see it once - Apollo doesn't show it
+            again after you close the panel.</li>
+      </ol>
+      <div class="callout note">
+        <div class="callout-title">Treat the key like a password</div>
+        <p>
+          Anyone with your API key can spend your Apollo credits. Don't paste
+          it into Slack, screenshots, or anywhere outside Uptown's
+          integration form. We store it encrypted at rest and never display
+          it back - once it's saved, all the Team page shows is
+          <em>Connected</em>, plus a line reading "Apollo · key set 3 days ago
+          by you@company.com".
+        </p>
+      </div>
+
+      <h4>Adding the key on the Team page</h4>
+      <ol>
+        <li>Go to <a href="/team/">Team</a> (admin only).</li>
+        <li>Scroll down to the <strong>Enrichment</strong> section.</li>
+        <li>Paste your Apollo API key into the form and click
+            <em>Connect Apollo</em>.</li>
+        <li>Status flips to "Connected" and a usage widget appears showing
+            last-30-days API calls + matched emails + credits charged.</li>
+      </ol>
+      <p>
+        Once connected, the card also gives you <em>Replace key</em> (rotate to
+        a new Apollo key in place), <em>Disconnect</em> (future calls stop;
+        emails already on prospects stay put), and <em>View detailed log ↗</em>
+        - a per-call audit trail of the last 100 enrichment calls, which is
+        where to look when one prospect won't resolve.
+      </p>
+
+      <h4>Using enrichment</h4>
+      <p>
+        Once connected, the <strong>Email</strong> column on every account's
+        Prospects tab gains an <em>Enrich ↗</em> button on empty cells.
+        There are three trigger paths:
+      </p>
+      <ul>
+        <li><strong>Per-row enrichment</strong>: click <em>Enrich ↗</em> on a
+            single empty Email cell. One Apollo credit, email returns within
+            a second or two. Admin only.</li>
+        <li><strong>Bulk enrichment</strong>: select multiple prospects via
+            the row checkboxes, then click <em>Enrich N</em> in the bulk
+            action bar. <em>N</em> is the actionable count - selected
+            prospects missing email AND with name + company set. Bulk sticks
+            to that stricter bar on purpose: a prospect with no company but a
+            clean <code>/in/&lt;slug&gt;</code> LinkedIn URL gets skipped by
+            bulk, even though the per-row <em>Enrich ↗</em> button will still
+            find them. Admin only.</li>
+        <li><strong>Auto-enrich on acceptance</strong>: per-account toggle
+            (off by default). Click the <em>Auto-enrich: off ▾</em> pill at
+            the top of the Prospects tab and check the box. From then on,
+            whenever a prospect's status moves into Messaged, Responded, or
+            Meeting (i.e. they accepted your connection request), Apollo
+            fires automatically if the email is unknown. Admin only.</li>
+      </ul>
+
+      <h4>What you'll see</h4>
+      <ul>
+        <li><strong>Match found</strong>: the email replaces the
+            <em>Enrich ↗</em> button as plain click-to-copy text.</li>
+        <li><strong>No match</strong>: the cell shows <em>N/A</em> - Apollo
+            doesn't have this prospect in its database. Click N/A to retry
+            (clears the attempted-flag and runs a fresh call) - useful if
+            you've since updated their company or LinkedIn URL.</li>
+        <li><strong>Already had email</strong>: enrichment skips entirely
+            (no credit charged, no overwrite) so existing emails from
+            outreach event identity propagation or your meeting link
+            integrations stay put.</li>
+      </ul>
+
+      <p>
+        As a free side effect: when Apollo returns a clean canonical
+        LinkedIn URL (the <code>/in/&lt;slug&gt;</code> vanity form), your
+        prospect's <code>profile_url</code> gets upgraded silently from the
+        URN-encoded form Sales Nav gives us. Improves match rates for
+        future enrichments and makes the LinkedIn link in the prospect row
+        click cleaner.
+      </p>
+
+      <h4>Match rates + cost</h4>
+      <p>
+        Match rates depend on the prospect's public web presence - Apollo
+        typically returns email for ~70-85% of well-known professionals.
+        Every call that reaches Apollo costs roughly 1 Apollo credit, whether
+        or not it finds a match. Calls that never reach Apollo don't charge:
+        no key configured, the prospect already has an email, or not enough to
+        match on. Failed calls (Apollo down, bad API key, etc.) are flagged in
+        the log but don't charge either.
+      </p>
+      <p>
+        The <a href="/team/">Team page</a> usage widget shows last-30-days
+        rollups: total API calls, emails matched, credits charged - the credit
+        count includes no-matches, for the reason above. For
+        exact charges + remaining credits, check Apollo's own usage
+        dashboard.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">Enrichment doesn't move funnel data</div>
+        <p>
+          Enrichment writes to the Email column, and backfills Title, Company
+          and the canonical LinkedIn URL when ours are blank or URN-encoded -
+          never overwriting a value you typed or the extension scraped.
+          It never touches
+          Last touch, Status, Sentiment, Event count, or any rollup - 
+          those are activity-driven only. Same wall as Rating + Notes.
+        </p>
+      </div>
+
+      <p>
+        <em>Phone enrichment isn't part of this integration.</em>
+        Apollo's sync response only returns the company main line (not
+        personal mobiles), and the paid async reveal path was unreliable
+        in our testing. If a prospect shares a phone in a reply or
+        meeting, it shows up in their <strong>Edit info</strong> form via
+        the timeline expansion - there's just no enrichment-driven Phone
+        column on the table.
+      </p>
+
+      <h3 id="dash-share">8.18 - Sharing an account with a link</h3>
       <p>
         The <strong>Share</strong> button at the top-right of an account page
         creates one public link to that account. Anyone you send it to gets
@@ -3286,7 +3464,9 @@
             There's one active link per account; re-opening Share shows the same
             link.</li>
         <li><strong>Send it</strong> to whoever needs to work or review the
-            account. They land directly on it and can use every tab.</li>
+            account. They land directly on it and get the five client-facing
+            tabs - <em>Summary, Meetings, Responses, Prospects, Meeting
+            Links</em>. The six internal tabs aren't shown.</li>
         <li><strong>Stop sharing</strong> any time: open Share and click
             <strong>Stop sharing</strong>. The link stops working immediately for
             everyone, and any open session loses access on the spot.</li>
@@ -3296,110 +3476,13 @@
         <p>
           It's full edit access with no sign-in, so treat it like a document
           you'd only hand to someone you trust with that account. Deleting the
-          account retires its link automatically.
+          account retires its link automatically. Hiding the internal tabs keeps
+          a client out of your working views - it tidies what they see, it
+          doesn't reduce what the link can do.
         </p>
       </div>
 
-      <h3 id="dash-analysis">8.16 - Per-account: Analysis</h3>
-      <p>
-        The Analysis tab reads the account's data and tells you what to
-        change. Top to bottom: Meetings, Responses, Title performance,
-        Health check. Every section has the standard timeframe pills plus
-        a custom From/To pair - Meetings and Responses filter
-        independently, while Title performance and Health check share the
-        selection on the Title performance card. On mobile, each section's
-        filters collapse behind a <em>+ Filters</em> button.
-      </p>
-      <p>
-        Meetings and Responses each filter on <em>Notes</em> as well:
-        <em>Has notes</em> narrows the table to prospects you've written
-        something on, <em>No notes</em> shows the rest. The minus button
-        next to either heading folds that whole section away, and the plus
-        button brings it back - the tab remembers which way you left each
-        one for that account.
-      </p>
-      <p>
-        Click a date column header to sort by it: <em>Booked</em> or
-        <em>Meeting date</em> on Meetings, <em>Received</em> on Responses.
-        The first click puts newest first, the next flips to oldest first,
-        and the caret shows which way it's pointing. Rows with no meeting
-        date set stay at the bottom either way.
-      </p>
-      <ul>
-        <li><strong>Meetings</strong> - every booked meeting with
-            <em>Date booked</em> (when the booking was logged) and
-            <em>Meeting date</em> (when the meeting happens), both
-            click-to-edit, plus LinkedIn / Sales Nav links beside the name
-            and your prospect notes. Meeting dates fill automatically from
-            Calendly and HubSpot bookings; meetings logged before Jul 16,
-            2026 have a blank meeting date until you set one.</li>
-        <li><strong>Opportunity value and Revenue closed</strong> - two
-            optional dollar fields on the Meetings table. Click <em>+
-            Add</em> in either column, type a number, and press Enter;
-            clearing the box removes the value. Both attach to the
-            prospect rather than the individual meeting, so a prospect who
-            books twice is one deal carrying one number, shown on both
-            rows. Leave them empty if you don't track deal size here -
-            nothing else in the tab depends on them. These fields appear
-            only on the Analysis tab, not on Prospects.</li>
-        <li><strong>Responses</strong> - every reply, spreadsheet-style:
-            date received, the date your message was sent, the reply lag
-            between them (tracked since Jul 8, 2026), LinkedIn / Sales Nav
-            links, the message you sent, the full reply text, sentiment
-            (editable, positives show green), and your prospect notes
-            (click to edit, saves on blur). When the prospect has a meeting
-            on the books, a green <em>Meeting booked</em> flag sits under
-            their sentiment - hover it for the booked date and the meeting
-            date. The flag marks the prospect, not the single reply, so
-            someone who replied three times carries it on all three. Each row
-            also has a highlight dot in the last column - click it to tint the
-            row yellow, blue, purple, green or red. The <em>Highlight</em>
-            filter next to Notes then narrows to any color, one color, or the
-            unmarked rows, and the color rides along as its own column in
-            <em>Copy for Excel</em>. The Meetings table works exactly the same
-            way, and the two keep their own filters - marking a reply does not
-            mark that prospect's meeting. Highlights mark a review pass rather
-            than the prospect, so they're stored in your browser: a teammate on
-            another machine sees the table unmarked. Filter
-            by date, notes, highlight, sentiment, or search - this is the table
-            to use when a diagnosis says "read 20-30 negative replies and tag
-            the patterns."</li>
-        <li><strong>Copying into Excel</strong> - both tables have row
-            checkboxes; the header checkbox selects every filtered row, not
-            just the page on screen. <em>Copy for Excel</em> puts the
-            selection on the clipboard as a table that pastes straight into
-            Excel or Sheets, multi-line replies included. The selection bar
-            also has <em>Delete</em>, which removes just those logged
-            activities - the prospects stay, and their status recalculates
-            from what's left. Long lists show 50 rows at a time with
-            <em>Show 50 more</em> / <em>Show all</em> at the bottom. Long
-            sent messages clamp to a few lines - click one to expand it.</li>
-        <li><strong>Title performance</strong> - the funnel by job title
-            (grouped by seniority, or exact titles - the exact-title view
-            hides any title with fewer than 3 prospects and tells you how many
-            it dropped), each prospect counted once. Callouts above the table flag title groups that accept,
-            go positive, or book meaningfully better or worse than the
-            account average - with minimum sample sizes so a hot streak on
-            four prospects never drives a strategy call.</li>
-        <li><strong>Health check</strong> - the five benchmark tiles
-            (acceptance, response, positive, booking, meetings per month),
-            plus an <em>Opportunity value</em> and a <em>Revenue closed</em>
-            total whenever those fields have been filled in. The money
-            tiles are totals you typed, not rates measured against a
-            target, so they carry no pass-or-fail color, and each one is
-            left out entirely when it adds up to nothing. Both count each
-            prospect once and cover the same window as the rest of the
-            card. The five rate tiles are scored against the targets in
-            <a href="#benchmarks">section 10</a>, plus the matched issue
-            pattern with the likely cause, what to try, and which lever it
-            sits on - <em>Targeting</em>, <em>Messaging</em>, <em>Targeting +
-            Messaging</em>, <em>Data</em>, or <em>Hold</em>. A low-volume
-            banner appears when the window is too thin to diagnose
-            confidently.</li>
-      </ul>
-
-      <!-- ============================================================== -->
-      <h2 id="extension"><span class="num">9.</span>Extension reference (Tracker UI)</h2>
+<h2 id="extension"><span class="num">9.</span>Extension reference (Tracker UI)</h2>
 
       <p>
         Beyond Reply Buddy (covered in <a href="#reply-buddy">section 2</a>),
@@ -3567,7 +3650,7 @@
         The sidebar's second tab is the same queue as the dashboard's
         Follow-ups tab, always one click away from inside any LinkedIn page.
         The tab itself is covered in <a href="#rb-follow-ups">2.9</a>, the task
-        controls in <a href="#dash-followups">8.5</a>, and the day-to-day
+        controls in <a href="#dash-followups">8.8</a>, and the day-to-day
         routine in <a href="#cadence-working">3.5</a>.
       </p>
 
