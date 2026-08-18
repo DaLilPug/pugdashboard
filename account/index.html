@@ -90,8 +90,8 @@
 
   <!-- Tab order here IS the on-screen order; nothing else drives it. Panels may
        sit in any order in the document because only one is ever un-hidden.
-       data-internal marks the four tabs a client never sees on the public share
-       link. Two jobs: initShare() hides them for share visitors, and for a
+       data-internal marks the tabs a client never sees on the public share
+       link - everything from Follow-ups rightward. Two jobs: initShare() hides them for share visitors, and for a
        signed-in operator they get a light blue tint so it is obvious at a glance
        which tabs are internal. Keep the attribute and the initShare list in sync. -->
   <div class="sub-tabs" id="sub-tabs">
@@ -99,9 +99,9 @@
     <button class="sub-tab"        data-tab="meetings"      type="button">Meetings</button>
     <button class="sub-tab"        data-tab="responses"     type="button">Responses</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
-    <button class="sub-tab"        data-tab="followups"     type="button">Follow-ups</button>
-    <button class="sub-tab"        data-tab="cadence"       type="button">Cadence</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
+    <button class="sub-tab"        data-tab="followups"     type="button" data-internal>Follow-ups</button>
+    <button class="sub-tab"        data-tab="cadence"       type="button" data-internal>Cadence</button>
     <button class="sub-tab"        data-tab="replyinst"     type="button" data-internal>Reply Instructions</button>
     <button class="sub-tab"        data-tab="assets"        type="button" data-internal>Assets</button>
     <button class="sub-tab"        data-tab="integrations"  type="button" data-internal>Integrations</button>
