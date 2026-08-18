@@ -312,6 +312,19 @@
                 <button class="pr-chip"        data-notes="none" type="button">No notes</button>
               </div>
             </div>
+            <div class="pr-filter-group an-hl-filter">
+              <span class="pr-filter-label">Highlight</span>
+              <div class="pr-filter-chips" data-an-hl-filter="meet">
+                <button class="pr-chip active" data-hl="all"  type="button">All</button>
+                <button class="pr-chip"        data-hl="any"  type="button">Any</button>
+                <button class="pr-chip"        data-hl="none" type="button">None</button>
+                <button class="an-hl-chip an-hl-sw-yellow" data-hl="yellow" type="button" title="Only yellow" aria-label="Only yellow"></button>
+                <button class="an-hl-chip an-hl-sw-blue"   data-hl="blue"   type="button" title="Only blue"   aria-label="Only blue"></button>
+                <button class="an-hl-chip an-hl-sw-purple" data-hl="purple" type="button" title="Only purple" aria-label="Only purple"></button>
+                <button class="an-hl-chip an-hl-sw-green"  data-hl="green"  type="button" title="Only green"  aria-label="Only green"></button>
+                <button class="an-hl-chip an-hl-sw-red"    data-hl="red"    type="button" title="Only red"    aria-label="Only red"></button>
+              </div>
+            </div>
             <div class="timeframe-pills" id="an-meet-tfpills" data-an-table-pills="meet">
               <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
               <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
@@ -351,7 +364,7 @@
             </div>
             <div class="pr-filter-group an-hl-filter">
               <span class="pr-filter-label">Highlight</span>
-              <div class="pr-filter-chips" data-an-hl-filter>
+              <div class="pr-filter-chips" data-an-hl-filter="resp">
                 <button class="pr-chip active" data-hl="all"  type="button">All</button>
                 <button class="pr-chip"        data-hl="any"  type="button">Any</button>
                 <button class="pr-chip"        data-hl="none" type="button">None</button>
@@ -1866,8 +1879,12 @@
           // or activity data - deliberately no database column. They live
           // in this browser's localStorage per account, keyed by outreach
           // event id: { eventId: "yellow" | "blue" | ... }.
+          // One map for both tables: Responses and Meetings are both rows of
+          // public.outreach (filtered by type), so an id can only ever
+          // belong to one of them.
           highlights: {},
           respHl: "all",  // "all" | "any" | "none" | a color key
+          meetHl: "all",
           // Date-column sort per table. Both start newest-first, which
           // is the order the rows arrive in.
           meetSort: { key: "occurred_at", dir: "desc" },
@@ -2090,8 +2107,13 @@
             }
           }
           // Prune highlights against the ids that actually came back, so
-          // deleted responses don't leave marks behind forever.
-          loadHighlights(new Set((responses || []).map(r => r.id)));
+          // deleted rows don't leave marks behind forever. BOTH tables -
+          // passing responses alone would wipe every meeting highlight on
+          // the next load.
+          loadHighlights(new Set([
+            ...(responses || []).map(r => r.id),
+            ...(meetings  || []).map(r => r.id),
+          ]));
           anState.listsLoaded = true;
         }
 
@@ -2399,6 +2421,16 @@
           return mode === "has" ? has : !has;
         }
 
+        // "all" | "any" | "none" | a colour key - same semantics on both
+        // tables, so the test lives in one place.
+        function hlFilterKeeps(mode, id) {
+          if (mode === "all") return true;
+          const c = highlightOf(id);
+          if (mode === "any")  return !!c;
+          if (mode === "none") return !c;
+          return HL_KEYS.includes(mode) ? c === mode : true;
+        }
+
         function visibleResponses(ignoreSentAndSearch = false) {
           const { sinceMs, untilMs } = rangeMs(anState.respRange);
           const q = anState.respSearch.trim().toLowerCase();
@@ -2407,12 +2439,7 @@
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.respNotes, r.prospect_id)) return false;
-            if (anState.respHl !== "all") {
-              const c = highlightOf(r.id);
-              if (anState.respHl === "any"  && !c) return false;
-              if (anState.respHl === "none" &&  c) return false;
-              if (HL_KEYS.includes(anState.respHl) && c !== anState.respHl) return false;
-            }
+            if (!hlFilterKeeps(anState.respHl, r.id)) return false;
             if (ignoreSentAndSearch) return true;
             if (anState.respSent === "unclassified") {
               if (r.response_sentiment) return false;
@@ -2459,7 +2486,7 @@
           }
           return map;
         }
-        // ---- row highlights (Responses table) ------------------------
+        // ---- row highlights (Responses + Meetings tables) ------------
         // Local-only auditing marks. Stored in localStorage rather than
         // the database on purpose: they describe a review pass, not the
         // prospect or the reply, so they never belong on either record.
@@ -2473,13 +2500,16 @@
           { key: "red",    label: "Red"    },
         ];
         const HL_KEYS = HL_COLORS.map(c => c.key);
+        // Key still says "resp" - it predates Meetings getting highlights.
+        // Renaming it would orphan every mark an operator has already made,
+        // and the map covers both tables, so it stays as it is.
         const AN_HL_KEY = `account_${clientId}_an_resp_highlights`;
 
         function loadHighlights(validIds) {
           let raw = {};
           try { raw = JSON.parse(localStorage.getItem(AN_HL_KEY) || "{}") || {}; }
           catch { raw = {}; }
-          // Drop anything whose response no longer exists (deleted rows)
+          // Drop anything whose row no longer exists (deleted rows)
           // or whose colour we no longer recognise, so the blob can't
           // grow without bound across months of auditing.
           const clean = {};
@@ -2712,6 +2742,7 @@
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.meetNotes, r.prospect_id)) return false;
+            if (!hlFilterKeeps(anState.meetHl, r.id)) return false;
             return true;
           });
           return sortByDate(rows, anState.meetSort.key, anState.meetSort.dir);
@@ -2731,7 +2762,7 @@
         function renderMeetings() {
           const rows = visibleMeetings();
           if (!rows.length) {
-            meetRoot.innerHTML = `<div class="placeholder"><strong>No meetings match</strong>Clear the date range or the Notes filter above to see everything.</div>`;
+            meetRoot.innerHTML = `<div class="placeholder"><strong>No meetings match</strong>Clear the date range or the Notes / Highlight filters above to see everything.</div>`;
             return;
           }
           const shown = rows.slice(0, anState.meetLimit);
@@ -2746,10 +2777,13 @@
                   <th>Prospect</th><th>Links</th>
                   <th class="num">Opportunity value</th><th class="num">Revenue closed</th>
                   <th>Notes</th>
+                  <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
-                  ${shown.map(r => `
-                    <tr class="an-row">
+                  ${shown.map(r => {
+                    const hl = highlightOf(r.id);
+                    return `
+                    <tr class="an-row${hl ? ` an-hl-row an-hl-row-${hl}` : ""}">
                       ${checkCellHtml("meet", r.id, anState.meetSelected.has(r.id))}
                       <td class="pr-last">${meetDateSpan(r, "occurred_at")}</td>
                       <td class="pr-last">${meetDateSpan(r, "meeting_at")}</td>
@@ -2761,7 +2795,9 @@
                       <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "opportunity_value")}</td>
                       <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "revenue_closed")}</td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
-                    </tr>`).join("")}
+                      <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
+                    </tr>`;
+                  }).join("")}
                 </tbody>
               </table>
             </div>
@@ -2811,7 +2847,7 @@
           } else {
             const sel = visibleMeetings().filter(r => anState.meetSelected.has(r.id));
             header = ["Date Booked", "Meeting Date", "Name", "Title", "Company", "Email",
-                      "LinkedIn URL", "Sales Nav URL", "Opportunity Value", "Revenue Closed", "Notes"];
+                      "LinkedIn URL", "Sales Nav URL", "Opportunity Value", "Revenue Closed", "Notes", "Highlight"];
             rows = sel.map(r => {
               const opp = dealValue(r.prospect_id, "opportunity_value");
               const rev = dealValue(r.prospect_id, "revenue_closed");
@@ -2823,6 +2859,7 @@
                 opp === null ? "" : opp,
                 rev === null ? "" : rev,
                 (r.prospect_id && anState.notesByProspect[r.prospect_id]) || "",
+                highlightOf(r.id),
               ];
             });
           }
@@ -2862,15 +2899,16 @@
             return;
           }
           const gone = new Set(rows.map(r => r.id));
+          // Don't leave highlights pointing at rows that no longer exist.
+          // Both tables carry them now, so this runs either way.
+          let droppedHl = false;
+          for (const id of gone) {
+            if (anState.highlights[id]) { delete anState.highlights[id]; droppedHl = true; }
+          }
+          if (droppedHl) saveHighlights();
           if (isResp) {
             anState.responses = (anState.responses || []).filter(r => !gone.has(r.id));
             anState.respSelected.clear();
-            // Don't leave highlights pointing at rows that no longer exist.
-            let droppedHl = false;
-            for (const id of gone) {
-              if (anState.highlights[id]) { delete anState.highlights[id]; droppedHl = true; }
-            }
-            if (droppedHl) saveHighlights();
             renderResponses();
           } else {
             anState.meetings = (anState.meetings || []).filter(r => !gone.has(r.id));
@@ -3105,13 +3143,18 @@
         function applyHighlight(id, color) {
           setHighlight(id, color);
           closeHlPop();
+          // Which table the dot is in decides what to re-render. Find the
+          // dot first: the id alone doesn't say, and reaching for the
+          // Responses table unconditionally would leave a Meetings row
+          // showing its old colour.
+          const dot = anQuery(`[data-an-hl-open][data-event-id="${CSS.escape(id)}"]`);
+          const isMeet = !!(dot && dot.closest("#an-meetings"));
+          const rerender = isMeet ? renderMeetings : renderRespTable;
           // With a highlight filter on, this row may have just left the
           // view, so rebuild. Otherwise patch the row in place - a full
           // rebuild would lose scroll position and any open notes editor.
-          if (anState.respHl !== "all") { renderRespTable(); return; }
-          const tableEl = document.getElementById("an-resp-table");
-          const dot = tableEl && tableEl.querySelector(`[data-an-hl-open][data-event-id="${CSS.escape(id)}"]`);
-          if (!dot) { renderRespTable(); return; }
+          if ((isMeet ? anState.meetHl : anState.respHl) !== "all") { rerender(); return; }
+          if (!dot) { rerender(); return; }
           const tr = dot.closest("tr");
           const td = dot.closest("td");
           tr.className = `an-row${color ? ` an-hl-row an-hl-row-${color}` : ""}`;
@@ -3186,11 +3229,19 @@
           if (hlOpen) { openHlPop(hlOpen); return; }
           const hlf = e.target.closest("[data-an-hl-filter] button[data-hl]");
           if (hlf) {
-            anState.respHl = hlf.dataset.hl;
+            const kind = hlf.closest("[data-an-hl-filter]").dataset.anHlFilter;
             hlf.parentElement.querySelectorAll("button[data-hl]").forEach(b => b.classList.toggle("active", b === hlf));
-            anState.respLimit = 50;
-            anState.respSelected.clear();
-            if (anState.listsLoaded) renderResponses();
+            if (kind === "meet") {
+              anState.meetHl = hlf.dataset.hl;
+              anState.meetLimit = 50;
+              anState.meetSelected.clear();
+              if (anState.listsLoaded) renderMeetings();
+            } else {
+              anState.respHl = hlf.dataset.hl;
+              anState.respLimit = 50;
+              anState.respSelected.clear();
+              if (anState.listsLoaded) renderResponses();
+            }
             return;
           }
           const nf = e.target.closest("[data-an-notes-filter] .pr-chip");
