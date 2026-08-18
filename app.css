@@ -7204,12 +7204,6 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .sum-rev-val.sum-rev-closed {
   color: #107a3e;
 }
-.sum-rev-sub {
-  margin-top: 4px;
-  font-family: Inter, sans-serif;
-  font-size: 12px;
-  color: #8a95a1;
-}
 .sum-rev-empty {
   flex: 1 1 100%;
   font-family: Inter, sans-serif;

@@ -1401,30 +1401,26 @@
             return;
           }
 
-          // Only positive amounts count toward either total. A 0 is an
-          // operator explicitly recording "no value", not a missing entry,
-          // and including it in the count would overstate how many deals
-          // actually carry a number.
-          let opp = 0, rev = 0, oppCount = 0, revCount = 0;
+          // Only positive amounts contribute. A 0 is an operator explicitly
+          // recording "no value", not a missing entry. `any` just drives the
+          // empty state - the card shows the two totals and nothing else.
+          let opp = 0, rev = 0, any = false;
           for (const r of rows) {
             const o = Number(r.opportunity_value), v = Number(r.revenue_closed);
-            if (o > 0) { opp += o; oppCount++; }
-            if (v > 0) { rev += v; revCount++; }
+            if (o > 0) { opp += o; any = true; }
+            if (v > 0) { rev += v; any = true; }
           }
 
-          const cell = (label, total, count, cls) => `
+          const cell = (label, total, cls) => `
             <div class="sum-rev-cell">
               <div class="sum-rev-label">${esc(label)}</div>
               <div class="sum-rev-val ${cls}">${esc(fmtMoney(total))}</div>
-              <div class="sum-rev-sub">${fmtInt(count)} ${count === 1 ? "prospect" : "prospects"}</div>
             </div>`;
 
           revenueEl.innerHTML =
-            cell("Opportunity Value", opp, oppCount, "") +
-            cell("Revenue Closed",    rev, revCount, "sum-rev-closed") +
-            (oppCount || revCount
-              ? ""
-              : `<div class="sum-rev-empty">No amounts recorded yet. Add them on the Meetings tab.</div>`);
+            cell("Opportunity Value", opp, "") +
+            cell("Revenue Closed",    rev, "sum-rev-closed") +
+            (any ? "" : `<div class="sum-rev-empty">No amounts recorded yet. Add them on the Meetings tab.</div>`);
         }
 
         // Fetch one timeframe via the client_summary_for_period RPC.
