@@ -7557,10 +7557,12 @@
             .replace(/ Sent\b/g, "")
             .replace(/ Booked\b/g, "");
 
+          // All-time total leads, then months newest-first - the reverse of the
+          // other tables here, where the total column trails the periods.
           return `<tr class="${isRate ? "period-rate-row" : ""}">
             <th><span class="period-label-full">${esc(label)}</span><span class="period-label-short">${esc(shortLabel)}</span></th>
-            ${cells}
             <td class="${gCls}"><div class="period-cell"><span class="period-cell-val">${isRate ? fmtPct(gv) : fmtInt(gv)}</span></div></td>
+            ${cells}
           </tr>`;
         };
 
@@ -7581,7 +7583,7 @@
         root.innerHTML = `
           <table class="period-table mon-table">
             <thead>
-              <tr><th></th>${headCells}<th class="period-all">All</th></tr>
+              <tr><th></th><th class="period-all">All</th>${headCells}</tr>
             </thead>
             <tbody>${rowDefs.map(buildRow).join("")}</tbody>
           </table>
