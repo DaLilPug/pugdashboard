@@ -54,8 +54,9 @@
               title="Rename account">&#9998;</button>
 
       <!-- Share: per-account public link. Floats to the right of the row
-           (margin-left:auto). Hidden until the account loads, and never
-           shown to share-link visitors. -->
+           (margin-left:auto). Hidden until the account loads. Share-link
+           visitors DO see it (so they can pass the link on) but never get
+           the revoke control - only a real operator can stop sharing. -->
       <div id="share-wrap" class="share-wrap hidden">
         <button id="share-btn" class="btn-share" type="button" aria-haspopup="dialog" aria-expanded="false" title="Share this account">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -67,9 +68,8 @@
         <div id="share-pop" class="share-pop hidden" role="dialog" aria-label="Share this account">
           <div class="share-pop-title">Share this account</div>
           <p class="share-pop-blurb">
-            Anyone with this link gets full edit access to <strong>this account only</strong> -
-            no Uptown login needed. They can't see your other accounts or your team, and you can
-            stop sharing anytime.
+            Anyone with this link gets full access to <strong>this account only</strong> -
+            no Uptown login needed.
           </p>
           <div id="share-none">
             <button id="share-create" class="btn-primary share-pop-create" type="button">Create share link</button>
@@ -1024,11 +1024,64 @@
           }
         }
 
-        // Never show the Share control to a share-link visitor.
         const wrap = document.getElementById("share-wrap");
-        if (!wrap || isShareUser) return;
+        if (!wrap) return;
 
         wrap.classList.remove("hidden");
+
+        // Share-link visitors get the panel too, so they can copy the link and
+        // hand it on, but NOT the revoke control - stopping a share stays with
+        // real operators (Austin, 2026-08-25). share-admin enforces the same
+        // rule server-side: it 403s every action for a share user, including
+        // "get", so this branch must not call it. It doesn't need to. The
+        // synthetic account's email is share+<slug>@uptown.com, so the slug the
+        // visitor arrived on is already in the session, and the link rebuilds
+        // from it with no round trip. Kept in sync with SHARE_BASE in the
+        // share-admin function.
+        if (isShareUser) {
+          document.getElementById("share-revoke")?.remove();
+          document.getElementById("share-none")?.remove();
+          const slug = ((sess.user.email || "").split("@")[0].split("+")[1] || "").trim();
+          if (!slug) { wrap.classList.add("hidden"); return; }
+
+          const btnS  = document.getElementById("share-btn");
+          const popS  = document.getElementById("share-pop");
+          const urlS  = document.getElementById("share-url");
+          const copyS = document.getElementById("share-copy");
+          urlS.value = "https://app.uptown.com/share/" + slug;
+          document.getElementById("share-active").classList.remove("hidden");
+
+          btnS.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const open = popS.classList.toggle("hidden");
+            btnS.setAttribute("aria-expanded", open ? "false" : "true");
+          });
+          popS.addEventListener("click", (e) => e.stopPropagation());
+          document.addEventListener("click", (e) => {
+            if (!popS.classList.contains("hidden") && !wrap.contains(e.target)) {
+              popS.classList.add("hidden");
+              btnS.setAttribute("aria-expanded", "false");
+            }
+          });
+          document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && !popS.classList.contains("hidden")) {
+              popS.classList.add("hidden");
+              btnS.setAttribute("aria-expanded", "false");
+            }
+          });
+          copyS.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(urlS.value);
+              const prev = copyS.textContent;
+              copyS.textContent = "Copied";
+              setTimeout(() => { copyS.textContent = prev; }, 1400);
+            } catch (_) {
+              urlS.select();
+              try { document.execCommand("copy"); } catch (_) {}
+            }
+          });
+          return;
+        }
 
         const btn      = document.getElementById("share-btn");
         const pop      = document.getElementById("share-pop");
@@ -1095,7 +1148,7 @@
           try {
             const r = await sb.invokeFunction("share-admin", { action: "create", client_id: clientId });
             renderActive(r.link.url);
-            setMsg("Share link ready. Anyone with it can edit this account.", "ok");
+            setMsg("Share link ready. Anyone with it has full access to this account.", "ok");
           } catch (err) {
             setMsg(err.message || "Couldn't create the link.", "error");
           } finally {
