@@ -1044,6 +1044,16 @@
           const slug = ((sess.user.email || "").split("@")[0].split("+")[1] || "").trim();
           if (!slug) { wrap.classList.add("hidden"); return; }
 
+          // Put the share URL back in the address bar. Clients copy what
+          // they see up there and send it to teammates, and /account/?id=
+          // is a login wall for anyone without a session - the slug IS the
+          // access, so keep it visible (Austin, 2026-08-27). Tab switching
+          // writes location.pathname + hash, so the copied link also
+          // carries the open tab. clientId was read into a const at
+          // startup, so nothing re-reads ?id= after this. A refresh on
+          // /share/<slug> just re-enters through the share flow.
+          history.replaceState(null, "", `/share/${encodeURIComponent(slug)}${location.hash}`);
+
           const btnS  = document.getElementById("share-btn");
           const popS  = document.getElementById("share-pop");
           const urlS  = document.getElementById("share-url");

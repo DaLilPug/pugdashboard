@@ -33,7 +33,10 @@
         var shareMatch = window.location.pathname.match(/^\/share\/(.+)$/);
         if (shareMatch) {
           var slug = shareMatch[1].replace(/\/+$/, '');
-          window.location.replace('/share/?s=' + encodeURIComponent(slug));
+          // Carry the hash: share URLs copied from an open dashboard
+          // include the tab (/share/<slug>#responses), and the recipient
+          // should land on that same tab.
+          window.location.replace('/share/?s=' + encodeURIComponent(slug) + window.location.hash);
           return;
         }
 
