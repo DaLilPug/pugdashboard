@@ -7239,3 +7239,45 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .an-hl-toast-err {
   background: #8c2f2f;
 }
+
+/* Service tags on the dashboard client list. Chips read in canonical
+   order (Connector, DWY, DFY, Content); the cell opens a small fixed
+   popover of four checkboxes - fixed like the highlight picker, because
+   the table's scroll container clips in-cell dropdowns. */
+.service-cell { cursor: pointer; white-space: nowrap; }
+.svc-chip {
+  display: inline-block;
+  padding: 2px 7px;
+  margin-right: 4px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.svc-connector { background: #e8f1f8; color: #1d5d8c; }
+.svc-dwy       { background: #fdf2e3; color: #8a5a12; }
+.svc-dfy       { background: #e7f4ec; color: #1e6b3a; }
+.svc-content   { background: #f0eafa; color: #5b3a9b; }
+.svc-pop {
+  position: fixed;
+  z-index: 300;
+  background: #fff;
+  border: 1px solid #d6dee5;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(14, 42, 58, 0.18);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.svc-pop-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.svc-pop-opt:hover { background: #f2f6f9; }

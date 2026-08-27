@@ -137,6 +137,23 @@
       </select>
     </div>
 
+    <div class="filter-group">
+      <span class="filter-label">Service</span>
+      <div class="ms-wrap" data-filter="services">
+        <button class="ms-button" type="button" aria-haspopup="listbox" aria-expanded="false">
+          <span class="ms-label">All</span>
+          <span class="ms-caret">▾</span>
+        </button>
+        <div class="ms-popover hidden" role="listbox" aria-label="Service filter">
+          <div class="ms-head">
+            <button type="button" class="ms-link" data-ms-action="all">Select all</button>
+            <button type="button" class="ms-link" data-ms-action="none">Clear</button>
+          </div>
+          <div class="ms-options" data-ms-target="services"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="filter-spacer"></div>
 
     <div class="filter-group filter-group-timeframe">
@@ -209,6 +226,7 @@
               <th class="sortable" data-sort="startDate">Start Date<span class="sort-caret"></span></th>
               <th class="sortable" data-sort="endDate">End Date<span class="sort-caret"></span></th>
               <th>Status</th>
+              <th class="col-service">Service</th>
               <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
               <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
@@ -235,7 +253,7 @@
             </tr>
           </thead>
           <tbody id="client-tbody">
-            <tr><td colspan="22" class="loading">Loading…</td></tr>
+            <tr><td colspan="23" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -606,7 +624,7 @@
        //   14 Pos.booking, 15 Trend, 16 Extras-toggle,
        //   17 RegularFU, 18 PositiveFU, 19 InMails, 20 Retargeting,
        //   21 OpenTasks, 22 Actions.
-      const colspan    = 22;
+      const colspan    = 23;
 
       // Per-client open/overdue task counts, read from the cached
       // client_task_counts table (pg_cron-refreshed every 20 min) in
@@ -621,6 +639,7 @@
       const LS_SORT_DIR  = "dashboard_sort_dir";
       const LS_SEL_ACCTS = "dashboard_sel_accts";
       const LS_SEL_COS   = "dashboard_sel_cos";
+      const LS_SEL_SVCS  = "dashboard_sel_svcs";
       const LS_SORT_VER  = "dashboard_sort_version";
       const LS_SHOW_ARCH = "dashboard_show_archived";
       const LS_TF_VER    = "dashboard_tf_version";
@@ -666,6 +685,8 @@
       // Stored in localStorage as a JSON array of ids; null = absent.
       let selectedAccountIds = parseStoredSet(localStorage.getItem(LS_SEL_ACCTS));
       let selectedCompanies  = parseStoredSet(localStorage.getItem(LS_SEL_COS));
+      // Service filter state, same null-means-all convention as the others.
+      let selectedServices   = parseStoredSet(localStorage.getItem(LS_SEL_SVCS));
       // Quick-search text. Deliberately NOT persisted: it's a transient
       // find-this-account tool, and a remembered search re-hiding rows on
       // the next visit would read as "my accounts disappeared".
@@ -1012,7 +1033,7 @@
           : "";
         try {
           clientsCache = await sb.sbFetch(
-            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at" +
+            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at,services" +
             orgFilter +
             archivedFilter +
             "&order=name.asc"
@@ -1229,6 +1250,15 @@
         const stOK  = statusVal === "all"
           ? (_ => true)
           : (c => c._status === statusVal);
+        // Service filter: a row passes when ANY of its services is selected.
+        // "(none)" is the untagged bucket, so unassigned seats stay findable.
+        const svcOK = !selectedServices || selectedServices.size === 0
+          ? (_ => true)
+          : (c => {
+              const svcs = Array.isArray(c.services) ? c.services : [];
+              if (!svcs.length) return selectedServices.has("(none)");
+              return svcs.some(sv => selectedServices.has(sv));
+            });
         // Quick search: every whitespace-separated token must appear in
         // name+company (so "nick south" or partial words like "sh an"
         // both narrow as you type).
@@ -1239,7 +1269,7 @@
               const hay = `${c.name || ""} ${c.company || ""}`.toLowerCase();
               return qTokens.every(t => hay.includes(t));
             });
-        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c) && qOK(c));
+        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c) && svcOK(c) && qOK(c));
       }
 
       let enrichedCache = [];
@@ -1299,6 +1329,23 @@
           `;
         }).join("") || `<div class="ms-empty">No companies set yet.</div>`;
 
+        // Service options are a fixed vocabulary (canonical order) plus the
+        // untagged bucket - no search box needed.
+        const svcEl = document.querySelector('[data-ms-target="services"]');
+        if (svcEl) {
+          svcEl.innerHTML = [...SERVICE_OPTIONS, "(none)"].map(v => {
+            const checked = selectedServices == null || selectedServices.size === 0
+              ? true
+              : selectedServices.has(v);
+            return `
+              <label class="ms-option">
+                <input type="checkbox" data-ms-kind="service" value="${esc(v)}" ${checked ? "checked" : ""}/>
+                <span>${v === "(none)" ? "No service set" : esc(v)}</span>
+              </label>
+            `;
+          }).join("");
+        }
+
         refreshMsLabels();
         // If a popover happens to be open with an active search query when
         // we re-render (e.g. after saving an inline edit), re-apply the
@@ -1315,6 +1362,8 @@
         const coEl  = document.querySelector('[data-ms-target="companies"]');
         accEl.addEventListener("change", onAccountMsChange);
         coEl .addEventListener("change", onCompanyMsChange);
+        document.querySelector('[data-ms-target="services"]')
+          ?.addEventListener("change", onServiceMsChange);
 
         document.querySelectorAll(".ms-popover").forEach(pop => {
           // Type-to-filter: hide rows whose label doesn't contain the query.
@@ -1345,8 +1394,9 @@
               if (!box) return;
               box.checked = (link.dataset.msAction === "all");
             });
-            if (kind === "accounts") onAccountMsChange();
-            else                     onCompanyMsChange();
+            if (kind === "accounts")      onAccountMsChange();
+            else if (kind === "services") onServiceMsChange();
+            else                          onCompanyMsChange();
           });
         });
       }
@@ -1383,6 +1433,20 @@
         rerender();
       }
 
+      function onServiceMsChange() {
+        const boxes = document.querySelectorAll('[data-ms-kind="service"]');
+        const checked = [...boxes].filter(b => b.checked).map(b => b.value);
+        if (checked.length === boxes.length || checked.length === 0) {
+          selectedServices = null;
+          localStorage.removeItem(LS_SEL_SVCS);
+        } else {
+          selectedServices = new Set(checked);
+          localStorage.setItem(LS_SEL_SVCS, JSON.stringify(checked));
+        }
+        refreshMsLabels();
+        rerender();
+      }
+
       function refreshMsLabels() {
         const accLabelEl = document.querySelector('[data-filter="accounts"] .ms-label');
         const coLabelEl  = document.querySelector('[data-filter="companies"] .ms-label');
@@ -1391,6 +1455,8 @@
           return c ? (c.name || "Unnamed") : id;
         });
         if (coLabelEl)  coLabelEl .textContent = labelForSet(selectedCompanies,  "All", (k) => k);
+        const svcLabelEl = document.querySelector('[data-filter="services"] .ms-label');
+        if (svcLabelEl) svcLabelEl.textContent = labelForSet(selectedServices, "All", (k) => k === "(none)" ? "No service" : k);
       }
 
       // Compact label for the filter button: "All" when nothing (or
@@ -1479,6 +1545,7 @@
               <span class="editable-value">${c.endDate ? esc(fmtDate(c.endDate)) : `<span class="editable-empty">— set —</span>`}</span>
             </td>
             <td class="status-cell">${statusHtml}</td>
+            <td class="service-cell" title="Click to edit services">${serviceChipsHtml(c.services)}</td>
             <td class="num drill">${fmtInt(c.connections)}</td>
             <td class="num drill">${fmtInt(c.messages)}</td>
             <td class="num drill rate-cell ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
@@ -1503,6 +1570,77 @@
         `;
       }
 
+      // ---- Service tags ---------------------------------------------------
+      // Fixed vocabulary, canonical order. Pilot/Pro folded into DFY at
+      // import (2026-08-27) - the UI only ever offers these four.
+      const SERVICE_OPTIONS = ["Connector", "DWY", "DFY", "Content"];
+      function canonicalServices(list) {
+        const set = new Set(list || []);
+        return SERVICE_OPTIONS.filter(sv => set.has(sv));
+      }
+      function serviceChipsHtml(list) {
+        const svcs = canonicalServices(list);
+        if (!svcs.length) return `<span class="editable-empty">— set —</span>`;
+        return svcs.map(sv => `<span class="svc-chip svc-${sv.toLowerCase()}">${sv}</span>`).join("");
+      }
+
+      // Editor: a small body-level popover of four checkboxes (fixed
+      // positioning, same reasoning as the highlight picker - the table's
+      // scroll container would clip an in-cell dropdown). Every toggle
+      // saves immediately: optimistic cell update, revert + alert if the
+      // PATCH fails.
+      let svcPop = null, svcPopClientId = null;
+      function closeSvcPop() { if (svcPop) { svcPop.remove(); svcPop = null; svcPopClientId = null; } }
+      function openSvcPop(td, clientId) {
+        if (svcPop && svcPopClientId === clientId) { closeSvcPop(); return; }
+        closeSvcPop();
+        const row = enrichedCache.find(x => x.id === clientId);
+        const current = new Set(canonicalServices(row?.services));
+        svcPop = document.createElement("div");
+        svcPop.className = "svc-pop";
+        svcPopClientId = clientId;
+        svcPop.innerHTML = SERVICE_OPTIONS.map(sv => `
+          <label class="svc-pop-opt">
+            <input type="checkbox" value="${esc(sv)}" ${current.has(sv) ? "checked" : ""}/>
+            <span>${esc(sv)}</span>
+          </label>
+        `).join("");
+        document.body.appendChild(svcPop);
+        const b = td.getBoundingClientRect();
+        const pRect = svcPop.getBoundingClientRect();
+        let top = b.bottom + 4;
+        if (top + pRect.height > window.innerHeight - 8) top = b.top - pRect.height - 4;
+        svcPop.style.top  = `${Math.max(8, top)}px`;
+        svcPop.style.left = `${Math.max(8, Math.min(b.left, window.innerWidth - pRect.width - 8))}px`;
+
+        svcPop.addEventListener("click", (e) => e.stopPropagation());
+        svcPop.addEventListener("change", async () => {
+          const next = canonicalServices([...svcPop.querySelectorAll("input:checked")].map(i => i.value));
+          const prev = row.services;
+          row.services = next;
+          const cc = clientsCache.find(x => x.id === clientId);
+          if (cc) cc.services = next;
+          td.innerHTML = serviceChipsHtml(next);
+          try {
+            await sb.sbFetch(`/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`, {
+              method: "PATCH",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ services: next }),
+            });
+          } catch (err) {
+            row.services = prev;
+            if (cc) cc.services = prev;
+            td.innerHTML = serviceChipsHtml(prev);
+            closeSvcPop();
+            alert("Couldn't save services: " + (err.message || err));
+          }
+        });
+      }
+      document.addEventListener("click", (e) => {
+        if (svcPop && !e.target.closest(".svc-pop") && !e.target.closest(".service-cell")) closeSvcPop();
+      });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSvcPop(); });
+
       function wireRowHandlers() {
         // Row click → account page. The interactive cells (inline-edit
         // columns and the row-action button column) all stopPropagation
@@ -1513,11 +1651,17 @@
         // page now (pencil button next to the H1).
         tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
           tr.addEventListener("click", (e) => {
-            if (e.target.closest(".editable, .col-actions")) return;
+            if (e.target.closest(".editable, .col-actions, .service-cell")) return;
             window.location.href = `/account/?id=${encodeURIComponent(tr.dataset.clientId)}`;
           });
         });
         tbodyEl.querySelectorAll(".editable").forEach(wireEditable);
+        tbodyEl.querySelectorAll(".service-cell").forEach(td => {
+          td.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openSvcPop(td, td.closest("tr").dataset.clientId);
+          });
+        });
         tbodyEl.querySelectorAll(".btn-row-action").forEach(wireRowAction);
       }
 
