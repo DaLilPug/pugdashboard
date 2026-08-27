@@ -2163,7 +2163,7 @@
           // deleted rows don't leave marks behind forever. BOTH tables -
           // passing responses alone would wipe every meeting highlight on
           // the next load.
-          loadHighlights(new Set([
+          await loadHighlights(new Set([
             ...(responses || []).map(r => r.id),
             ...(meetings  || []).map(r => r.id),
           ]));
@@ -2540,11 +2540,13 @@
           return map;
         }
         // ---- row highlights (Responses + Meetings tables) ------------
-        // Local-only auditing marks. Stored in localStorage rather than
-        // the database on purpose: they describe a review pass, not the
-        // prospect or the reply, so they never belong on either record.
-        // The trade-off is that they are per-browser - a teammate on
-        // another machine sees an unhighlighted table.
+        // Shared team marks, stored in public.row_highlights and scoped by
+        // has_client_access like everything else on the account - so every
+        // operator, and share-link visitors too, sees the same colours.
+        // They lived in localStorage until 2026-08-26 ("doesn't seem to be
+        // saving between users and sessions" - Austin); loadHighlights()
+        // migrates any marks it still finds there into the table once,
+        // then removes the key.
         const HL_COLORS = [
           { key: "yellow", label: "Yellow" },
           { key: "blue",   label: "Blue"   },
@@ -2553,34 +2555,77 @@
           { key: "red",    label: "Red"    },
         ];
         const HL_KEYS = HL_COLORS.map(c => c.key);
-        // Key still says "resp" - it predates Meetings getting highlights.
-        // Renaming it would orphan every mark an operator has already made,
-        // and the map covers both tables, so it stays as it is.
+        // Legacy per-browser key - read once for the migration, never written.
         const AN_HL_KEY = `account_${clientId}_an_resp_highlights`;
 
-        function loadHighlights(validIds) {
-          let raw = {};
-          try { raw = JSON.parse(localStorage.getItem(AN_HL_KEY) || "{}") || {}; }
-          catch { raw = {}; }
-          // Drop anything whose row no longer exists (deleted rows)
-          // or whose colour we no longer recognise, so the blob can't
-          // grow without bound across months of auditing.
-          const clean = {};
-          for (const [id, color] of Object.entries(raw)) {
-            if (validIds.has(id) && HL_KEYS.includes(color)) clean[id] = color;
+        async function loadHighlights(validIds) {
+          let rows = [];
+          try {
+            rows = await sb.sbFetchAll(
+              `/rest/v1/row_highlights?client_id=eq.${encodeURIComponent(clientId)}&select=event_id,color`
+            );
+          } catch (err) {
+            // Render uncoloured rather than block the tables; a retry
+            // happens naturally on the next visit.
+            console.warn("highlights: load failed -", err.message || err);
+            rows = [];
           }
-          anState.highlights = clean;
-          if (Object.keys(clean).length !== Object.keys(raw).length) saveHighlights();
-        }
-        function saveHighlights() {
-          try { localStorage.setItem(AN_HL_KEY, JSON.stringify(anState.highlights)); }
-          catch { /* storage full or private mode - highlights just won't persist */ }
+          const map = {};
+          for (const r of rows || []) if (HL_KEYS.includes(r.color)) map[r.event_id] = r.color;
+
+          // One-time migration of the old localStorage marks. validIds
+          // filters stale ids out (the old format's only cleanup ran on
+          // load, so the blob can reference long-deleted rows), and the
+          // table wins wherever both have a colour for the same row.
+          let legacy = {};
+          try { legacy = JSON.parse(localStorage.getItem(AN_HL_KEY) || "{}") || {}; }
+          catch { legacy = {}; }
+          const up = Object.entries(legacy)
+            .filter(([id, c]) => validIds.has(id) && HL_KEYS.includes(c) && !map[id])
+            .map(([id, c]) => ({ event_id: id, client_id: clientId, color: c }));
+          if (up.length) {
+            try {
+              await sb.sbFetch(`/rest/v1/row_highlights?on_conflict=event_id`, {
+                method: "POST",
+                headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+                body: JSON.stringify(up),
+              });
+              for (const r of up) map[r.event_id] = r.color;
+              localStorage.removeItem(AN_HL_KEY);
+            } catch (err) {
+              // Keep the local copy for another attempt next load, but
+              // still show the marks this session.
+              console.warn("highlights: migration failed -", err.message || err);
+              for (const r of up) map[r.event_id] = r.color;
+            }
+          } else if (Object.keys(legacy).length) {
+            localStorage.removeItem(AN_HL_KEY); // nothing left worth keeping
+          }
+          anState.highlights = map;
         }
         const highlightOf = (id) => anState.highlights[id] || "";
         function setHighlight(id, color) {
+          const prev = anState.highlights[id] || "";
           if (color) anState.highlights[id] = color;
           else delete anState.highlights[id];
-          saveHighlights();
+          // Optimistic: the row recolours immediately and the write follows.
+          // On failure the mark reverts and both tables re-render - a colour
+          // that exists on one screen but not in the table is exactly the
+          // bug this storage move was meant to end.
+          const req = color
+            ? sb.sbFetch(`/rest/v1/row_highlights?on_conflict=event_id`, {
+                method: "POST",
+                headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+                body: JSON.stringify([{ event_id: id, client_id: clientId, color }]),
+              })
+            : sb.sbFetch(`/rest/v1/row_highlights?event_id=eq.${encodeURIComponent(id)}`, {
+                method: "DELETE",
+              });
+          req.catch((err) => {
+            console.warn("highlights: save failed -", err.message || err);
+            if (prev) anState.highlights[id] = prev; else delete anState.highlights[id];
+            try { renderRespTable(); renderMeetings(); } catch (_) {}
+          });
         }
         // The whole cell is one small button. Nothing else ever renders
         // here - the colour shows up as the row background instead.
@@ -2952,13 +2997,9 @@
             return;
           }
           const gone = new Set(rows.map(r => r.id));
-          // Don't leave highlights pointing at rows that no longer exist.
-          // Both tables carry them now, so this runs either way.
-          let droppedHl = false;
-          for (const id of gone) {
-            if (anState.highlights[id]) { delete anState.highlights[id]; droppedHl = true; }
-          }
-          if (droppedHl) saveHighlights();
+          // row_highlights cascades on outreach delete, so the table cleans
+          // itself - only the in-memory copies need dropping.
+          for (const id of gone) delete anState.highlights[id];
           if (isResp) {
             anState.responses = (anState.responses || []).filter(r => !gone.has(r.id));
             anState.respSelected.clear();
