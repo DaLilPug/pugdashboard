@@ -7210,3 +7210,32 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
   font-size: 13px;
   color: #8a95a1;
 }
+
+/* Highlight toast: the one place highlight state changes speak to the
+   user - migrations in, conflicts kept, saves that failed and reverted.
+   Bottom-center, above the table scroll, never intercepts clicks. */
+.an-hl-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%) translateY(10px);
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--navy-900, #0e2a3a);
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(14, 42, 58, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 300;
+}
+.an-hl-toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.an-hl-toast-err {
+  background: #8c2f2f;
+}

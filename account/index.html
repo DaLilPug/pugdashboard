@@ -2558,6 +2558,27 @@
         // Legacy per-browser key - read once for the migration, never written.
         const AN_HL_KEY = `account_${clientId}_an_resp_highlights`;
 
+        // Every highlight state change announces itself. The rule a user
+        // can rely on: if a row stays coloured, the colour is shared -
+        // saved for the whole team. Anything else (a failed save, marks
+        // migrating in from this browser, a conflict that kept the team's
+        // colour) says so out loud instead of happening silently.
+        let hlToastEl = null, hlToastTimer = null;
+        function hlNotice(msg, kind = "ok") {
+          if (!hlToastEl) {
+            hlToastEl = document.createElement("div");
+            hlToastEl.className = "an-hl-toast";
+            hlToastEl.setAttribute("role", "status");
+            document.body.appendChild(hlToastEl);
+          }
+          hlToastEl.textContent = msg;
+          hlToastEl.className = `an-hl-toast an-hl-toast-${kind} an-hl-toast-show`;
+          if (hlToastTimer) clearTimeout(hlToastTimer);
+          hlToastTimer = setTimeout(() => {
+            hlToastEl.className = "an-hl-toast";
+          }, 7000);
+        }
+
         async function loadHighlights(validIds) {
           let rows = [];
           try {
@@ -2568,6 +2589,7 @@
             // Render uncoloured rather than block the tables; a retry
             // happens naturally on the next visit.
             console.warn("highlights: load failed -", err.message || err);
+            hlNotice("Shared highlights couldn't load - rows are shown uncoloured. Reload to retry.", "err");
             rows = [];
           }
           const map = {};
@@ -2583,6 +2605,11 @@
           const up = Object.entries(legacy)
             .filter(([id, c]) => validIds.has(id) && HL_KEYS.includes(c) && !map[id])
             .map(([id, c]) => ({ event_id: id, client_id: clientId, color: c }));
+          // Rows where this browser held one colour but the team already
+          // set a different one: the team's colour stays, and the user is
+          // told, because a mark that silently vanishes reads as data loss.
+          const kept = Object.entries(legacy)
+            .filter(([id, c]) => validIds.has(id) && HL_KEYS.includes(c) && map[id] && map[id] !== c).length;
           if (up.length) {
             try {
               await sb.sbFetch(`/rest/v1/row_highlights?on_conflict=event_id`, {
@@ -2592,14 +2619,20 @@
               });
               for (const r of up) map[r.event_id] = r.color;
               localStorage.removeItem(AN_HL_KEY);
+              hlNotice(
+                `${up.length} highlight${up.length === 1 ? "" : "s"} saved only on this browser ${up.length === 1 ? "was" : "were"} added to the shared set - the whole team sees them now.`
+                + (kept ? ` ${kept} row${kept === 1 ? "" : "s"} already had a team colour, which was kept.` : "")
+              );
             } catch (err) {
               // Keep the local copy for another attempt next load, but
               // still show the marks this session.
               console.warn("highlights: migration failed -", err.message || err);
               for (const r of up) map[r.event_id] = r.color;
+              hlNotice("This browser has highlights that couldn't reach the shared set - they'll retry on the next visit.", "err");
             }
           } else if (Object.keys(legacy).length) {
             localStorage.removeItem(AN_HL_KEY); // nothing left worth keeping
+            if (kept) hlNotice(`${kept} old highlight${kept === 1 ? "" : "s"} on this browser ${kept === 1 ? "was" : "were"} skipped - those rows already have a team colour.`);
           }
           anState.highlights = map;
         }
@@ -2625,6 +2658,7 @@
             console.warn("highlights: save failed -", err.message || err);
             if (prev) anState.highlights[id] = prev; else delete anState.highlights[id];
             try { renderRespTable(); renderMeetings(); } catch (_) {}
+            hlNotice("Couldn't save that highlight, so it was reverted. Check your connection and try again.", "err");
           });
         }
         // The whole cell is one small button. Nothing else ever renders
