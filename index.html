@@ -16,6 +16,24 @@
        and Guides are reachable at their own URLs and from inside the app;
        the binding consent line lives on the sign-in button in /login/. -->
   <meta name="robots" content="noindex, nofollow" />
+  <!-- Signed-in users skip this page entirely. The check runs in <head>,
+       before first paint, so there's no landing-page flash on the way to
+       the dashboard - "an annoying extra click every time" (Austin,
+       2026-08-27). Share-link sessions are skipped here on purpose:
+       loading supabase-client.js brings its shareScopeGuard along, which
+       bounces them to their one account page. Anyone signed out just
+       sees the static landing as before. -->
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script>
+    (function () {
+      try {
+        var s = sb.getSession();
+        var meta = s && s.user && s.user.user_metadata;
+        if (s && !(meta && meta.is_share_user)) window.location.replace("/dashboard/");
+      } catch (_) { /* no session store - fall through to the landing */ }
+    })();
+  </script>
   <link rel="icon" type="image/png" href="/assets/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
