@@ -198,7 +198,11 @@
 
     <section class="table-section">
       <div class="section-head">
-        <h2>Account performance</h2>
+        <div class="view-switch" id="view-switch" role="tablist" aria-label="Dashboard view">
+          <button class="view-tab active" data-dview="accounts" type="button">Accounts</button>
+          <button class="view-tab" data-dview="meetings" type="button">Meetings</button>
+        </div>
+        <h2 id="section-title">Account performance</h2>
         <span id="client-count" class="section-meta"></span>
         <!-- Seat usage chip: "181 of 200 seats" for org admins.
              Hidden for members (no seats_paid to show) and also when
@@ -254,6 +258,27 @@
           </thead>
           <tbody id="client-tbody">
             <tr><td colspan="23" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Master meetings view: every meeting booked across the accounts
+           the viewer can see, and which account it was booked for. Hidden
+           by default and populated lazily on first switch, so it adds
+           zero cost to the initial dashboard load. -->
+      <div class="table-wrap" id="meetings-wrap" hidden>
+        <table class="client-table meetings-table" id="meetings-table">
+          <thead>
+            <tr>
+              <th>Booked</th>
+              <th>Account</th>
+              <th>Prospect</th>
+              <th>Title</th>
+              <th>Company</th>
+              <th>Meeting Date</th>
+            </tr>
+          </thead>
+          <tbody id="meetings-tbody">
+            <tr><td colspan="6" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -736,7 +761,11 @@
       // multiselects.
       quickSearchEl.addEventListener("input", () => {
         quickSearch = quickSearchEl.value;
-        renderKpiStrip(kpiEl, filteredEnriched().length, aggregateForKpis(filteredEnriched()));
+        // On the meetings view, search filters meeting rows only - the KPI
+        // strip keeps its account-filter scope (search there is account text).
+        if (dashView !== "meetings") {
+          renderKpiStrip(kpiEl, filteredEnriched().length, aggregateForKpis(filteredEnriched()));
+        }
         renderTable();
       });
       quickSearchEl.addEventListener("keydown", (e) => {
@@ -1067,7 +1096,7 @@
         const active = clientsCache.filter(
           c => c.org_id === org.id && !c.archived_at
         ).length;
-        seatUsageEl.hidden = false;
+        seatUsageEl.hidden = (dashView === "meetings");
         seatUsageEl.textContent = `— ${active} of ${org.seats_paid} seats used`;
         seatUsageEl.classList.toggle("at-cap",   active >= org.seats_paid);
         seatUsageEl.classList.toggle("near-cap", active < org.seats_paid && active >= org.seats_paid * 0.9);
@@ -1240,7 +1269,7 @@
         return endDate < today ? "inactive" : "active";
       }
 
-      function filteredEnriched() {
+      function filteredEnriched(includeSearch = true) {
         const accOK = !selectedAccountIds || selectedAccountIds.size === 0
           ? (_ => true)
           : (c => selectedAccountIds.has(c.id));
@@ -1269,12 +1298,13 @@
               const hay = `${c.name || ""} ${c.company || ""}`.toLowerCase();
               return qTokens.every(t => hay.includes(t));
             });
-        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c) && svcOK(c) && qOK(c));
+        return enrichedCache.filter(c => accOK(c) && coOK(c) && stOK(c) && svcOK(c) && (!includeSearch || qOK(c)));
       }
 
       let enrichedCache = [];
 
       function renderTable() {
+        if (dashView === "meetings") { renderMeetingsView(); return; }
         const filtered = filteredEnriched();
         countEl.textContent = `— ${filtered.length} account${filtered.length === 1 ? '' : 's'}`;
 
@@ -1569,6 +1599,120 @@
           </tr>
         `;
       }
+
+      // ---- Master meetings view --------------------------------------------
+      // "Meetings" tab in the section head: every meeting booked across the
+      // accounts the viewer can see, and which account it was booked for.
+      // Nothing is fetched on initial dashboard load - data loads on first
+      // switch and is cached per timeframe window for the session. Backed
+      // by the partial index outreach_meetings_occurred_idx.
+      const viewSwitchEl   = document.getElementById("view-switch");
+      const meetingsWrapEl = document.getElementById("meetings-wrap");
+      const meetingsBodyEl = document.getElementById("meetings-tbody");
+      const sectionTitleEl = document.getElementById("section-title");
+      const accountsWrapEl = tableEl.closest(".table-wrap");
+      const defaultSearchPlaceholder = quickSearchEl.placeholder;
+      let dashView = "accounts";            // always starts on Accounts
+      const meetingsFetchCache = new Map(); // "since|until" -> rows
+      let meetingsPaintSeq = 0;             // drops stale async paints
+
+      async function fetchMeetingsWindow() {
+        const [since, until] = effectiveRange();
+        const key = `${since || ""}|${until || ""}`;
+        if (meetingsFetchCache.has(key)) return meetingsFetchCache.get(key);
+        let path = "/rest/v1/outreach" +
+          "?select=id,client_id,prospect_name,company,title,occurred_at,meeting_at,profile_url" +
+          "&type=eq.meeting_booked&order=occurred_at.desc";
+        if (since) path += `&occurred_at=gte.${encodeURIComponent(since)}`;
+        if (until) path += `&occurred_at=lte.${encodeURIComponent(until)}`;
+        // Cache the in-flight promise (not the resolved rows) so the
+        // double paint from stale-while-revalidate shares one fetch.
+        // RLS scopes rows to accessible clients; for platform admins the
+        // client-side visibleClients filter keeps display org-scoped.
+        const promise = sb.sbFetchAll(path).catch(err => {
+          meetingsFetchCache.delete(key); // don't cache failures
+          throw err;
+        });
+        meetingsFetchCache.set(key, promise);
+        return promise;
+      }
+
+      async function renderMeetingsView() {
+        const seq = ++meetingsPaintSeq;
+        const [since, until] = effectiveRange();
+        if (!meetingsFetchCache.has(`${since || ""}|${until || ""}`)) {
+          meetingsBodyEl.innerHTML = `<tr><td colspan="6" class="loading">Loading meetings…</td></tr>`;
+          countEl.textContent = "";
+        }
+        let rows;
+        try { rows = await fetchMeetingsWindow(); }
+        catch (err) {
+          if (seq !== meetingsPaintSeq) return;
+          meetingsBodyEl.innerHTML = `<tr><td colspan="6" class="loading">Couldn't load meetings: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+        if (seq !== meetingsPaintSeq || dashView !== "meetings") return;
+
+        // Account, company, status, and service filters flow through the
+        // same predicate set as the accounts table; quick search applies
+        // to the MEETING fields (prospect, title, company, account name).
+        const visibleClients = new Map(filteredEnriched(false).map(c => [c.id, c]));
+        const qTokens = quickSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        const shown = rows.filter(m => {
+          const client = visibleClients.get(m.client_id);
+          if (!client) return false;
+          if (!qTokens.length) return true;
+          const hay = `${m.prospect_name || ""} ${m.company || ""} ${m.title || ""} ${client.name || ""}`.toLowerCase();
+          return qTokens.every(t => hay.includes(t));
+        });
+
+        countEl.textContent = `— ${shown.length} meeting${shown.length === 1 ? "" : "s"}`;
+        if (!shown.length) {
+          meetingsBodyEl.innerHTML = `<tr><td colspan="6" class="loading">No meetings match the current filters.</td></tr>`;
+          return;
+        }
+        meetingsBodyEl.innerHTML = shown.map(m => {
+          const client = visibleClients.get(m.client_id);
+          const prospect = m.profile_url && /^https?:\/\//i.test(m.profile_url)
+            ? `<a href="${esc(m.profile_url)}" target="_blank" rel="noopener noreferrer">${esc(m.prospect_name || "—")}</a>`
+            : esc(m.prospect_name || "—");
+          return `
+            <tr>
+              <td>${esc(fmtDate(m.occurred_at))}</td>
+              <td class="meeting-account"><a href="/account/?id=${encodeURIComponent(m.client_id)}#meetings">${esc(client.name || "—")}</a></td>
+              <td>${prospect}</td>
+              <td>${esc(m.title || "—")}</td>
+              <td>${esc(m.company || "—")}</td>
+              <td>${m.meeting_at ? esc(fmtDate(m.meeting_at)) : "—"}</td>
+            </tr>`;
+        }).join("");
+      }
+
+      function setDashView(view) {
+        if (view === dashView) return;
+        dashView = view;
+        const meetings = view === "meetings";
+        viewSwitchEl.querySelectorAll(".view-tab").forEach(b =>
+          b.classList.toggle("active", b.dataset.dview === view));
+        accountsWrapEl.hidden = meetings;
+        meetingsWrapEl.hidden = !meetings;
+        sectionTitleEl.textContent = meetings ? "All meetings" : "Account performance";
+        quickSearchEl.placeholder = meetings ? "Search meetings…" : defaultSearchPlaceholder;
+        // Accounts-only chrome has no meaning on the meetings view.
+        document.getElementById("add-account-btn").hidden = meetings;
+        document.querySelector(".show-archived").hidden = meetings;
+        if (meetings) {
+          seatUsageEl.hidden = true;
+          renderMeetingsView();
+        } else {
+          seatUsageEl.hidden = seatUsageEl.textContent === "";
+          renderTable();
+        }
+      }
+      viewSwitchEl.addEventListener("click", (e) => {
+        const btn = e.target.closest(".view-tab");
+        if (btn) setDashView(btn.dataset.dview);
+      });
 
       // ---- Service tags ---------------------------------------------------
       // Fixed vocabulary, canonical order. Pilot/Pro folded into DFY at

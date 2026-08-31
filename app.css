@@ -7281,3 +7281,37 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
   user-select: none;
 }
 .svc-pop-opt:hover { background: #f2f6f9; }
+
+/* Accounts / Meetings view switcher on the main dashboard section head.
+   Segmented control; the meetings table itself reuses .client-table. */
+.view-switch {
+  display: inline-flex;
+  border: 1px solid var(--gray-300, #d6dee5);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.view-tab {
+  border: none;
+  background: #fff;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-600, #5b6b78);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.view-tab + .view-tab { border-left: 1px solid var(--gray-300, #d6dee5); }
+.view-tab:hover { background: #f2f6f9; }
+.view-tab.active {
+  background: var(--navy, #163a52);
+  color: #fff;
+}
+.meetings-table td { white-space: nowrap; }
+.meetings-table .meeting-account a { font-weight: 600; }
+
+/* [hidden] loses to the author display rule on .show-archived; restore it
+   (the Meetings view hides accounts-only chrome via the hidden attribute). */
+.show-archived[hidden] { display: none; }
