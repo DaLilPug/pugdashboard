@@ -1635,7 +1635,7 @@
       function intChipHtml(v) {
         const val = INTEGRATION_OPTIONS.includes(v) ? v : "Not Integrated";
         const yes = val !== "Not Integrated";
-        return `<span class="int-chip ${yes ? "int-yes" : "int-none"}">${esc(val)}</span>`;
+        return `<span class="status-dot ${yes ? "status-active" : "status-inactive"}"></span><span class="status-text">${esc(val)}</span>`;
       }
       let intPop = null, intPopClientId = null;
       function closeIntPop() { if (intPop) { intPop.remove(); intPop = null; intPopClientId = null; } }
@@ -1813,14 +1813,15 @@
 
         // Account, company, status, and service filters flow through the
         // same predicate set as the accounts table; quick search applies
-        // to the MEETING fields (prospect, title, company, account name).
+        // to the MEETING fields (prospect, title, company, account name
+        // and the account's company).
         const visibleClients = new Map(filteredEnriched(false).map(c => [c.id, c]));
         const qTokens = quickSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
         const shown = rows.filter(m => {
           const client = visibleClients.get(m.client_id);
           if (!client) return false;
           if (!qTokens.length) return true;
-          const hay = `${m.prospect_name || ""} ${m.company || ""} ${m.title || ""} ${client.name || ""}`.toLowerCase();
+          const hay = `${m.prospect_name || ""} ${m.company || ""} ${m.title || ""} ${client.name || ""} ${client.company || ""}`.toLowerCase();
           return qTokens.every(t => hay.includes(t));
         });
 
@@ -1856,9 +1857,9 @@
                 <a href="/account/?id=${encodeURIComponent(m.client_id)}#meetings">${esc(client.name || "—")}</a>
                 ${client.company ? `<div class="an-sub">${esc(client.company)}</div>` : ""}
               </td>
-              <td>${prospect}</td>
-              <td>${esc(m.title || "—")}</td>
-              <td>${esc(m.company || "—")}</td>
+              <td class="mm-clip">${prospect}</td>
+              <td class="mm-clip" title="${esc(m.title || "")}">${esc(m.title || "—")}</td>
+              <td class="mm-clip" title="${esc(m.company || "")}">${esc(m.company || "—")}</td>
               <td>${m.meeting_at ? esc(fmtDate(m.meeting_at)) : "—"}</td>
               <td class="num an-money-cell">${mmMoneyCellHtml(m.prospect_id, "opportunity_value")}</td>
               <td class="num an-money-cell">${mmMoneyCellHtml(m.prospect_id, "revenue_closed")}</td>

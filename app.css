@@ -7331,19 +7331,11 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .client-table tbody tr.an-hl-row-green:hover  { background: #d9ead3; }
 .client-table tbody tr.an-hl-row-red:hover    { background: #f4cccc; }
 
-/* Integration column chip (Accounts view). Green = bookings flow in
-   automatically (HubSpot / Calendly / Zapier / Bandaid); grey = manual. */
+/* Integration column (Accounts view): same look as the Status column -
+   green dot = bookings flow in automatically (HubSpot / Calendly /
+   Zapier / Bandaid), grey dot = Not Integrated. Text stays navy; the
+   dot does the talking. Reuses .status-dot / .status-text. */
 .integration-cell { cursor: pointer; white-space: nowrap; }
-.int-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-.int-yes  { background: #e7f4ec; color: #1e6b3a; }
-.int-none { background: #eef1f4; color: #7a8794; }
 /* Meetings tab: dot column now sits on the far right */
 .meetings-table .mm-hl-cell { padding-left: 0; padding-right: 10px; text-align: right; }
 
@@ -7354,4 +7346,14 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
+}
+
+/* Meetings view: clamp the free-text columns (prospect, title, company)
+   so the table fits a fullscreen window and the highlight dot on the
+   far right stays reachable without horizontal scrolling. Clipped
+   values show in full on hover via the title attribute. */
+.meetings-table td.mm-clip {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
