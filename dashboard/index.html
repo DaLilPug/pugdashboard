@@ -230,8 +230,8 @@
               <th class="sortable" data-sort="startDate">Start Date<span class="sort-caret"></span></th>
               <th class="sortable" data-sort="endDate">End Date<span class="sort-caret"></span></th>
               <th>Status</th>
-              <th class="col-service">Service</th>
               <th class="col-integration">Integration</th>
+              <th class="col-service">Service</th>
               <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
               <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
@@ -646,8 +646,8 @@
       const showArchivedEl = document.getElementById("show-archived");
       // Total column count, used by loading + empty-state rows that
       // span the full table width. Kept in sync with the <thead>:
-      //   1 Account, 2 Company, 3 Start, 4 End, 5 Status, 6 Service,
-      //   7 Integration, 8 Connections, 9 Messages, 10 Acc.rate,
+      //   1 Account, 2 Company, 3 Start, 4 End, 5 Status, 6 Integration,
+      //   7 Service, 8 Connections, 9 Messages, 10 Acc.rate,
       //   11 Responses, 12 Resp.rate, 13 Positives, 14 Pos.resp.rate,
       //   15 Meetings, 16 Pos.booking, 17 Trend, 18 Extras-toggle,
       //   19 RegularFU, 20 PositiveFU, 21 InMails, 22 Retargeting,
@@ -1601,8 +1601,8 @@
               <span class="editable-value">${c.endDate ? esc(fmtDate(c.endDate)) : `<span class="editable-empty">— set —</span>`}</span>
             </td>
             <td class="status-cell">${statusHtml}</td>
-            <td class="service-cell" title="Click to edit services">${serviceChipsHtml(c.services)}</td>
             <td class="integration-cell" title="Click to set integration">${intChipHtml(c.integration)}</td>
+            <td class="service-cell" title="Click to edit services">${serviceChipsHtml(c.services)}</td>
             <td class="num drill">${fmtInt(c.connections)}</td>
             <td class="num drill">${fmtInt(c.messages)}</td>
             <td class="num drill rate-cell ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
