@@ -269,16 +269,19 @@
         <table class="client-table meetings-table" id="meetings-table">
           <thead>
             <tr>
+              <th class="mm-hl-th"><span class="sr-only">Highlight</span></th>
               <th>Booked</th>
               <th>Account</th>
               <th>Prospect</th>
               <th>Title</th>
               <th>Company</th>
               <th>Meeting Date</th>
+              <th class="num">Opp. Value</th>
+              <th class="num">Revenue Closed</th>
             </tr>
           </thead>
           <tbody id="meetings-tbody">
-            <tr><td colspan="6" class="loading">Loading…</td></tr>
+            <tr><td colspan="9" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -655,6 +658,12 @@
       // client_task_counts table (pg_cron-refreshed every 20 min) in
       // parallel with the summary RPC. Map: client_id -> {outstanding, overdue}.
       let taskCountsById = new Map();
+
+      // Per-client opportunity/closed-revenue sums for the two money KPI
+      // cards, from the client_meeting_deals RPC (fetched in parallel with
+      // the summary; timeframe-scoped by meeting date). Map:
+      // client_id -> { opp, closed }.
+      let dealsById = new Map();
 
       // ---- persisted filter state ---------------------------------------
 
@@ -1198,7 +1207,7 @@
           // counts are current-state (not timeframe-scoped) and come from
           // client_task_counts (pg_cron-refreshed every 20 min). A failure
           // there is non-fatal - the column just shows 0.
-          const [summaryRes, taskRes] = await Promise.all([
+          const [summaryRes, taskRes, dealsRes] = await Promise.all([
             sb.sbFetch("/rest/v1/rpc/account_dashboard_summary", {
               method: "POST",
               body: JSON.stringify({
@@ -1209,10 +1218,27 @@
             }),
             sb.sbFetch("/rest/v1/client_task_counts?select=client_id,outstanding,overdue")
               .catch(e => { console.warn("task counts fetch failed; Open Tasks shows 0:", e); return []; }),
+            // Money rollup rides the same Promise.all, so the two KPI
+            // cards add no load latency. Failure is non-fatal: the cards
+            // show a dash until the next successful refresh.
+            sb.sbFetch("/rest/v1/rpc/client_meeting_deals", {
+              method: "POST",
+              body: JSON.stringify({
+                p_org_id: orgIdForCache,
+                p_since:  since || null,
+                p_until:  until || null,
+              }),
+            }).catch(e => { console.warn("deals rollup fetch failed:", e); return null; }),
           ]);
           summary = summaryRes;
           taskCountsById = new Map((Array.isArray(taskRes) ? taskRes : [])
             .map(r => [r.client_id, { outstanding: r.outstanding || 0, overdue: r.overdue || 0 }]));
+          if (Array.isArray(dealsRes)) {
+            dealsById = new Map(dealsRes.map(r =>
+              [r.client_id, { opp: Number(r.opportunity) || 0, closed: Number(r.closed) || 0 }]));
+          } else {
+            dealsById = new Map(); // stale totals against a new window would lie
+          }
         } catch (err) {
           // If we already painted from cache, leave it on screen and
           // just log; otherwise show the error state.
@@ -1621,7 +1647,8 @@
         const key = `${since || ""}|${until || ""}`;
         if (meetingsFetchCache.has(key)) return meetingsFetchCache.get(key);
         let path = "/rest/v1/outreach" +
-          "?select=id,client_id,prospect_name,company,title,occurred_at,meeting_at,profile_url" +
+          "?select=id,client_id,prospect_id,prospect_name,company,title,occurred_at,meeting_at,profile_url," +
+          "prospects(opportunity_value,revenue_closed)" +
           "&type=eq.meeting_booked&order=occurred_at.desc";
         if (since) path += `&occurred_at=gte.${encodeURIComponent(since)}`;
         if (until) path += `&occurred_at=lte.${encodeURIComponent(until)}`;
@@ -1637,21 +1664,86 @@
         return promise;
       }
 
+      // Shared row highlights: same row_highlights rows as the account
+      // tabs (keyed by outreach event id), so a colour set here shows
+      // there and vice versa. Loaded lazily with the meetings data.
+      const MM_HL_COLORS = [
+        { key: "yellow", label: "Yellow" },
+        { key: "blue",   label: "Blue"   },
+        { key: "purple", label: "Purple" },
+        { key: "green",  label: "Green"  },
+        { key: "red",    label: "Red"    },
+      ];
+      const MM_HL_KEYS = MM_HL_COLORS.map(c => c.key);
+      let mmHighlights = null;       // event_id -> color (null = not loaded)
+      let mmHlPromise = null;        // in-flight load; reset on failure so a later render retries
+      let mmDeals = new Map();       // prospect_id -> {opportunity_value, revenue_closed}
+      const MM_MONEY_LABEL = { opportunity_value: "opportunity value", revenue_closed: "revenue closed" };
+
+      function loadMmHighlights() {
+        if (mmHighlights) return Promise.resolve(mmHighlights);
+        if (!mmHlPromise) {
+          mmHlPromise = (async () => {
+            try {
+              const rows = await sb.sbFetchAll("/rest/v1/row_highlights?select=event_id,color");
+              mmHighlights = {};
+              for (const r of rows || []) if (MM_HL_KEYS.includes(r.color)) mmHighlights[r.event_id] = r.color;
+              return mmHighlights;
+            } catch (err) {
+              // Render uncoloured this pass, but let a later render retry -
+              // permanently caching an empty set would let a pick silently
+              // overwrite teammates' colours.
+              console.warn("meetings highlights load failed:", err);
+              mmHlPromise = null;
+              return {};
+            }
+          })();
+        }
+        return mmHlPromise;
+      }
+
+      function mmMoneyCellHtml(prospectId, field) {
+        if (!prospectId) return "—";
+        const d = mmDeals.get(prospectId);
+        const v = d && d[field] != null ? Number(d[field]) : null;
+        const attrs = `data-mm-money data-field="${field}" data-prospect-id="${esc(prospectId)}"`;
+        return v === null
+          ? `<div class="an-money-display an-money-empty" ${attrs} title="Click to set the ${MM_MONEY_LABEL[field]}">+ Add</div>`
+          : `<div class="an-money-display an-money-has" ${attrs} title="Click to edit">${esc(fmtMoney(v))}</div>`;
+      }
+
+      function mmHlCellHtml(id) {
+        const c = (mmHighlights && mmHighlights[id]) || "";
+        const label = c ? `${MM_HL_COLORS.find(x => x.key === c).label} highlight` : "No highlight";
+        return `<button class="an-hl-dot ${c ? `an-hl-sw-${c} an-hl-dot-set` : ""}" data-mm-hl-open data-event-id="${esc(id)}" type="button" title="${esc(label)} - click to change" aria-label="${esc(label)}"></button>`;
+      }
+
       async function renderMeetingsView() {
         const seq = ++meetingsPaintSeq;
         const [since, until] = effectiveRange();
         if (!meetingsFetchCache.has(`${since || ""}|${until || ""}`)) {
-          meetingsBodyEl.innerHTML = `<tr><td colspan="6" class="loading">Loading meetings…</td></tr>`;
+          meetingsBodyEl.innerHTML = `<tr><td colspan="9" class="loading">Loading meetings…</td></tr>`;
           countEl.textContent = "";
         }
         let rows;
-        try { rows = await fetchMeetingsWindow(); }
+        try { [rows] = await Promise.all([fetchMeetingsWindow(), loadMmHighlights()]); }
         catch (err) {
           if (seq !== meetingsPaintSeq) return;
-          meetingsBodyEl.innerHTML = `<tr><td colspan="6" class="loading">Couldn't load meetings: ${esc(err.message)}</td></tr>`;
+          meetingsBodyEl.innerHTML = `<tr><td colspan="9" class="loading">Couldn't load meetings: ${esc(err.message)}</td></tr>`;
           return;
         }
         if (seq !== meetingsPaintSeq || dashView !== "meetings") return;
+
+        // Deal values ride the fetch as an embedded prospects join; fold
+        // them into the prospect-keyed map the money cells edit against.
+        for (const m of rows) {
+          if (m.prospect_id && m.prospects && !mmDeals.has(m.prospect_id)) {
+            mmDeals.set(m.prospect_id, {
+              opportunity_value: m.prospects.opportunity_value,
+              revenue_closed:    m.prospects.revenue_closed,
+            });
+          }
+        }
 
         // Account, company, status, and service filters flow through the
         // same predicate set as the accounts table; quick search applies
@@ -1666,9 +1758,22 @@
           return qTokens.every(t => hay.includes(t));
         });
 
-        countEl.textContent = `— ${shown.length} meeting${shown.length === 1 ? "" : "s"}`;
+        // Header rollup: meetings shown, plus their opportunity/closed
+        // totals (each prospect counted once even with repeat meetings).
+        let opp = 0, closed = 0;
+        const seenProspects = new Set();
+        for (const m of shown) {
+          if (!m.prospect_id || seenProspects.has(m.prospect_id)) continue;
+          seenProspects.add(m.prospect_id);
+          const d = mmDeals.get(m.prospect_id);
+          if (d) { opp += Number(d.opportunity_value) || 0; closed += Number(d.revenue_closed) || 0; }
+        }
+        countEl.textContent =
+          `— ${shown.length} meeting${shown.length === 1 ? "" : "s"}` +
+          ` · ${fmtMoneyCompact(opp)} opportunity · ${fmtMoneyCompact(closed)} closed`;
+
         if (!shown.length) {
-          meetingsBodyEl.innerHTML = `<tr><td colspan="6" class="loading">No meetings match the current filters.</td></tr>`;
+          meetingsBodyEl.innerHTML = `<tr><td colspan="9" class="loading">No meetings match the current filters.</td></tr>`;
           return;
         }
         meetingsBodyEl.innerHTML = shown.map(m => {
@@ -1676,17 +1781,159 @@
           const prospect = m.profile_url && /^https?:\/\//i.test(m.profile_url)
             ? `<a href="${esc(m.profile_url)}" target="_blank" rel="noopener noreferrer">${esc(m.prospect_name || "—")}</a>`
             : esc(m.prospect_name || "—");
+          const hl = (mmHighlights && mmHighlights[m.id]) || "";
+          const hlCell = mmHighlights ? mmHlCellHtml(m.id) : "";
           return `
-            <tr>
+            <tr class="mm-row${hl ? ` an-hl-row-${hl}` : ""}" data-event-id="${esc(m.id)}" data-client-id="${esc(m.client_id)}">
+              <td class="mm-hl-cell">${hlCell}</td>
               <td>${esc(fmtDate(m.occurred_at))}</td>
               <td class="meeting-account"><a href="/account/?id=${encodeURIComponent(m.client_id)}#meetings">${esc(client.name || "—")}</a></td>
               <td>${prospect}</td>
               <td>${esc(m.title || "—")}</td>
               <td>${esc(m.company || "—")}</td>
               <td>${m.meeting_at ? esc(fmtDate(m.meeting_at)) : "—"}</td>
+              <td class="num an-money-cell">${mmMoneyCellHtml(m.prospect_id, "opportunity_value")}</td>
+              <td class="num an-money-cell">${mmMoneyCellHtml(m.prospect_id, "revenue_closed")}</td>
             </tr>`;
         }).join("");
       }
+
+      // ---- highlight picker (master meetings) -----------------------
+      // Same popover pattern and shared CSS as the account tabs.
+      let mmHlPop = null;
+      function closeMmHlPop() { if (mmHlPop) { mmHlPop.remove(); mmHlPop = null; } }
+      function openMmHlPop(btn) {
+        const id = btn.dataset.eventId;
+        if (mmHlPop && mmHlPop.dataset.eventId === id) { closeMmHlPop(); return; }
+        closeMmHlPop();
+        const current = (mmHighlights && mmHighlights[id]) || "";
+        mmHlPop = document.createElement("div");
+        mmHlPop.className = "an-hl-pop";
+        mmHlPop.dataset.eventId = id;
+        mmHlPop.setAttribute("role", "group");
+        mmHlPop.setAttribute("aria-label", "Row highlight");
+        mmHlPop.innerHTML =
+          `<button class="an-hl-opt an-hl-opt-none${current ? "" : " an-hl-opt-on"}" data-mm-hl-pick="" type="button" title="No highlight" aria-label="No highlight"></button>`
+          + MM_HL_COLORS.map(c =>
+            `<button class="an-hl-opt an-hl-sw-${c.key}${current === c.key ? " an-hl-opt-on" : ""}" data-mm-hl-pick="${c.key}" type="button" title="${esc(c.label)}" aria-label="${esc(c.label)}"></button>`
+          ).join("");
+        document.body.appendChild(mmHlPop);
+        const b = btn.getBoundingClientRect();
+        const pr = mmHlPop.getBoundingClientRect();
+        let top = b.bottom + 6;
+        if (top + pr.height > window.innerHeight - 8) top = b.top - pr.height - 6;
+        mmHlPop.style.top  = `${Math.max(8, top)}px`;
+        mmHlPop.style.left = `${Math.max(8, Math.min(b.left, window.innerWidth - pr.width - 8))}px`;
+      }
+      function applyMmHighlight(id, color) {
+        closeMmHlPop();
+        const prev = mmHighlights[id] || "";
+        if (color) mmHighlights[id] = color; else delete mmHighlights[id];
+        // Patch the row in place (a full rebuild would lose scroll position).
+        const tr = meetingsBodyEl.querySelector(`tr[data-event-id="${CSS.escape(id)}"]`);
+        if (tr) {
+          tr.className = `mm-row${color ? ` an-hl-row-${color}` : ""}`;
+          const cell = tr.querySelector(".mm-hl-cell");
+          if (cell) cell.innerHTML = mmHlCellHtml(id);
+        }
+        // Optimistic write, same rows the account tabs read. client_id is
+        // required by the table; it's stamped on the row.
+        const write = async () => {
+          const clientId = tr?.dataset.clientId;
+          if (color) {
+            await sb.sbFetch(`/rest/v1/row_highlights?on_conflict=event_id`, {
+              method: "POST",
+              headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+              body: JSON.stringify([{ event_id: id, client_id: clientId, color }]),
+            });
+          } else {
+            await sb.sbFetch(`/rest/v1/row_highlights?event_id=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+          }
+        };
+        write().catch(err => {
+          console.warn("meetings highlight save failed:", err);
+          if (prev) mmHighlights[id] = prev; else delete mmHighlights[id];
+          renderMeetingsView();
+          alert("Couldn't save that highlight, so it was reverted. Check your connection and try again.");
+        });
+      }
+      document.addEventListener("click", (e) => {
+        const pick = e.target.closest("[data-mm-hl-pick]");
+        if (pick) {
+          const id = mmHlPop && mmHlPop.dataset.eventId;
+          if (id) applyMmHighlight(id, pick.dataset.mmHlPick);
+          return;
+        }
+        const open = e.target.closest("[data-mm-hl-open]");
+        if (open) { openMmHlPop(open); return; }
+        if (mmHlPop && !e.target.closest(".an-hl-pop")) closeMmHlPop();
+      });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMmHlPop(); });
+      window.addEventListener("scroll", closeMmHlPop, true);
+
+      // ---- money editing (master meetings) --------------------------
+      // Same inline editor and RPC as the account tab's Meetings table;
+      // saves update the KPI money cards and the header rollup too.
+      document.addEventListener("click", (e) => {
+        const div = e.target.closest("[data-mm-money]");
+        if (!div || div.dataset.editing === "1") return;
+        const pid   = div.dataset.prospectId;
+        const field = div.dataset.field;
+        const d     = mmDeals.get(pid) || { opportunity_value: null, revenue_closed: null };
+        const prev  = d[field] != null ? Number(d[field]) : null;
+        const input = document.createElement("input");
+        input.type = "number";
+        input.className = "an-money-edit";
+        input.min = "0";
+        input.step = "0.01";
+        input.placeholder = "0";
+        input.setAttribute("aria-label", MM_MONEY_LABEL[field]);
+        if (prev !== null) input.value = String(prev);
+        div.replaceWith(input);
+        input.focus();
+        input.select();
+        let cancelled = false;
+        const done = () => {
+          if (input.isConnected) {
+            const td = input.closest("td");
+            if (td) td.innerHTML = mmMoneyCellHtml(pid, field);
+          }
+        };
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Escape") { ev.preventDefault(); cancelled = true; input.blur(); }
+          else if (ev.key === "Enter") { ev.preventDefault(); input.blur(); }
+        });
+        input.addEventListener("blur", async () => {
+          if (cancelled) { done(); return; }
+          const raw = input.value.trim();
+          let next = null;
+          if (raw !== "") {
+            const n = Number(raw);
+            if (!isFinite(n) || n < 0) { done(); return; }
+            next = Math.round(n * 100) / 100;
+          }
+          if (next === prev) { done(); return; }
+          try {
+            await sb.sbFetch(`/rest/v1/rpc/set_prospect_deal_field`, {
+              method: "POST",
+              body: JSON.stringify({ p_prospect_id: pid, p_field: field, p_value: next }),
+            });
+            d[field] = next;
+            mmDeals.set(pid, d);
+            // Keep the KPI cards honest by re-asking the server for the
+            // rollup (cheap RPC; local delta arithmetic drifts when the
+            // base map is stale or a fetch failed).
+            refreshDealsRollup();
+          } catch (err) {
+            alert("Couldn't save the value: " + (err.message || err));
+          }
+          done();
+          // Repaint the table (header rollup included) - but never while
+          // another money editor is open: rebuilding the tbody would
+          // destroy a focused input and lose whatever was typed.
+          if (!meetingsBodyEl.querySelector(".an-money-edit")) renderMeetingsView();
+        });
+      });
 
       function setDashView(view) {
         if (view === dashView) return;
@@ -1713,6 +1960,32 @@
         const btn = e.target.closest(".view-tab");
         if (btn) setDashView(btn.dataset.dview);
       });
+
+      // Re-fetch the per-client money rollup and repaint the KPI strip.
+      // The strip keeps its account-filter scope on the meetings view
+      // (search text there describes meetings, not accounts).
+      async function refreshDealsRollup() {
+        try {
+          const [since, until] = effectiveRange();
+          const org = drillInOrg || await getUserOrg();
+          const rows = await sb.sbFetch("/rest/v1/rpc/client_meeting_deals", {
+            method: "POST",
+            body: JSON.stringify({
+              p_org_id: org ? org.id : null,
+              p_since:  since || null,
+              p_until:  until || null,
+            }),
+          });
+          if (Array.isArray(rows)) {
+            dealsById = new Map(rows.map(r =>
+              [r.client_id, { opp: Number(r.opportunity) || 0, closed: Number(r.closed) || 0 }]));
+            const list = filteredEnriched(dashView !== "meetings");
+            renderKpiStrip(kpiEl, list.length, aggregateForKpis(list));
+          }
+        } catch (err) {
+          console.warn("deals rollup refresh failed:", err);
+        }
+      }
 
       // ---- Service tags ---------------------------------------------------
       // Fixed vocabulary, canonical order. Pilot/Pro folded into DFY at
@@ -2012,7 +2285,11 @@
           connections: 0, messages: 0, responses: 0, positives: 0, meetings: 0,
           inmails: 0, retargeting: 0, regularFollowups: 0, positiveFollowups: 0,
         };
+        t.oppValue = 0;
+        t.revClosed = 0;
         for (const m of perClient) {
+          const d = dealsById.get(m.id);
+          if (d) { t.oppValue += d.opp; t.revClosed += d.closed; }
           t.connections       += m.connections       || 0;
           t.messages          += m.messages          || 0;
           t.responses         += m.responses         || 0;
@@ -2052,6 +2329,8 @@
           ["Pos. resp. rate",   fmtPct(t.posRespRate)],
           ["Meetings",          fmtInt(t.meetings)],
           ["Pos. booking rate", fmtPct(t.posBookRate)],
+          ["Opportunity value", dealsById.size || t.oppValue ? fmtMoneyCompact(t.oppValue) : "—"],
+          ["Revenue closed",    dealsById.size || t.revClosed ? fmtMoneyCompact(t.revClosed) : "—"],
         ];
         root.innerHTML = cards.map(([label, value]) => `
           <div class="kpi-card">
@@ -2149,6 +2428,22 @@
       // ---- value formatters ---------------------------------------------
 
       function fmtInt(n) { return n == null ? "—" : n.toLocaleString(); }
+      function fmtMoney(n) {
+        const v = Number(n);
+        if (!isFinite(v)) return "—";
+        return v.toLocaleString("en-US", {
+          style: "currency", currency: "USD",
+          minimumFractionDigits: Number.isInteger(v) ? 0 : 2,
+          maximumFractionDigits: 2,
+        });
+      }
+      function fmtMoneyCompact(n) {
+        const v = Number(n) || 0;
+        const a = Math.abs(v);
+        if (a >= 1e6) return "$" + (v / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+        if (a >= 1e3) return "$" + (v / 1e3).toFixed(a >= 1e5 ? 0 : 1) + "K";
+        return "$" + v.toLocaleString();
+      }
       function fmtPct(r) { return r == null ? "—" : (r * 100).toFixed(1) + "%"; }
       function fmtDate(d) {
         // DB gives YYYY-MM-DD; render as US MM/DD/YYYY.

@@ -7315,3 +7315,18 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 /* [hidden] loses to the author display rule on .show-archived; restore it
    (the Meetings view hides accounts-only chrome via the hidden attribute). */
 .show-archived[hidden] { display: none; }
+
+/* Master meetings view: highlight dot column + money cells reuse the
+   account-tab an-* styles; only the hover-reveal needs a local hook
+   (the account tables scope it to .an-row). */
+.meetings-table .mm-hl-cell { width: 34px; padding-left: 10px; padding-right: 0; }
+.meetings-table .mm-hl-th { width: 34px; }
+.meetings-table .mm-row:hover .an-hl-dot { opacity: 1; }
+
+/* Highlighted meetings rows keep their tint under the generic
+   .client-table row hover (which would otherwise win on specificity). */
+.client-table tbody tr.an-hl-row-yellow:hover { background: #fff2cc; }
+.client-table tbody tr.an-hl-row-blue:hover   { background: #cfe2f3; }
+.client-table tbody tr.an-hl-row-purple:hover { background: #d9d2e9; }
+.client-table tbody tr.an-hl-row-green:hover  { background: #d9ead3; }
+.client-table tbody tr.an-hl-row-red:hover    { background: #f4cccc; }
