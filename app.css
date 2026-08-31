@@ -7330,3 +7330,28 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .client-table tbody tr.an-hl-row-purple:hover { background: #d9d2e9; }
 .client-table tbody tr.an-hl-row-green:hover  { background: #d9ead3; }
 .client-table tbody tr.an-hl-row-red:hover    { background: #f4cccc; }
+
+/* Integration column chip (Accounts view). Green = bookings flow in
+   automatically (HubSpot / Calendly / Zapier / Bandaid); grey = manual. */
+.integration-cell { cursor: pointer; white-space: nowrap; }
+.int-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.int-yes  { background: #e7f4ec; color: #1e6b3a; }
+.int-none { background: #eef1f4; color: #7a8794; }
+/* Meetings tab: dot column now sits on the far right */
+.meetings-table .mm-hl-cell { padding-left: 0; padding-right: 10px; text-align: right; }
+
+/* The account cell's company sub-line: the meetings table is nowrap, so
+   clamp the sub-line instead of letting a long company name overflow. */
+.meetings-table .an-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}

@@ -443,6 +443,41 @@
 
       if (batch.length < PAGE) break;                  // end-of-data
       if (total != null && all.length >= total) break; // hit the known total
+
+      // Opt-in fast path (options.parallel): the first page told us the
+      // exact total, so fetch every remaining page concurrently instead
+      // of walking them one round-trip at a time. Order is preserved by
+      // awaiting Promise.all and concatenating in range order. Only used
+      // by read-heavy lazy views (e.g. the dashboard's master Meetings
+      // tab); default behavior is unchanged.
+      if (options.parallel && offset === 0 && total != null) {
+        const offsets = [];
+        for (let o = PAGE; o < total; o += PAGE) offsets.push(o);
+        const batches = await Promise.all(offsets.map(async (o) => {
+          const r = await fetch(`${URL_BASE}${path}`, {
+            ...options,
+            headers: {
+              apikey:         ANON_KEY,
+              Authorization:  `Bearer ${s.access_token}`,
+              "Content-Type": "application/json",
+              "Range-Unit":   "items",
+              "Range":        `${o}-${o + PAGE - 1}`,
+              ...(options.headers || {}),
+            },
+          });
+          if (!r.ok && r.status !== 206) {
+            const text = await r.text();
+            let payload;
+            try { payload = JSON.parse(text); } catch (_) { payload = { message: text }; }
+            throw new Error(payload.message || payload.error || `HTTP ${r.status}`);
+          }
+          const b = await r.json();
+          return Array.isArray(b) ? b : [];
+        }));
+        for (const b of batches) for (const row of b) all.push(row);
+        return all;
+      }
+
       offset += PAGE;
     }
 

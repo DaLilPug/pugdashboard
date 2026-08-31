@@ -231,6 +231,7 @@
               <th class="sortable" data-sort="endDate">End Date<span class="sort-caret"></span></th>
               <th>Status</th>
               <th class="col-service">Service</th>
+              <th class="col-integration">Integration</th>
               <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
               <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
@@ -257,7 +258,7 @@
             </tr>
           </thead>
           <tbody id="client-tbody">
-            <tr><td colspan="23" class="loading">Loading…</td></tr>
+            <tr><td colspan="24" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -269,7 +270,6 @@
         <table class="client-table meetings-table" id="meetings-table">
           <thead>
             <tr>
-              <th class="mm-hl-th"><span class="sr-only">Highlight</span></th>
               <th>Booked</th>
               <th>Account</th>
               <th>Prospect</th>
@@ -278,6 +278,7 @@
               <th>Meeting Date</th>
               <th class="num">Opp. Value</th>
               <th class="num">Revenue Closed</th>
+              <th class="mm-hl-th"><span class="sr-only">Highlight</span></th>
             </tr>
           </thead>
           <tbody id="meetings-tbody">
@@ -643,16 +644,15 @@
       const countEl    = document.getElementById("client-count");
       const seatUsageEl    = document.getElementById("seat-usage");
       const showArchivedEl = document.getElementById("show-archived");
-      // 13 data columns + the trailing row-actions column = 14.
       // Total column count, used by loading + empty-state rows that
-       // span the full table width. Kept in sync with the <thead>:
-       //   1 Account, 2 Company, 3 Start, 4 End, 5 Status,
-       //   6 Connections, 7 Messages, 8 Acc.rate, 9 Responses,
-       //   10 Resp.rate, 11 Positives, 12 Pos.resp.rate, 13 Meetings,
-       //   14 Pos.booking, 15 Trend, 16 Extras-toggle,
-       //   17 RegularFU, 18 PositiveFU, 19 InMails, 20 Retargeting,
-       //   21 OpenTasks, 22 Actions.
-      const colspan    = 23;
+      // span the full table width. Kept in sync with the <thead>:
+      //   1 Account, 2 Company, 3 Start, 4 End, 5 Status, 6 Service,
+      //   7 Integration, 8 Connections, 9 Messages, 10 Acc.rate,
+      //   11 Responses, 12 Resp.rate, 13 Positives, 14 Pos.resp.rate,
+      //   15 Meetings, 16 Pos.booking, 17 Trend, 18 Extras-toggle,
+      //   19 RegularFU, 20 PositiveFU, 21 InMails, 22 Retargeting,
+      //   23 OpenTasks, 24 Actions.
+      const colspan    = 24;
 
       // Per-client open/overdue task counts, read from the cached
       // client_task_counts table (pg_cron-refreshed every 20 min) in
@@ -1071,7 +1071,7 @@
           : "";
         try {
           clientsCache = await sb.sbFetch(
-            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at,services" +
+            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at,services,integration" +
             orgFilter +
             archivedFilter +
             "&order=name.asc"
@@ -1602,6 +1602,7 @@
             </td>
             <td class="status-cell">${statusHtml}</td>
             <td class="service-cell" title="Click to edit services">${serviceChipsHtml(c.services)}</td>
+            <td class="integration-cell" title="Click to set integration">${intChipHtml(c.integration)}</td>
             <td class="num drill">${fmtInt(c.connections)}</td>
             <td class="num drill">${fmtInt(c.messages)}</td>
             <td class="num drill rate-cell ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
@@ -1625,6 +1626,71 @@
           </tr>
         `;
       }
+
+      // ---- Integration column ----------------------------------------------
+      // Manual single-select: how meetings reach the tracker for this seat.
+      // The four named values all mean "bookings flow in automatically" and
+      // render green; 'Not Integrated' is the grey default.
+      const INTEGRATION_OPTIONS = ["Not Integrated", "HubSpot", "Calendly", "Zapier", "Bandaid"];
+      function intChipHtml(v) {
+        const val = INTEGRATION_OPTIONS.includes(v) ? v : "Not Integrated";
+        const yes = val !== "Not Integrated";
+        return `<span class="int-chip ${yes ? "int-yes" : "int-none"}">${esc(val)}</span>`;
+      }
+      let intPop = null, intPopClientId = null;
+      function closeIntPop() { if (intPop) { intPop.remove(); intPop = null; intPopClientId = null; } }
+      function openIntPop(td, clientId) {
+        closeSvcPop();
+        if (intPop && intPopClientId === clientId) { closeIntPop(); return; }
+        closeIntPop();
+        const row = enrichedCache.find(x => x.id === clientId);
+        const current = INTEGRATION_OPTIONS.includes(row?.integration) ? row.integration : "Not Integrated";
+        intPop = document.createElement("div");
+        intPop.className = "svc-pop int-pop";
+        intPopClientId = clientId;
+        intPop.innerHTML = INTEGRATION_OPTIONS.map(v => `
+          <label class="svc-pop-opt">
+            <input type="radio" name="int-pick" value="${esc(v)}" ${v === current ? "checked" : ""}/>
+            <span>${esc(v)}</span>
+          </label>
+        `).join("");
+        document.body.appendChild(intPop);
+        const b = td.getBoundingClientRect();
+        const pRect = intPop.getBoundingClientRect();
+        let top = b.bottom + 4;
+        if (top + pRect.height > window.innerHeight - 8) top = b.top - pRect.height - 4;
+        intPop.style.top  = `${Math.max(8, top)}px`;
+        intPop.style.left = `${Math.max(8, Math.min(b.left, window.innerWidth - pRect.width - 8))}px`;
+
+        intPop.addEventListener("click", (e) => e.stopPropagation());
+        intPop.addEventListener("change", async () => {
+          const next = intPop.querySelector("input:checked")?.value;
+          if (!row) { closeIntPop(); return; }
+          if (!next || next === row.integration) { closeIntPop(); return; }
+          const prev = row.integration;
+          row.integration = next;
+          const cc = clientsCache.find(x => x.id === clientId);
+          if (cc) cc.integration = next;
+          td.innerHTML = intChipHtml(next);
+          closeIntPop();
+          try {
+            await sb.sbFetch(`/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`, {
+              method: "PATCH",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ integration: next }),
+            });
+          } catch (err) {
+            row.integration = prev;
+            if (cc) cc.integration = prev;
+            td.innerHTML = intChipHtml(prev);
+            alert("Couldn't save the integration: " + (err.message || err));
+          }
+        });
+      }
+      document.addEventListener("click", (e) => {
+        if (intPop && !e.target.closest(".int-pop") && !e.target.closest(".integration-cell")) closeIntPop();
+      });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeIntPop(); });
 
       // ---- Master meetings view --------------------------------------------
       // "Meetings" tab in the section head: every meeting booked across the
@@ -1656,7 +1722,7 @@
         // double paint from stale-while-revalidate shares one fetch.
         // RLS scopes rows to accessible clients; for platform admins the
         // client-side visibleClients filter keeps display org-scoped.
-        const promise = sb.sbFetchAll(path).catch(err => {
+        const promise = sb.sbFetchAll(path, { parallel: true }).catch(err => {
           meetingsFetchCache.delete(key); // don't cache failures
           throw err;
         });
@@ -1785,15 +1851,18 @@
           const hlCell = mmHighlights ? mmHlCellHtml(m.id) : "";
           return `
             <tr class="mm-row${hl ? ` an-hl-row-${hl}` : ""}" data-event-id="${esc(m.id)}" data-client-id="${esc(m.client_id)}">
-              <td class="mm-hl-cell">${hlCell}</td>
               <td>${esc(fmtDate(m.occurred_at))}</td>
-              <td class="meeting-account"><a href="/account/?id=${encodeURIComponent(m.client_id)}#meetings">${esc(client.name || "—")}</a></td>
+              <td class="meeting-account">
+                <a href="/account/?id=${encodeURIComponent(m.client_id)}#meetings">${esc(client.name || "—")}</a>
+                ${client.company ? `<div class="an-sub">${esc(client.company)}</div>` : ""}
+              </td>
               <td>${prospect}</td>
               <td>${esc(m.title || "—")}</td>
               <td>${esc(m.company || "—")}</td>
               <td>${m.meeting_at ? esc(fmtDate(m.meeting_at)) : "—"}</td>
               <td class="num an-money-cell">${mmMoneyCellHtml(m.prospect_id, "opportunity_value")}</td>
               <td class="num an-money-cell">${mmMoneyCellHtml(m.prospect_id, "revenue_closed")}</td>
+              <td class="mm-hl-cell">${hlCell}</td>
             </tr>`;
         }).join("");
       }
@@ -2009,6 +2078,7 @@
       let svcPop = null, svcPopClientId = null;
       function closeSvcPop() { if (svcPop) { svcPop.remove(); svcPop = null; svcPopClientId = null; } }
       function openSvcPop(td, clientId) {
+        closeIntPop();
         if (svcPop && svcPopClientId === clientId) { closeSvcPop(); return; }
         closeSvcPop();
         const row = enrichedCache.find(x => x.id === clientId);
@@ -2068,7 +2138,7 @@
         // page now (pencil button next to the H1).
         tbodyEl.querySelectorAll("tr[data-client-id]").forEach(tr => {
           tr.addEventListener("click", (e) => {
-            if (e.target.closest(".editable, .col-actions, .service-cell")) return;
+            if (e.target.closest(".editable, .col-actions, .service-cell, .integration-cell")) return;
             window.location.href = `/account/?id=${encodeURIComponent(tr.dataset.clientId)}`;
           });
         });
@@ -2077,6 +2147,12 @@
           td.addEventListener("click", (e) => {
             e.stopPropagation();
             openSvcPop(td, td.closest("tr").dataset.clientId);
+          });
+        });
+        tbodyEl.querySelectorAll(".integration-cell").forEach(td => {
+          td.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openIntPop(td, td.closest("tr").dataset.clientId);
           });
         });
         tbodyEl.querySelectorAll(".btn-row-action").forEach(wireRowAction);
