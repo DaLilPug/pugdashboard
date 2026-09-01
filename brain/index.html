@@ -285,14 +285,17 @@
         console.warn("client roster failed:", err);
       }
       for (const sel of [$("chat-client"), $("gen-client")]) {
-        sel.innerHTML = '<option value="">Select a client…</option>' + seats.map((s) =>
-          `<option value="${esc(s.seat)}">${esc(s.seat)} - ${esc(s.company || "?")}</option>`).join("");
+        sel.innerHTML = seats.length
+          ? '<option value="">Select a client…</option>' + seats.map((s) =>
+              `<option value="${esc(s.seat)}">${esc(s.seat)} - ${esc(s.company || "?")}</option>`).join("")
+          : '<option value="">Client list failed to load - refresh the page</option>';
       }
 
       // ============================== CHAT ================================
       const thread = $("chat-thread");
       let chatMsgs = [];   // [{role, content}] for the current client
       let chatBusy = false;
+      let chatGen = 0;     // bumped on client switch; stale replies are dropped
 
       function pushBubble(role, text, thinking = false) {
         const div = document.createElement("div");
@@ -304,6 +307,7 @@
       }
 
       $("chat-client").addEventListener("change", () => {
+        chatGen++;
         chatMsgs = [];
         thread.innerHTML = "";
         if ($("chat-client").value) {
@@ -317,19 +321,24 @@
         if (!client) { pushBubble("brain", "Pick a client first."); return; }
         if (!text || chatBusy) return;
         chatBusy = true;
+        const gen = chatGen;
         $("chat-input").value = "";
-        pushBubble("user", text);
+        const userBubble = pushBubble("user", text);
         chatMsgs.push({ role: "user", content: text });
         const ind = pushBubble("brain", "Thinking…", true);
         try {
           const r = await callFn("brain-chat", { method: "POST", body: { client, messages: chatMsgs } });
+          if (gen !== chatGen) return; // client switched mid-flight; drop the stale reply
           ind.remove();
           pushBubble("brain", r.answer);
           chatMsgs.push({ role: "assistant", content: r.answer });
         } catch (err) {
+          if (gen !== chatGen) return;
           ind.remove();
-          pushBubble("brain", `Something went wrong: ${err.message}`);
+          userBubble.remove();
           chatMsgs.pop();
+          $("chat-input").value = text; // give the question back for a retry
+          pushBubble("brain", `Something went wrong: ${err.message} - your question is back in the box.`);
         } finally {
           chatBusy = false;
         }
@@ -355,7 +364,13 @@
         const btn = $("gen-go");
         btn.disabled = true;
         const label = genIntent === "audit" ? "audit" : "review call agenda";
+        const t0 = Date.now();
         $("gen-status").textContent = `Writing the ${label} for ${client} - takes about a minute…`;
+        const tick = setInterval(() => {
+          const s = Math.round((Date.now() - t0) / 1000);
+          $("gen-status").textContent =
+            `Writing the ${label} for ${client} - ${s}s (long audits can take 2-3 minutes)…`;
+        }, 5000);
         try {
           const body = { intent: genIntent, client };
           const focus = $("gen-focus").value.trim();
@@ -365,15 +380,18 @@
           const r = await callFn("brain-generate", { method: "POST", body });
           const card = document.createElement("div");
           card.className = "gen-result";
-          card.innerHTML = `Done: <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>` +
+          card.innerHTML = (r.note ? `${esc(r.note)}: ` : "Done: ") +
+            `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>` +
             ` - in ${esc(r.seat)}'s campaign doc. Give the page a read before the call.`;
           $("gen-results").prepend(card);
           $("gen-status").textContent = "";
         } catch (err) {
           $("gen-status").textContent = "";
-          $("gen-error").textContent = err.message;
+          $("gen-error").textContent = err.message +
+            " - if this was a timeout, check the campaign doc before retrying: the page may still have landed.";
           $("gen-error").classList.remove("hidden");
         } finally {
+          clearInterval(tick);
           btn.disabled = false;
         }
       });
@@ -381,7 +399,13 @@
       // ============================= SKILLS ===============================
       let curFile = null;      // { path, sha }
       let loadedContent = "";
+      let fileLoading = false;
       const editor = $("skills-editor");
+      const dirty = () => !!curFile && !fileLoading && editor.value !== loadedContent;
+
+      window.addEventListener("beforeunload", (e) => {
+        if (dirty()) { e.preventDefault(); e.returnValue = ""; }
+      });
 
       function setSkillsStatus(msg, ok = true) {
         const el = $("skills-status");
@@ -410,11 +434,11 @@
       }
 
       async function openFile(path, btn) {
-        if (curFile && editor.value !== loadedContent &&
-            !confirm("You have unsaved changes - discard them?")) return;
+        if (dirty() && !confirm("You have unsaved changes - discard them?")) return;
         document.querySelectorAll(".skills-file").forEach((x) => x.classList.toggle("active", x === btn));
         $("history-panel").classList.add("hidden");
         $("skills-error").classList.add("hidden");
+        fileLoading = true;
         editor.value = "Loading…";
         try {
           const r = await callFn("brain-skills", { qs: `?action=read&path=${encodeURIComponent(path)}` });
@@ -424,9 +448,15 @@
           $("skills-save").disabled = false;
           $("skills-history-btn").disabled = false;
         } catch (err) {
+          curFile = null;
+          loadedContent = "";
           editor.value = "";
+          $("skills-save").disabled = true;
+          $("skills-history-btn").disabled = true;
           $("skills-error").textContent = err.message;
           $("skills-error").classList.remove("hidden");
+        } finally {
+          fileLoading = false;
         }
       }
 
@@ -438,9 +468,17 @@
         $("skills-error").classList.add("hidden");
         try {
           const r = await callFn("brain-skills", { method: "POST",
-            body: { action: "save", path: curFile.path, content: editor.value } });
+            body: { action: "save", path: curFile.path, content: editor.value, sha: curFile.sha } });
           loadedContent = editor.value;
-          setSkillsStatus(`Saved - version ${r.commit.slice(0, 8)}, live now.`);
+          const active = document.querySelector(".skills-file.active");
+          setSkillsStatus(r.warning
+            ? `Saved (version ${r.commit.slice(0, 8)}) - ${r.warning}`
+            : `Saved - version ${r.commit.slice(0, 8)}, live now.`, !r.warning);
+          // refresh the sha so the next save doesn't 409 against our own commit
+          try {
+            const re = await callFn("brain-skills", { qs: `?action=read&path=${encodeURIComponent(curFile.path)}` });
+            curFile.sha = re.sha;
+          } catch (_) { /* next save falls back to server-side sha */ }
         } catch (err) {
           $("skills-error").textContent = err.message;
           $("skills-error").classList.remove("hidden");
@@ -473,10 +511,15 @@
               view.style.padding = "5px 12px";
               view.textContent = "View";
               view.addEventListener("click", async () => {
-                const old = await callFn("brain-skills",
-                  { qs: `?action=version&path=${encodeURIComponent(curFile.path)}&ref=${v.sha}` });
-                if (confirm("Load this version into the editor? (Nothing is saved until you hit Save or Restore.)")) {
+                if (dirty() && !confirm("You have unsaved changes - viewing an old version will discard them. Continue?")) return;
+                try {
+                  const old = await callFn("brain-skills",
+                    { qs: `?action=version&path=${encodeURIComponent(curFile.path)}&ref=${v.sha}` });
                   editor.value = old.content;
+                  setSkillsStatus("Viewing an old version - hit Save to make it current, or reopen the file to discard.");
+                } catch (err) {
+                  $("skills-error").textContent = err.message;
+                  $("skills-error").classList.remove("hidden");
                 }
               });
               const restore = document.createElement("button");
