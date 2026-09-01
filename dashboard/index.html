@@ -26,6 +26,10 @@
       <!-- Guides link: always visible. Leftmost utility-nav button so
            "how do I…" is one click away from any dashboard surface. -->
       <a href="/guides/" class="btn-guides-link">Guides</a>
+      <!-- Brain nav: hidden by default; revealed below only for members of
+           the Uptown Creation org. Brain (app.uptown.com/brain) is an
+           internal tool - client operators never see the link exists. -->
+      <a id="brain-link" href="/brain/" class="btn-guides-link hidden">Brain</a>
       <!-- Team nav: hidden by default; revealed below for users who
            are admin of at least one org (or platform admins). Drill-in
            mode for platform admins carries the as_org param through so
@@ -299,6 +303,20 @@
       const session = await Auth.requireAuth();
       Auth.wireSignOut();
       Auth.wireUserEmail(session);
+
+      // Reveal the Brain nav link for Uptown Creation members only.
+      // Fire-and-forget; the /brain/ page and its functions re-check
+      // membership themselves, so this is purely discoverability.
+      (async () => {
+        try {
+          const rows = await sb.sbFetch(
+            "/rest/v1/organization_members?select=org_id" +
+            `&operator_id=eq.${encodeURIComponent(session.user.id)}` +
+            "&org_id=eq.993a8795-efdd-4cfc-902d-023f791a26e7&limit=1"
+          );
+          if (rows && rows.length) document.getElementById("brain-link").classList.remove("hidden");
+        } catch (e) { /* link stays hidden */ }
+      })();
 
       // Fire the welcome email (idempotent server-side via the
       // operators.welcome_email_sent_at flag — only the very first

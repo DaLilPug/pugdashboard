@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brain - Uptown Tracker</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css" />
+  <style>
+    /* Brain is an internal Uptown Creation tool riding the Tracker's shell.
+       Everything here reuses app.css tokens; only layout is local. */
+    .brain-main { max-width: 1180px; margin: 24px auto; padding: 0 20px; }
+    .brain-tabs {
+      display: inline-flex; border: 1px solid var(--gray-300, #d6dee5);
+      border-radius: 8px; overflow: hidden; background: #fff; margin-bottom: 18px;
+    }
+    .brain-tab {
+      appearance: none; border: 0; background: #fff; cursor: pointer;
+      padding: 9px 22px; font: 600 13px Montserrat, sans-serif; color: var(--navy, #163a52);
+    }
+    .brain-tab + .brain-tab { border-left: 1px solid var(--gray-300, #d6dee5); }
+    .brain-tab.active { background: var(--navy, #163a52); color: #fff; }
+    .brain-panel { display: none; }
+    .brain-panel.active { display: block; }
+    .brain-card {
+      background: #fff; border: 1px solid #e3e9ef; border-radius: 12px;
+      padding: 20px; box-shadow: 0 1px 3px rgba(22, 58, 82, .06);
+    }
+    .brain-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .brain-label { font: 600 11px Montserrat, sans-serif; letter-spacing: .06em;
+      text-transform: uppercase; color: #7a8794; }
+    .brain-select, .brain-input, .brain-textarea {
+      font: 500 14px Inter, sans-serif; color: var(--navy, #163a52);
+      border: 1px solid #d6dee5; border-radius: 8px; padding: 9px 12px; background: #fff;
+    }
+    .brain-select:focus, .brain-input:focus, .brain-textarea:focus {
+      outline: 2px solid rgba(30, 182, 131, .35); border-color: #1EB683;
+    }
+    .brain-textarea { width: 100%; resize: vertical; }
+    .brain-btn {
+      appearance: none; border: 0; border-radius: 8px; cursor: pointer;
+      background: var(--navy, #163a52); color: #fff;
+      font: 700 13px Montserrat, sans-serif; padding: 10px 22px;
+    }
+    .brain-btn[disabled] { opacity: .55; cursor: default; }
+    .brain-btn.secondary { background: #eef1f4; color: var(--navy, #163a52); }
+    .brain-btn.danger { background: #b3402e; }
+    .brain-note { font: 500 12px Inter, sans-serif; color: #7a8794; }
+    .brain-error { font: 600 13px Inter, sans-serif; color: #b3402e; margin-top: 10px; }
+
+    /* Chat */
+    .chat-layout { display: flex; flex-direction: column; height: calc(100vh - 240px); min-height: 420px; }
+    .chat-thread { flex: 1; overflow-y: auto; padding: 6px 2px 14px; }
+    .chat-msg { max-width: 78%; margin: 8px 0; padding: 11px 14px; border-radius: 12px;
+      font: 500 14px/1.55 Inter, sans-serif; white-space: pre-wrap; word-wrap: break-word; }
+    .chat-msg.user { margin-left: auto; background: var(--navy, #163a52); color: #fff;
+      border-bottom-right-radius: 4px; }
+    .chat-msg.brain { margin-right: auto; background: #eef3f7; color: var(--navy, #163a52);
+      border-bottom-left-radius: 4px; }
+    .chat-msg.brain.thinking { color: #7a8794; font-style: italic; }
+    .chat-composer { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid #e3e9ef; }
+    .chat-composer .brain-input { flex: 1; }
+
+    /* Generate */
+    .gen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 800px) { .gen-grid { grid-template-columns: 1fr; } }
+    .gen-result { margin-top: 16px; padding: 14px 16px; border: 1px solid #cfe8db;
+      background: #f0faf5; border-radius: 10px; font: 500 14px Inter, sans-serif; }
+    .gen-result a { font-weight: 700; color: #1e6b3a; }
+    .radio-pills { display: inline-flex; gap: 8px; }
+    .radio-pill { border: 1px solid #d6dee5; border-radius: 999px; padding: 8px 16px;
+      cursor: pointer; font: 600 13px Montserrat, sans-serif; color: var(--navy, #163a52);
+      background: #fff; user-select: none; }
+    .radio-pill.active { background: var(--navy, #163a52); color: #fff; border-color: var(--navy, #163a52); }
+
+    /* Skills */
+    .skills-layout { display: grid; grid-template-columns: 250px 1fr; gap: 16px; }
+    @media (max-width: 800px) { .skills-layout { grid-template-columns: 1fr; } }
+    .skills-list { display: flex; flex-direction: column; gap: 4px; }
+    .skills-file {
+      text-align: left; appearance: none; cursor: pointer; border: 1px solid transparent;
+      border-radius: 8px; background: transparent; padding: 9px 12px;
+      font: 600 13px Inter, sans-serif; color: var(--navy, #163a52);
+    }
+    .skills-file:hover { background: #eef3f7; }
+    .skills-file.active { background: var(--navy, #163a52); color: #fff; }
+    .skills-file .sub { display: block; font: 500 11px Inter, sans-serif; color: #7a8794; }
+    .skills-file.active .sub { color: rgba(255, 255, 255, .7); }
+    .skills-editor { width: 100%; min-height: 480px; font: 13px/1.6 ui-monospace, Consolas, monospace;
+      border: 1px solid #d6dee5; border-radius: 10px; padding: 14px; color: #1e2f3c; }
+    .skills-toolbar { display: flex; gap: 10px; align-items: center; margin: 10px 0 0; flex-wrap: wrap; }
+    .skills-status { font: 600 12px Inter, sans-serif; color: #1e6b3a; }
+    .history-panel { margin-top: 14px; border-top: 1px solid #e3e9ef; padding-top: 12px; }
+    .history-row { display: flex; gap: 12px; align-items: center; padding: 7px 4px;
+      font: 500 13px Inter, sans-serif; color: var(--navy, #163a52);
+      border-bottom: 1px solid #f0f3f6; }
+    .history-row .when { color: #7a8794; min-width: 150px; }
+    .history-row .msg { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gate-card { max-width: 520px; margin: 80px auto; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="header-logo">
+        <img src="/assets/logo-tracker-white.png" alt="Uptown Tracker" />
+      </div>
+      <div class="header-pipe"></div>
+      <div class="header-sub">Brain</div>
+    </div>
+    <div class="header-right">
+      <div id="user-email" class="header-user"></div>
+      <a href="/dashboard/" class="btn-guides-link">Dashboard</a>
+      <button id="signout-btn" class="btn-signout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <main class="brain-main">
+    <!-- Org gate message: shown instead of the app when the signed-in user
+         is not an Uptown Creation member. The functions enforce the same
+         check server-side; this is just the polite front door. -->
+    <div id="brain-gate" class="brain-card gate-card hidden">
+      <h2 style="font-family:Montserrat,sans-serif;color:var(--navy,#163a52)">Internal tool</h2>
+      <p class="brain-note" style="margin-top:8px">Brain is internal to the Uptown Creation team.
+      You're signed in, but this account isn't part of that organization.</p>
+      <p style="margin-top:14px"><a href="/dashboard/">Back to your dashboard</a></p>
+    </div>
+
+    <div id="brain-app" class="hidden">
+      <div class="brain-tabs" role="tablist">
+        <button class="brain-tab active" data-tab="chat" type="button">Chat</button>
+        <button class="brain-tab" data-tab="generate" type="button">Generate</button>
+        <button class="brain-tab" data-tab="skills" type="button">Skills</button>
+      </div>
+
+      <!-- ============================== CHAT ============================== -->
+      <section id="panel-chat" class="brain-panel active">
+        <div class="brain-card chat-layout">
+          <div class="brain-row" style="margin-bottom:10px">
+            <span class="brain-label">Client</span>
+            <select id="chat-client" class="brain-select"><option value="">Loading clients…</option></select>
+            <span class="brain-note">Brain answers about one client at a time - calls, emails, campaign doc, live numbers. Switch clients to switch context.</span>
+          </div>
+          <div id="chat-thread" class="chat-thread"></div>
+          <div class="chat-composer">
+            <input id="chat-input" class="brain-input" type="text"
+                   placeholder="Ask about this client - state of the account, last call commitments, what changed…" />
+            <button id="chat-send" class="brain-btn" type="button">Send</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ GENERATE ============================ -->
+      <section id="panel-generate" class="brain-panel">
+        <div class="brain-card">
+          <div class="gen-grid">
+            <div>
+              <div class="brain-label" style="margin-bottom:6px">What do you need?</div>
+              <div class="radio-pills" id="gen-intent">
+                <span class="radio-pill active" data-intent="audit">Account Audit</span>
+                <span class="radio-pill" data-intent="agenda">Review Call Agenda</span>
+              </div>
+              <div style="margin-top:16px">
+                <div class="brain-label" style="margin-bottom:6px">Client</div>
+                <select id="gen-client" class="brain-select" style="min-width:280px">
+                  <option value="">Loading clients…</option>
+                </select>
+              </div>
+              <div id="gen-date-wrap" style="margin-top:16px" class="hidden">
+                <div class="brain-label" style="margin-bottom:6px">Call date (optional)</div>
+                <input id="gen-date" class="brain-input" type="text" placeholder="MM/DD/YY" style="width:140px" />
+                <div class="brain-note" style="margin-top:4px">Leave blank and Brain uses the date agreed on the last call.</div>
+              </div>
+            </div>
+            <div>
+              <div class="brain-label" style="margin-bottom:6px">Anything to focus on? (optional)</div>
+              <textarea id="gen-focus" class="brain-textarea" rows="6"
+                placeholder="e.g. focus on the InMail experiment, or: client asked about pausing - address momentum"></textarea>
+              <div class="brain-note" style="margin-top:6px">
+                The page is written from live tracker numbers, the campaign doc, and the latest call
+                transcripts, following the instructions in the Skills tab. It lands in the client's
+                campaign doc and the link appears here.
+              </div>
+            </div>
+          </div>
+          <div class="brain-row" style="margin-top:18px">
+            <button id="gen-go" class="brain-btn" type="button">Generate</button>
+            <span id="gen-status" class="brain-note"></span>
+          </div>
+          <div id="gen-error" class="brain-error hidden"></div>
+          <div id="gen-results"></div>
+        </div>
+      </section>
+
+      <!-- ============================= SKILLS ============================= -->
+      <section id="panel-skills" class="brain-panel">
+        <div class="brain-card">
+          <p class="brain-note" style="margin-bottom:12px">
+            These files are Brain's instructions - edit them and every future output changes.
+            Every save is a permanent version with your name on it, and any earlier version can
+            be restored, so you can't break anything that can't be undone.
+          </p>
+          <div class="skills-layout">
+            <div class="skills-list" id="skills-list"><span class="brain-note">Loading…</span></div>
+            <div>
+              <textarea id="skills-editor" class="skills-editor" spellcheck="false"
+                        placeholder="Pick a file on the left"></textarea>
+              <div class="skills-toolbar">
+                <button id="skills-save" class="brain-btn" type="button" disabled>Save</button>
+                <button id="skills-history-btn" class="brain-btn secondary" type="button" disabled>History</button>
+                <span id="skills-status" class="skills-status"></span>
+              </div>
+              <div id="skills-error" class="brain-error hidden"></div>
+              <div id="history-panel" class="history-panel hidden"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/config.js"></script>
+  <script src="/supabase-client.js"></script>
+  <script src="/auth.js"></script>
+  <script>
+    (async function main() {
+      const session = await Auth.requireAuth();
+      Auth.wireSignOut();
+      Auth.wireUserEmail(session);
+
+      const UPTOWN_ORG_ID = "993a8795-efdd-4cfc-902d-023f791a26e7";
+      const FN = window.SUPABASE_CONFIG.url + "/functions/v1";
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => String(s ?? "").replace(/[&<>"']/g,
+        (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+      // ---- org gate (UX only; the functions enforce it for real) ---------
+      const membership = await sb.sbFetch(
+        "/rest/v1/organization_members?select=org_id" +
+        `&operator_id=eq.${encodeURIComponent(session.user.id)}` +
+        `&org_id=eq.${UPTOWN_ORG_ID}&limit=1`
+      ).catch(() => []);
+      if (!membership || !membership.length) {
+        $("brain-gate").classList.remove("hidden");
+        return;
+      }
+      $("brain-app").classList.remove("hidden");
+
+      async function callFn(fn, { method = "GET", body = null, qs = "" } = {}) {
+        const s = await sb.ensureFreshSession();
+        const resp = await fetch(`${FN}/${fn}${qs}`, {
+          method,
+          headers: {
+            "Authorization": `Bearer ${s.access_token}`,
+            "apikey": window.SUPABASE_CONFIG.anonKey,
+            "Content-Type": "application/json",
+          },
+          body: body ? JSON.stringify(body) : null,
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+        return data;
+      }
+
+      // ---- tabs -----------------------------------------------------------
+      document.querySelectorAll(".brain-tab").forEach((t) => {
+        t.addEventListener("click", () => {
+          document.querySelectorAll(".brain-tab").forEach((x) => x.classList.toggle("active", x === t));
+          document.querySelectorAll(".brain-panel").forEach((p) =>
+            p.classList.toggle("active", p.id === `panel-${t.dataset.tab}`));
+        });
+      });
+
+      // ---- client roster (shared by chat + generate) ----------------------
+      let seats = [];
+      try {
+        const r = await callFn("brain-generate");
+        seats = r.seats || [];
+      } catch (err) {
+        console.warn("client roster failed:", err);
+      }
+      for (const sel of [$("chat-client"), $("gen-client")]) {
+        sel.innerHTML = '<option value="">Select a client…</option>' + seats.map((s) =>
+          `<option value="${esc(s.seat)}">${esc(s.seat)} - ${esc(s.company || "?")}</option>`).join("");
+      }
+
+      // ============================== CHAT ================================
+      const thread = $("chat-thread");
+      let chatMsgs = [];   // [{role, content}] for the current client
+      let chatBusy = false;
+
+      function pushBubble(role, text, thinking = false) {
+        const div = document.createElement("div");
+        div.className = `chat-msg ${role}${thinking ? " thinking" : ""}`;
+        div.textContent = text;
+        thread.appendChild(div);
+        thread.scrollTop = thread.scrollHeight;
+        return div;
+      }
+
+      $("chat-client").addEventListener("change", () => {
+        chatMsgs = [];
+        thread.innerHTML = "";
+        if ($("chat-client").value) {
+          pushBubble("brain", `Ask me anything about ${$("chat-client").value} - I have their calls, emails, campaign doc, and live numbers.`);
+        }
+      });
+
+      async function sendChat() {
+        const client = $("chat-client").value;
+        const text = $("chat-input").value.trim();
+        if (!client) { pushBubble("brain", "Pick a client first."); return; }
+        if (!text || chatBusy) return;
+        chatBusy = true;
+        $("chat-input").value = "";
+        pushBubble("user", text);
+        chatMsgs.push({ role: "user", content: text });
+        const ind = pushBubble("brain", "Thinking…", true);
+        try {
+          const r = await callFn("brain-chat", { method: "POST", body: { client, messages: chatMsgs } });
+          ind.remove();
+          pushBubble("brain", r.answer);
+          chatMsgs.push({ role: "assistant", content: r.answer });
+        } catch (err) {
+          ind.remove();
+          pushBubble("brain", `Something went wrong: ${err.message}`);
+          chatMsgs.pop();
+        } finally {
+          chatBusy = false;
+        }
+      }
+      $("chat-send").addEventListener("click", sendChat);
+      $("chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+
+      // ============================ GENERATE ==============================
+      let genIntent = "audit";
+      $("gen-intent").addEventListener("click", (e) => {
+        const pill = e.target.closest(".radio-pill");
+        if (!pill) return;
+        genIntent = pill.dataset.intent;
+        document.querySelectorAll("#gen-intent .radio-pill").forEach((p) =>
+          p.classList.toggle("active", p === pill));
+        $("gen-date-wrap").classList.toggle("hidden", genIntent !== "agenda");
+      });
+
+      $("gen-go").addEventListener("click", async () => {
+        const client = $("gen-client").value;
+        $("gen-error").classList.add("hidden");
+        if (!client) { $("gen-error").textContent = "Pick a client."; $("gen-error").classList.remove("hidden"); return; }
+        const btn = $("gen-go");
+        btn.disabled = true;
+        const label = genIntent === "audit" ? "audit" : "review call agenda";
+        $("gen-status").textContent = `Writing the ${label} for ${client} - takes about a minute…`;
+        try {
+          const body = { intent: genIntent, client };
+          const focus = $("gen-focus").value.trim();
+          if (focus) body.focus = focus;
+          const date = $("gen-date").value.trim();
+          if (genIntent === "agenda" && date) body.call_date = date;
+          const r = await callFn("brain-generate", { method: "POST", body });
+          const card = document.createElement("div");
+          card.className = "gen-result";
+          card.innerHTML = `Done: <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>` +
+            ` - in ${esc(r.seat)}'s campaign doc. Give the page a read before the call.`;
+          $("gen-results").prepend(card);
+          $("gen-status").textContent = "";
+        } catch (err) {
+          $("gen-status").textContent = "";
+          $("gen-error").textContent = err.message;
+          $("gen-error").classList.remove("hidden");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // ============================= SKILLS ===============================
+      let curFile = null;      // { path, sha }
+      let loadedContent = "";
+      const editor = $("skills-editor");
+
+      function setSkillsStatus(msg, ok = true) {
+        const el = $("skills-status");
+        el.textContent = msg;
+        el.style.color = ok ? "#1e6b3a" : "#b3402e";
+        if (msg) setTimeout(() => { if (el.textContent === msg) el.textContent = ""; }, 6000);
+      }
+
+      async function loadSkillsList() {
+        try {
+          const r = await callFn("brain-skills", { qs: "?action=list" });
+          const list = $("skills-list");
+          list.innerHTML = "";
+          for (const f of r.files) {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "skills-file";
+            const isEx = f.path.includes("/exemplars/");
+            b.innerHTML = `${esc(f.name.replace(/\.md$/, ""))}<span class="sub">${isEx ? "exemplar" : "skill"}</span>`;
+            b.addEventListener("click", () => openFile(f.path, b));
+            list.appendChild(b);
+          }
+        } catch (err) {
+          $("skills-list").innerHTML = `<span class="brain-error">${esc(err.message)}</span>`;
+        }
+      }
+
+      async function openFile(path, btn) {
+        if (curFile && editor.value !== loadedContent &&
+            !confirm("You have unsaved changes - discard them?")) return;
+        document.querySelectorAll(".skills-file").forEach((x) => x.classList.toggle("active", x === btn));
+        $("history-panel").classList.add("hidden");
+        $("skills-error").classList.add("hidden");
+        editor.value = "Loading…";
+        try {
+          const r = await callFn("brain-skills", { qs: `?action=read&path=${encodeURIComponent(path)}` });
+          curFile = { path: r.path, sha: r.sha };
+          loadedContent = r.content;
+          editor.value = r.content;
+          $("skills-save").disabled = false;
+          $("skills-history-btn").disabled = false;
+        } catch (err) {
+          editor.value = "";
+          $("skills-error").textContent = err.message;
+          $("skills-error").classList.remove("hidden");
+        }
+      }
+
+      $("skills-save").addEventListener("click", async () => {
+        if (!curFile) return;
+        if (editor.value === loadedContent) { setSkillsStatus("No changes to save."); return; }
+        if (!confirm(`Save ${curFile.path.split("/").pop()}? This changes Brain's behavior immediately.`)) return;
+        $("skills-save").disabled = true;
+        $("skills-error").classList.add("hidden");
+        try {
+          const r = await callFn("brain-skills", { method: "POST",
+            body: { action: "save", path: curFile.path, content: editor.value } });
+          loadedContent = editor.value;
+          setSkillsStatus(`Saved - version ${r.commit.slice(0, 8)}, live now.`);
+        } catch (err) {
+          $("skills-error").textContent = err.message;
+          $("skills-error").classList.remove("hidden");
+        } finally {
+          $("skills-save").disabled = false;
+        }
+      });
+
+      $("skills-history-btn").addEventListener("click", async () => {
+        if (!curFile) return;
+        const panel = $("history-panel");
+        if (!panel.classList.contains("hidden")) { panel.classList.add("hidden"); return; }
+        panel.innerHTML = '<span class="brain-note">Loading history…</span>';
+        panel.classList.remove("hidden");
+        try {
+          const r = await callFn("brain-skills",
+            { qs: `?action=history&path=${encodeURIComponent(curFile.path)}` });
+          panel.innerHTML = "";
+          r.versions.forEach((v, i) => {
+            const row = document.createElement("div");
+            row.className = "history-row";
+            const when = new Date(v.date).toLocaleString("en-US",
+              { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+            row.innerHTML = `<span class="when">${esc(when)}${i === 0 ? " (current)" : ""}</span>` +
+              `<span class="msg">${esc(v.message)}</span>`;
+            if (i > 0) {
+              const view = document.createElement("button");
+              view.type = "button";
+              view.className = "brain-btn secondary";
+              view.style.padding = "5px 12px";
+              view.textContent = "View";
+              view.addEventListener("click", async () => {
+                const old = await callFn("brain-skills",
+                  { qs: `?action=version&path=${encodeURIComponent(curFile.path)}&ref=${v.sha}` });
+                if (confirm("Load this version into the editor? (Nothing is saved until you hit Save or Restore.)")) {
+                  editor.value = old.content;
+                }
+              });
+              const restore = document.createElement("button");
+              restore.type = "button";
+              restore.className = "brain-btn danger";
+              restore.style.padding = "5px 12px";
+              restore.textContent = "Restore";
+              restore.addEventListener("click", async () => {
+                if (!confirm(`Restore this ${when} version as the live one?`)) return;
+                try {
+                  const res = await callFn("brain-skills", { method: "POST",
+                    body: { action: "restore", path: curFile.path, ref: v.sha } });
+                  setSkillsStatus(`Restored - version ${res.commit.slice(0, 8)}, live now.`);
+                  panel.classList.add("hidden");
+                  const active = document.querySelector(".skills-file.active");
+                  await openFile(curFile.path, active);
+                } catch (err) {
+                  $("skills-error").textContent = err.message;
+                  $("skills-error").classList.remove("hidden");
+                }
+              });
+              row.appendChild(view);
+              row.appendChild(restore);
+            }
+            panel.appendChild(row);
+          });
+        } catch (err) {
+          panel.innerHTML = `<span class="brain-error">${esc(err.message)}</span>`;
+        }
+      });
+
+      loadSkillsList();
+    })();
+  </script>
+</body>
+</html>
