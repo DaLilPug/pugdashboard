@@ -891,10 +891,15 @@
         <li><strong>Person card</strong> with the prospect's name, title,
             company, and three quick-action icon buttons (see
             <a href="#rb-quick-buttons">2.4</a>).</li>
-        <li><strong>Conversation</strong> showing the most recent
-            <em>Message Sent</em> (outbound) and <em>LinkedIn Response</em>
-            (inbound) it could detect, plus a collapsible <em>Edit reply
-            instructions</em> drawer (see <a href="#rb-instructions">2.5</a>).</li>
+        <li><strong>Conversation</strong> showing the <em>Message Sent</em>
+            (outbound) and <em>LinkedIn Response</em> (inbound) it detected in
+            the thread. Message Sent is the message the reply was actually
+            answering - the newest one sent <em>before</em> their latest
+            response - so logging a response days later still pairs it with
+            the right send, and a quick "thanks, appreciate it" you sent after
+            their reply stays out of it. A collapsible <em>Edit reply
+            instructions</em> drawer sits underneath (see
+            <a href="#rb-instructions">2.5</a>).</li>
         <li><strong>Suggested Reply</strong> - the AI-drafted blurb with a Copy
             button and a <em>Revise</em> box (see
             <a href="#rb-blurb">2.6</a>), then sentiment pills (Positive /
@@ -1704,6 +1709,11 @@
             strongest first. When an account has more than one variation, an
             <strong>Initial message</strong> picker appears above the lead list -
             choose the variation there and every copy on that page uses it.
+            The pick matters beyond the clipboard: when you log the send
+            (step 4), the Tracker records which variation was selected, and
+            the <a href="#dash-analysis">Initial Message Testing</a> card on
+            Analysis scores each variation's response, positive and meeting
+            rates from exactly those logs.
             <div class="callout warn" style="margin-top:8px;">
               <div class="callout-title">Replace the placeholder before your first send</div>
               <p>
@@ -1947,12 +1957,14 @@
 
       <h4>Filters &amp; timeframe</h4>
       <ul>
-        <li><strong>Accounts / Companies / Status</strong> - narrow the table to
-            just the accounts you want to look at. Status defaults to
+        <li><strong>Accounts / Companies / Status / Service</strong> - narrow the
+            table to just the accounts you want to look at. Status defaults to
             <em>Active</em>, and it comes straight off the account's End Date
             column: no end date, or one still in the future, reads Active. It has
             nothing to do with whether anyone has logged outreach lately. Switch
-            to <em>All</em> to see wound-down accounts alongside live ones.</li>
+            to <em>All</em> to see wound-down accounts alongside live ones.
+            Service filters by the account's service tags, with a "No service
+            set" bucket for the untagged.</li>
         <li><strong>Search</strong> - a live keyword filter over account name and
             company. It isn't remembered between visits; it's a
             find-this-account-now tool, while the dropdowns are the durable
@@ -1972,7 +1984,25 @@
       <p>
         Above the table, a KPI strip totals the funnel across every account
         currently passing your filters, so you can read the org-wide number and
-        the per-account breakdown without changing views.
+        the per-account breakdown without changing views. The strip ends with
+        <em>Opportunity value</em> and <em>Revenue closed</em> cards - totals of
+        the deal fields typed on prospects, each prospect counted once.
+      </p>
+
+      <h4>The Meetings view</h4>
+      <p>
+        Next to the section title sits an <strong>Accounts / Meetings</strong>
+        switcher. <em>Meetings</em> flips the table to every meeting booked
+        across all accounts passing your filters, newest first: the account it
+        was booked for (company name underneath), the prospect, their title and
+        company, the booked date, the meeting date, and editable <em>Opp.
+        Value</em> / <em>Revenue Closed</em> cells that write to the same
+        prospect fields as the per-account Meetings tab. A rollup beside the
+        title totals the meetings shown and their money columns. The search box
+        searches meeting fields here - prospect, title, prospect company,
+        account name and the account's company - and row highlights work from
+        the dot in the last column, same as everywhere else. The view loads on
+        first switch, so it adds nothing to the dashboard's initial load time.
       </p>
 
       <h4>Reading the columns</h4>
@@ -1985,6 +2015,15 @@
       </p>
 
       <ul>
+        <li><strong>Service</strong> - the account's service tags (Connector,
+            DWY, DFY, Content). Click the cell to edit; the header's Service
+            dropdown filters on the same tags.</li>
+        <li><strong>Integration</strong> - how meetings reach the Tracker for
+            this account, shown like the Status column: a green dot for
+            HubSpot, Calendly, Zapier or Bandaid (bookings flow in
+            automatically), grey for Not Integrated. Click to change. It's a
+            hand-maintained flag for at-a-glance coverage, not a live health
+            check.</li>
         <li><strong>Connections</strong> - connection requests sent in the timeframe.</li>
         <li><strong>Messages</strong> - Message 1 sends (= new accepted connections).</li>
         <li><strong>Acc. rate</strong> - Messages ÷ Connections. Color-coded against
@@ -2144,11 +2183,13 @@
         filter setting, and marking a reply does not mark that prospect's meeting.
       </p>
       <div class="callout note">
-        <div class="callout-title">Highlights live in your browser</div>
+        <div class="callout-title">Highlights are shared</div>
         <p>
-          They mark a review pass rather than the prospect, so they're stored
-          locally instead of on the record: a teammate on another machine sees the
-          table unmarked, and clearing your browser data clears them.
+          Highlights save to the account, not to your browser: mark a row and
+          every teammate viewing that account sees the same color, on this tab
+          and on the main dashboard's Meetings view alike. Treat them as a
+          shared review layer - "these are the rows we're talking about" -
+          rather than private scratch marks.
         </p>
       </div>
 
@@ -2962,7 +3003,8 @@
       <p>
         Analysis reads the account's data and tells you what to change. Top to
         bottom: Summary, Trends by Period, Period Comparison, Daily Activity,
-        Title performance, Health check. It's an internal tab - clients on a
+        Title performance, Initial Message Testing, Health check. It's an
+        internal tab - clients on a
         <a href="#dash-share">share link</a> never see it.
       </p>
 
@@ -3003,6 +3045,19 @@
             worse than the account average - with minimum sample sizes so a hot
             streak on four prospects never drives a strategy call. Its timeframe
             pills scope Title performance and Health check together.</li>
+        <li><strong>Initial Message Testing</strong> - every initial-message
+            variation the extension has logged, scored: prospects messaged,
+            sends, responses, response rate, positives, meetings. Message logs
+            carry whichever variation was selected in the extension's picker at
+            log time, so switching variations builds a real A/B over time. Each
+            prospect counts once per variation, and a response, positive or
+            meeting credits a variation only when it happened after that
+            prospect's first send of it. The card runs on its own timeframe
+            pills and custom range (defaulting to All Time - stamped data
+            begins mid-August 2026), independent of the Title performance
+            window above. Click a message to expand its full text;
+            <code>{{first_name}}</code>-style placeholders mark where
+            personalization was filled in at send time.</li>
         <li><strong>Health check</strong> - the five benchmark tiles
             (acceptance, response, positive, booking, meetings per month),
             plus an <em>Opportunity value</em> and a <em>Revenue closed</em>
@@ -3230,7 +3285,12 @@
             hasn't joined yet, with <em>Resend</em> and <em>Revoke</em> on each
             row.</li>
         <li><strong>Manage access</strong> (admin-only) - for each member, click
-            <em>Manage access</em> to pick which accounts they can see.</li>
+            <em>Manage access</em> to pick which accounts they can see. A member
+            who has access to <em>every</em> active account keeps that status
+            automatically: when a new account is created they're granted it on
+            the spot, so full-access teammates never need re-granting. Curated
+            access (anything less than everything) stays exactly as you set
+            it.</li>
         <li><strong>Change a role</strong> (admin-only) - click the
             <em>Admin</em> / <em>Member</em> badge in a member's Role column to
             promote or demote them; you'll get a confirm first. Your own row
