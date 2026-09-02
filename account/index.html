@@ -287,6 +287,14 @@
 
       <section class="panel-card">
         <div class="panel-card-head">
+          <h2>Initial Message Testing</h2>
+        </div>
+        <div class="panel-card-sub">How each initial message variation performs, over the timeframe selected in Title performance above. Message logs from the extension carry the variation selected at log time. Each prospect counts once per variation; responses, positives, and meetings count when they happened after that prospect's first send of it. Click a message to expand.</div>
+        <div id="an-initmsg"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
           <h2>Health check</h2>
         </div>
         <div class="panel-card-sub">The funnel scored against Uptown's benchmarks, over the timeframe selected in Title performance above, with the diagnosis and the lever to pull. <a href="/guides/#benchmarks" target="_blank" rel="noopener">How the benchmarks work</a></div>
@@ -1888,6 +1896,7 @@
         const diagEl     = document.getElementById("an-diagnosis");
         const calloutsEl = document.getElementById("an-title-callouts");
         const titlesEl   = document.getElementById("an-titles");
+        const initMsgEl  = document.getElementById("an-initmsg");
         const respLagEl  = document.getElementById("an-resp-lag");
         const respRoot   = document.getElementById("an-responses");
         const meetRoot   = document.getElementById("an-meetings");
@@ -1916,6 +1925,7 @@
         const anState = {
           entry:    null,   // { metrics, dailyBuckets } for the window
           titles:   null,   // analysis_title_performance rows
+          initMsgs: null,   // analysis_initial_message_performance rows
           titleView: "seniority",
           responses: null,  // ALL response rows, newest first
           meetings:  null,  // ALL meeting_booked rows, newest first
@@ -2140,6 +2150,21 @@
             meetings:  Number(r.meetings)  || 0,
           }));
         }
+        async function fetchInitialMsgs() {
+          const b = windowBounds();
+          const rows = await sb.sbFetch(`/rest/v1/rpc/analysis_initial_message_performance`, {
+            method: "POST",
+            body: JSON.stringify({ p_client_id: clientId, p_since: b.sinceIso, p_until: b.untilIso }),
+          });
+          return (rows || []).map(r => ({
+            template:  r.message_template || "",
+            prospects: Number(r.prospects) || 0,
+            sends:     Number(r.sends)     || 0,
+            responded: Number(r.responded) || 0,
+            positive:  Number(r.positive)  || 0,
+            meetings:  Number(r.meetings)  || 0,
+          }));
+        }
         async function loadListsOnce() {
           if (anState.listsLoaded) return;
           const encId = encodeURIComponent(clientId);
@@ -2182,19 +2207,31 @@
 
         async function refreshCore() {
           const token = ++coreToken;
-          benchEl.innerHTML  = `<div class="loading">Loading…</div>`;
-          titlesEl.innerHTML = `<div class="loading">Loading…</div>`;
+          benchEl.innerHTML   = `<div class="loading">Loading…</div>`;
+          titlesEl.innerHTML  = `<div class="loading">Loading…</div>`;
+          initMsgEl.innerHTML = `<div class="loading">Loading…</div>`;
           try {
-            const [entry, titles] = await Promise.all([fetchWindowSummary(), fetchTitles()]);
+            // Initial-message rows ride the same window; a failure there
+            // (e.g. RPC not yet migrated) must not sink Titles + Health.
+            const [entry, titles, initMsgs] = await Promise.all([
+              fetchWindowSummary(), fetchTitles(),
+              fetchInitialMsgs().catch(err => {
+                console.warn("initial-message analysis failed:", err);
+                return null;
+              }),
+            ]);
             if (token !== coreToken) return; // superseded by a newer window pick
-            anState.entry  = entry;
-            anState.titles = titles;
+            anState.entry    = entry;
+            anState.titles   = titles;
+            anState.initMsgs = initMsgs;
             renderBenchAndDiagnosis();
             renderTitles();
+            renderInitialMsgs();
           } catch (err) {
             if (token !== coreToken) return;
             benchEl.innerHTML = `<div class="placeholder"><strong>Couldn't load the analysis</strong>${esc(err.message || "")}</div>`;
             diagEl.innerHTML = ""; titlesEl.innerHTML = ""; calloutsEl.innerHTML = "";
+            initMsgEl.innerHTML = "";
           }
         }
 
@@ -2428,6 +2465,47 @@
               </table>
             </div>
             ${note ? `<div class="pr-meta an-table-note">${esc(note)}</div>` : ""}`;
+        }
+
+        // ---- Initial Message Testing ---------------------------------
+        // One row per initial-message variation: the extension stamps the
+        // selected variation onto every Message log, and the RPC groups the
+        // stamps back into templates (de-rendering each row's prospect
+        // fields) and scores them. Rendered per prospect at log time, so
+        // the template shows {{first_name}}-style placeholders here.
+        function renderInitialMsgs() {
+          if (anState.initMsgs === null) {
+            initMsgEl.innerHTML = `<div class="placeholder"><strong>Couldn't load initial-message data</strong>Reload the page to retry.</div>`;
+            return;
+          }
+          const rows = anState.initMsgs || [];
+          if (!rows.length) {
+            initMsgEl.innerHTML = `<div class="placeholder"><strong>No stamped initial messages in this window</strong>Message activities logged from the extension carry the selected variation automatically - data appears as the team logs sends.</div>`;
+            return;
+          }
+          const pct = (n, d) => d ? (Math.round(1000 * n / d) / 10) + "%" : "—";
+          initMsgEl.innerHTML = `
+            <div class="pr-table-scroll">
+              <table class="pr-table an-table">
+                <thead><tr>
+                  <th>Message</th><th class="num">Prospects</th><th class="num">Sends</th>
+                  <th class="num">Responses</th><th class="num">Response rate</th>
+                  <th class="num">Positives</th><th class="num">Meetings</th>
+                </tr></thead>
+                <tbody>
+                  ${rows.map(r => `
+                    <tr>
+                      <td class="an-msg-text"><div class="an-msg-clamp" title="Click to expand or collapse">${esc(r.template)}</div></td>
+                      <td class="num">${r.prospects}</td>
+                      <td class="num">${r.sends}</td>
+                      <td class="num">${r.responded}</td>
+                      <td class="num">${pct(r.responded, r.prospects)}</td>
+                      <td class="num">${r.positive || "—"}</td>
+                      <td class="num">${r.meetings || "—"}</td>
+                    </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>`;
         }
 
         // Data-driven callouts over the seniority buckets. Conservative
