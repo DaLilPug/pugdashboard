@@ -288,8 +288,26 @@
       <section class="panel-card">
         <div class="panel-card-head">
           <h2>Initial Message Testing</h2>
+          <button class="btn-secondary an-filter-toggle" data-an-filters type="button" aria-expanded="false">+ Filters</button>
+          <div class="timeframe-wrap an-filters">
+            <div class="timeframe-pills" id="an-imt-tfpills" data-an-table-pills="imt">
+              <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
+              <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
+              <button class="timeframe-pill" data-tf="3w" type="button">3 Weeks</button>
+              <button class="timeframe-pill" data-tf="1m" type="button">1 Month</button>
+              <button class="timeframe-pill" data-tf="2m" type="button">2 Months</button>
+              <button class="timeframe-pill" data-tf="3m" type="button">3 Months</button>
+              <button class="timeframe-pill" data-tf="yr" type="button">This Year</button>
+              <button class="timeframe-pill active" data-tf="all" type="button">All Time</button>
+            </div>
+            <div class="timeframe-custom">
+              <input type="date" class="filter-date" id="an-imt-from" aria-label="Initial message testing from date">
+              <span class="timeframe-custom-sep">to</span>
+              <input type="date" class="filter-date" id="an-imt-to" aria-label="Initial message testing to date">
+            </div>
+          </div>
         </div>
-        <div class="panel-card-sub">How each initial message variation performs, over the timeframe selected in Title performance above. Message logs from the extension carry the variation selected at log time. Each prospect counts once per variation; responses, positives, and meetings count when they happened after that prospect's first send of it. Click a message to expand.</div>
+        <div class="panel-card-sub">How each initial message variation performs, in this card's own timeframe. Message logs from the extension carry the variation selected at log time. Each prospect counts once per variation; responses, positives, and meetings count when they happened after that prospect's first send of it. Click a message to expand.</div>
         <div id="an-initmsg"><div class="loading">Loading…</div></div>
       </section>
 
@@ -1942,6 +1960,9 @@
           // pills only drive Titles + Health check.
           respRange: { tf: "all", from: null, to: null },
           meetRange: { tf: "all", from: null, to: null },
+          // Initial Message Testing has its own window too - stamped data
+          // only exists from 2026-08-15 on, so All Time is the right default.
+          imtRange:  { tf: "all", from: null, to: null },
           // Per-table "Notes" chips ("all" | "has" | "none"). Session
           // only - the tab's other table filters aren't persisted
           // either, and a remembered filter that silently hides rows
@@ -2150,8 +2171,18 @@
             meetings:  Number(r.meetings)  || 0,
           }));
         }
+        function imtBounds() {
+          const r = anState.imtRange;
+          if (r.tf && r.tf !== "custom") {
+            return { sinceIso: cutoffFor(r.tf), untilIso: null };
+          }
+          return {
+            sinceIso: r.from ? new Date(`${r.from}T00:00:00`).toISOString() : null,
+            untilIso: r.to   ? new Date(`${r.to}T23:59:59.999`).toISOString() : null,
+          };
+        }
         async function fetchInitialMsgs() {
-          const b = windowBounds();
+          const b = imtBounds();
           const rows = await sb.sbFetch(`/rest/v1/rpc/analysis_initial_message_performance`, {
             method: "POST",
             body: JSON.stringify({ p_client_id: clientId, p_since: b.sinceIso, p_until: b.untilIso }),
@@ -2207,31 +2238,38 @@
 
         async function refreshCore() {
           const token = ++coreToken;
-          benchEl.innerHTML   = `<div class="loading">Loading…</div>`;
-          titlesEl.innerHTML  = `<div class="loading">Loading…</div>`;
-          initMsgEl.innerHTML = `<div class="loading">Loading…</div>`;
+          benchEl.innerHTML  = `<div class="loading">Loading…</div>`;
+          titlesEl.innerHTML = `<div class="loading">Loading…</div>`;
           try {
-            // Initial-message rows ride the same window; a failure there
-            // (e.g. RPC not yet migrated) must not sink Titles + Health.
-            const [entry, titles, initMsgs] = await Promise.all([
-              fetchWindowSummary(), fetchTitles(),
-              fetchInitialMsgs().catch(err => {
-                console.warn("initial-message analysis failed:", err);
-                return null;
-              }),
-            ]);
+            const [entry, titles] = await Promise.all([fetchWindowSummary(), fetchTitles()]);
             if (token !== coreToken) return; // superseded by a newer window pick
-            anState.entry    = entry;
-            anState.titles   = titles;
-            anState.initMsgs = initMsgs;
+            anState.entry  = entry;
+            anState.titles = titles;
             renderBenchAndDiagnosis();
             renderTitles();
-            renderInitialMsgs();
           } catch (err) {
             if (token !== coreToken) return;
             benchEl.innerHTML = `<div class="placeholder"><strong>Couldn't load the analysis</strong>${esc(err.message || "")}</div>`;
             diagEl.innerHTML = ""; titlesEl.innerHTML = ""; calloutsEl.innerHTML = "";
-            initMsgEl.innerHTML = "";
+          }
+        }
+
+        // Initial Message Testing refreshes on ITS OWN window (imtRange),
+        // fully decoupled from the Title performance pills above it.
+        let imtToken = 0;
+        async function refreshInitMsgs() {
+          const token = ++imtToken;
+          initMsgEl.innerHTML = `<div class="loading">Loading…</div>`;
+          try {
+            const rows = await fetchInitialMsgs();
+            if (token !== imtToken) return;
+            anState.initMsgs = rows;
+            renderInitialMsgs();
+          } catch (err) {
+            if (token !== imtToken) return;
+            console.warn("initial-message analysis failed:", err);
+            anState.initMsgs = null;
+            renderInitialMsgs();
           }
         }
 
@@ -3534,7 +3572,12 @@
             const kind  = group.dataset.anTablePills;
             const tf    = tblPill.dataset.tf;
             activatePill(group, tf);
-            if (kind === "resp") {
+            if (kind === "imt") {
+              document.getElementById("an-imt-from").value = "";
+              document.getElementById("an-imt-to").value = "";
+              anState.imtRange = { tf, from: null, to: null };
+              refreshInitMsgs();
+            } else if (kind === "resp") {
               document.getElementById("an-resp-from").value = "";
               document.getElementById("an-resp-to").value = "";
               anState.respRange = { tf, from: null, to: null };
@@ -3661,11 +3704,13 @@
           anState.meetLimit = 50; anState.meetSelected.clear();
           if (anState.listsLoaded) renderMeetings();
         });
+        wireTableRange("an-imt-from", "an-imt-to", "an-imt-tfpills", "imtRange", refreshInitMsgs);
 
         // ---- boot ----------------------------------------------------
         (async () => {
           await null; // yield one microtask; mirrors initSummary's TDZ guard
           refreshCore();
+          refreshInitMsgs();
           try {
             await loadListsOnce();
             renderResponses();
