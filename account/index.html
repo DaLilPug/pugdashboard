@@ -5106,6 +5106,16 @@
           `;
         }
 
+        function fillMessageTokens(text, e) {
+          if (!text || text.indexOf("{{") === -1) return text;
+          const first = (e.prospect_name || "").trim().split(/\s+/)[0] || "";
+          const map = { first_name: first, firstname: first, company: e.company || "", title: e.title || "" };
+          return text.replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (m, k) => {
+            const v = map[k.toLowerCase()];
+            return v == null ? m : v;
+          });
+        }
+
         function renderEvent(e) {
           const typeLabel = {
             connection:     "Connection request",
@@ -5129,9 +5139,15 @@
           // unlabeled (matches the prior behavior — labels would feel
           // overdesigned for a single-field event).
           const isResponse = e.type === "response";
-          const body = isResponse
+          // Message-1 stamps are stored as the variation's raw text with
+          // tokens (extension v1.6.30+). Fill them in for display from the
+          // event's own prospect fields; the edit form keeps the raw value so
+          // a save never persists the filled-in text. String replace only
+          // when a token is present, so no cost on the common path.
+          const rawBody = isResponse
             ? (e.response || "")
             : (e.message_sent || "");
+          const body = isResponse ? rawBody : fillMessageTokens(rawBody, e);
           const pairedMessage = isResponse ? (e.message_sent || "") : "";
 
           // Sentiment rendering for response rows:
@@ -5198,7 +5214,7 @@
           if (formEditable) {
             editForm = `
               <form class="pr-event-edit-form" data-action="submit-event-edit" data-event-id="${esc(e.id)}" data-event-type="${esc(e.type)}">
-                <textarea class="pr-event-edit-text" name="message_sent" rows="3">${esc(body)}</textarea>
+                <textarea class="pr-event-edit-text" name="message_sent" rows="3">${esc(rawBody)}</textarea>
                 <div class="pr-event-edit-actions">
                   <button type="button" class="btn-secondary pr-action" data-action="cancel-event-edit" data-event-id="${esc(e.id)}">Cancel</button>
                   <button type="submit" class="btn-primary pr-action">Save</button>
