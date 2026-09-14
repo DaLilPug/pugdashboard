@@ -14,20 +14,45 @@
 <body class="login-body">
 
   <!--
-    One form, two modes. `?signup=1` or `?email=…` flips into sign-up
-    mode; otherwise the card renders as sign-in. The toggle at the
-    bottom swaps modes in-place without a page reload so the URL
-    params (email pre-fill, in particular) don't get stripped.
+    One form, three modes: sign-in (default), reset, and sign-up. Sign-up
+    is reachable ONLY through the invite link an org admin copies from
+    /team/ (`?signup=1&email=…`); there is no "Create an account" toggle
+    on the page since 2026-09-14. Clients who were sent app.uptown.com
+    instead of their share link used to land here and create an empty
+    organization for themselves (twice in one day) - the #client-notice
+    at the top of the card now points them back to the share link.
 
-    A successful signup hides this form and shows the #confirm-panel
-    sibling below so the "check your inbox" step is unmissable.
+    Account creation is also enforced server-side: the BEFORE INSERT
+    trigger auth_users_invite_only on auth.users refuses any new user
+    whose email is neither @uptown.com nor in public.pending_invites.
+    That covers the password form AND "Continue with Google" (Supabase
+    otherwise auto-creates a user on first OAuth login). Both paths
+    surface the refusal as the INVITE_ONLY_MSG text below.
+
+    A successful (invited) signup hides this form and shows the
+    #confirm-panel sibling below so the "check your inbox" step is
+    unmissable.
   -->
   <form id="login-form" class="login-card" autocomplete="on">
     <div class="login-brand">
       <img src="/assets/logo-tracker-navy.png" alt="Uptown Tracker" />
     </div>
 
+    <!-- Client notice: shown in sign-in mode only. Plain-text copy
+         button for the coach@ address (no mailto: links on Uptown
+         properties). Same wording as the root landing page. -->
+    <div id="client-notice" class="login-notice">
+      <strong>Uptown client looking for your dashboard?</strong>
+      Use the shared link your Uptown team sent you. It starts with
+      <code>app.uptown.com/share/</code> and needs no password. Questions go to
+      your Customer Success Manager at
+      <button type="button" class="login-copy" data-copy="coach@uptown.com" title="Click to copy">coach@uptown.com</button>
+    </div>
+
     <div id="login-title" class="login-title">Sign in to continue</div>
+    <div id="invite-hint" class="login-invite-hint" hidden>
+      You've been invited to Uptown Tracker. Create your login with the email the invite was sent to.
+    </div>
 
     <!-- Hidden in sign-in mode. Name ends up on auth.users.raw_user_meta_data
          where the handle_new_auth_user trigger reads it into operators.name. -->
@@ -75,9 +100,12 @@
       </button>
     </div>
 
-    <div class="login-switch">
-      <span id="switch-prompt">New to Uptown?</span>
-      <a id="switch-link" href="#" role="button">Create an account</a>
+    <!-- Mode switch row. Hidden in sign-in mode (there is nothing to
+         switch TO); shows "Sign in" from sign-up and "Back to sign in"
+         from reset. -->
+    <div id="switch-row" class="login-switch" hidden>
+      <span id="switch-prompt"></span>
+      <a id="switch-link" href="#" role="button"></a>
     </div>
 
     <!-- Click-wrap consent. Lives inside the card so it's visually
@@ -145,6 +173,25 @@
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script>
+    // Shown whenever account creation is refused (password form or the
+    // Google bounce). Declared first: the OAuth-error handler below runs
+    // before the rest of this script's consts are initialized.
+    const INVITE_ONLY_MSG = "Sign-up is by invitation only. If you're an Uptown client looking for your dashboard, open the shared link your Uptown team sent you (it starts with app.uptown.com/share/). Questions: coach@uptown.com";
+
+    // OAuth error bounce. A Google account with no Uptown login trips the
+    // invite-only trigger; Supabase comes back to /login/ with
+    // #error=server_error&error_description=Database+error+saving+new+user
+    // (or error_code=signup_disabled if signups are ever turned off
+    // project-wide). Strip the hash and say what happened in plain words.
+    (function handleOAuthError() {
+      if (!location.hash || !location.hash.includes("error=")) return;
+      const p = new URLSearchParams(location.hash.slice(1));
+      const desc = p.get("error_description") || p.get("error") || "";
+      history.replaceState(null, "", location.pathname + location.search);
+      const el = document.getElementById("error-msg");
+      if (el) el.textContent = friendlySignupError({ message: desc }, "google") || desc;
+    })();
+
     // OAuth callback: when Supabase finishes a "Continue with Google"
     // (or any provider) round-trip, it bounces back here with
     // access_token + refresh_token in the URL hash. Stash the session
@@ -348,6 +395,9 @@
     const forgotLinkEl   = document.getElementById("forgot-link");
     const googleBlock    = document.getElementById("google-block");
     const googleBtn      = document.getElementById("google-btn");
+    const switchRowEl    = document.getElementById("switch-row");
+    const inviteHintEl   = document.getElementById("invite-hint");
+    const clientNoticeEl = document.getElementById("client-notice");
 
     let mode = wantsSignup ? "signup" : "signin";
 
@@ -371,6 +421,9 @@
         submitBtn.textContent    = "Create account";
         switchPromptEl.textContent = "Already have an account?";
         switchLinkEl.textContent   = "Sign in";
+        switchRowEl.hidden       = false;
+        inviteHintEl.hidden      = false;
+        clientNoticeEl.hidden    = true;
         googleBlock.hidden       = false;
         document.title           = "Create account - Uptown Tracker";
       } else if (mode === "reset") {
@@ -382,6 +435,9 @@
         submitBtn.textContent    = "Send reset link";
         switchPromptEl.textContent = "Remembered it?";
         switchLinkEl.textContent   = "Back to sign in";
+        switchRowEl.hidden       = false;
+        inviteHintEl.hidden      = true;
+        clientNoticeEl.hidden    = true;
         // Reset is a password-specific flow. Hide the OAuth option
         // here since it doesn't apply.
         googleBlock.hidden       = true;
@@ -394,8 +450,10 @@
         pwEl.required            = true;
         pwEl.setAttribute("autocomplete", "current-password");
         submitBtn.textContent    = "Sign in";
-        switchPromptEl.textContent = "New to Uptown?";
-        switchLinkEl.textContent   = "Create an account";
+        // No "Create an account" toggle: logins are invite-only.
+        switchRowEl.hidden       = true;
+        inviteHintEl.hidden      = true;
+        clientNoticeEl.hidden    = false;
         googleBlock.hidden       = false;
         document.title           = "Sign in - Uptown Tracker";
       }
@@ -417,11 +475,9 @@
 
     switchLinkEl.addEventListener("click", (e) => {
       e.preventDefault();
-      // From reset mode, "Back to sign in" is the only switch.
-      // Otherwise toggle between signin and signup.
-      if (mode === "reset")        mode = "signin";
-      else if (mode === "signup")  mode = "signin";
-      else                          mode = "signup";
+      // Only reachable from sign-up (invite link) or reset mode; both
+      // go back to sign-in. There is no path INTO sign-up from here.
+      mode = "signin";
       applyMode();
     });
 
@@ -542,6 +598,15 @@
       if (low.includes("user already registered")) {
         return "An account with this email already exists. Try signing in instead, or use Forgot password.";
       }
+      // The invite-only trigger on auth.users. Supabase wraps the raised
+      // exception as "Database error saving new user" on the OAuth path
+      // and passes the P0001 message through on the password path.
+      if (low.includes("database error saving new user")
+          || low.includes("signup_not_allowed")
+          || low.includes("invitation only")
+          || low.includes("signups not allowed")) {
+        return INVITE_ONLY_MSG;
+      }
       return raw;
     }
 
@@ -572,6 +637,16 @@
       emailEl.value = pendingSignupEmail;
       pwEl.value = "";
       pwEl.focus();
+    });
+
+    // Click-to-copy for the coach@ address in the client notice.
+    document.querySelectorAll(".login-copy").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try { await navigator.clipboard.writeText(btn.dataset.copy); } catch (_) { /* clipboard blocked; text is visible anyway */ }
+        const prev = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => { btn.textContent = prev; }, 1500);
+      });
     });
 
     // "Back to sign in" from the reset-sent card.

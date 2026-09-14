@@ -75,6 +75,35 @@
     footer a { color: var(--muted); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
     footer .sep { margin: 0 8px; opacity: .5; }
+    /* Client notice: same wording as /login/. Clients who were sent this
+       address instead of their share link read this before "Sign in". */
+    .client-notice {
+      max-width: 420px;
+      margin-top: 28px;
+      text-align: left;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--muted);
+      background: rgba(1, 58, 82, 0.05);
+      border: 1px solid rgba(1, 58, 82, 0.12);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .client-notice strong { display: block; color: var(--navy); margin-bottom: 2px; }
+    .client-notice code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #fff;
+      border: 1px solid rgba(1, 58, 82, 0.15);
+      border-radius: 4px;
+      padding: 0 4px;
+    }
+    .client-notice button {
+      background: none; border: 0; padding: 0; margin: 0;
+      font: inherit; font-weight: 600; color: var(--navy);
+      text-decoration: underline dotted; cursor: pointer;
+    }
+    .client-notice button:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -83,11 +112,30 @@
 
   <a class="signin" href="/login/">Sign in</a>
 
+  <div class="client-notice">
+    <strong>Uptown client looking for your dashboard?</strong>
+    Use the shared link your Uptown team sent you. It starts with
+    <code>app.uptown.com/share/</code> and needs no password. Questions go to
+    your Customer Success Manager at
+    <button type="button" data-copy="coach@uptown.com" title="Click to copy">coach@uptown.com</button>
+  </div>
+
   <footer>
     &copy; <span id="year"></span> Uptown Creation, LLC
   </footer>
 
-  <script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    // Click-to-copy for the coach@ address (no mailto: links on Uptown properties).
+    document.querySelectorAll('.client-notice button[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        try { await navigator.clipboard.writeText(btn.dataset.copy); } catch (_) { /* text is visible anyway */ }
+        var prev = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = prev; }, 1500);
+      });
+    });
+  </script>
 
 </body>
 </html>
