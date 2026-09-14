@@ -183,13 +183,15 @@
     // #error=server_error&error_description=Database+error+saving+new+user
     // (or error_code=signup_disabled if signups are ever turned off
     // project-wide). Strip the hash and say what happened in plain words.
+    // The text is parked in oauthErrorText and painted AFTER the first
+    // applyMode() below, because applyMode() clears #error-msg.
+    let oauthErrorText = "";
     (function handleOAuthError() {
       if (!location.hash || !location.hash.includes("error=")) return;
       const p = new URLSearchParams(location.hash.slice(1));
       const desc = p.get("error_description") || p.get("error") || "";
       history.replaceState(null, "", location.pathname + location.search);
-      const el = document.getElementById("error-msg");
-      if (el) el.textContent = friendlySignupError({ message: desc }, "google") || desc;
+      oauthErrorText = friendlySignupError({ message: desc }, "google") || desc;
     })();
 
     // OAuth callback: when Supabase finishes a "Continue with Google"
@@ -407,6 +409,7 @@
     if (emailFromUrl) emailEl.value = emailFromUrl;
 
     applyMode();
+    if (oauthErrorText) errorEl.textContent = oauthErrorText;
 
     function applyMode() {
       errorEl.textContent = "";
