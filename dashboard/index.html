@@ -236,15 +236,18 @@
               <th>Status</th>
               <th class="col-integration">Integration</th>
               <th class="col-service">Service</th>
-              <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="responses">Responses<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
-              <th class="num sortable" data-sort="positives">Positives<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="posRespRate">Pos. resp. rate<span class="sort-caret"></span></th>
+              <!-- Metric columns run outcome-first (Meetings) back to the
+                   top of the funnel (Connections), each count followed by
+                   its rate. Row cells in renderRow() follow the same order. -->
               <th class="num sortable" data-sort="meetings">Meetings<span class="sort-caret"></span></th>
               <th class="num sortable rate-cell" data-sort="posBookRate">Pos. booking rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="positives">Positives<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="posRespRate">Pos. resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="responses">Responses<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
+              <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
               <th class="trend">Trend</th>
               <!-- Expand toggle reveals the 4 "Additional outreach"
                    columns. Default: collapsed. Click flips → ↔ ← and
@@ -1621,15 +1624,15 @@
             <td class="status-cell">${statusHtml}</td>
             <td class="integration-cell" title="Click to set integration">${intChipHtml(c.integration)}</td>
             <td class="service-cell" title="Click to edit services">${serviceChipsHtml(c.services)}</td>
-            <td class="num drill">${fmtInt(c.connections)}</td>
-            <td class="num drill">${fmtInt(c.messages)}</td>
-            <td class="num drill rate-cell ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
-            <td class="num drill">${fmtInt(c.responses)}</td>
-            <td class="num drill rate-cell ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
-            <td class="num drill">${fmtInt(c.positives)}</td>
-            <td class="num drill rate-cell ${rateClass(c.posRespRate)}">${fmtPct(c.posRespRate)}</td>
             <td class="num drill">${fmtInt(c.meetings)}</td>
             <td class="num drill rate-cell ${rateClass(c.posBookRate)}">${fmtPct(c.posBookRate)}</td>
+            <td class="num drill">${fmtInt(c.positives)}</td>
+            <td class="num drill rate-cell ${rateClass(c.posRespRate)}">${fmtPct(c.posRespRate)}</td>
+            <td class="num drill">${fmtInt(c.responses)}</td>
+            <td class="num drill rate-cell ${rateClass(c.respRate)}">${fmtPct(c.respRate)}</td>
+            <td class="num drill">${fmtInt(c.messages)}</td>
+            <td class="num drill rate-cell ${rateClass(c.accRate)}">${fmtPct(c.accRate)}</td>
+            <td class="num drill">${fmtInt(c.connections)}</td>
             <td class="trend drill">${sparkline(c.trendPositives, c.trendMeetings)}</td>
             <!-- Empty cell under the header's expand toggle keeps the
                  column track aligned. The chevron itself is purely a
@@ -2405,27 +2408,29 @@
       function rate(num, den) { return den ? num / den : null; }
 
       function renderKpiStrip(root, nClients, t) {
-        // Order + labels match /account/'s per-account KPI cards so
-        // the org-wide totals read the same way as the drill-in:
-        //   Accounts → Connections → Messages → Acceptance rate →
-        //   Responses → Response rate → Positives → Pos. resp. rate →
-        //   Meetings → Pos. booking rate.
+        // Order (9/14/26): the three roll-ups first (Accounts, Opportunity
+        // value, Revenue closed), then the funnel outcome-first, matching
+        // the table's metric columns left to right:
+        //   Meetings → Pos. booking rate → Positives → Pos. resp. rate →
+        //   Responses → Response rate → Messages → Acceptance rate →
+        //   Connections.
         // Pos. booking rate uses meetings/positives (not meetings/responses);
         // the funnel reads cleanly across all three rates that share the
-        // "Pos." prefix.
+        // "Pos." prefix. The per-account page (/account/) keeps its own
+        // top-of-funnel-first order.
         const cards = [
           ["Accounts",          String(nClients)],
-          ["Connections",       fmtInt(t.connections)],
-          ["Messages",          fmtInt(t.messages)],
-          ["Acceptance rate",   fmtPct(t.accRate)],
-          ["Responses",         fmtInt(t.responses)],
-          ["Response rate",     fmtPct(t.respRate)],
-          ["Positives",         fmtInt(t.positives)],
-          ["Pos. resp. rate",   fmtPct(t.posRespRate)],
-          ["Meetings",          fmtInt(t.meetings)],
-          ["Pos. booking rate", fmtPct(t.posBookRate)],
           ["Opportunity value", dealsById.size || t.oppValue ? fmtMoneyCompact(t.oppValue) : "—"],
           ["Revenue closed",    dealsById.size || t.revClosed ? fmtMoneyCompact(t.revClosed) : "—"],
+          ["Meetings",          fmtInt(t.meetings)],
+          ["Pos. booking rate", fmtPct(t.posBookRate)],
+          ["Positives",         fmtInt(t.positives)],
+          ["Pos. resp. rate",   fmtPct(t.posRespRate)],
+          ["Responses",         fmtInt(t.responses)],
+          ["Response rate",     fmtPct(t.respRate)],
+          ["Messages",          fmtInt(t.messages)],
+          ["Acceptance rate",   fmtPct(t.accRate)],
+          ["Connections",       fmtInt(t.connections)],
         ];
         root.innerHTML = cards.map(([label, value]) => `
           <div class="kpi-card">
