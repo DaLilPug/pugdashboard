@@ -238,15 +238,18 @@
               <th class="col-service">Service</th>
               <!-- Metric columns run outcome-first (Meetings) back to the
                    top of the funnel (Connections), each count followed by
-                   its rate. Row cells in renderRow() follow the same order. -->
+                   its rate. Row cells in renderRow() follow the same order.
+                   Rate headers are abbreviated (PBR/PRR/RR/AR %) so the rate
+                   columns stay narrow; the title attribute carries the full
+                   name for hover. -->
               <th class="num sortable" data-sort="meetings">Meetings<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="posBookRate">Pos. booking rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="posBookRate" title="Pos. booking rate (meetings / positives)">PBR %<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="positives">Positives<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="posRespRate">Pos. resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="posRespRate" title="Pos. response rate (positives / responses)">PRR %<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="responses">Responses<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="respRate">Resp. rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="respRate" title="Response rate (responses / messages)">RR %<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="messages">Messages<span class="sort-caret"></span></th>
-              <th class="num sortable rate-cell" data-sort="accRate">Acc. rate<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-sort="accRate" title="Acceptance rate (messages / connections)">AR %<span class="sort-caret"></span></th>
               <th class="num sortable" data-sort="connections">Connections<span class="sort-caret"></span></th>
               <th class="trend">Trend</th>
               <!-- Expand toggle reveals the 4 "Additional outreach"
