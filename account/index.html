@@ -99,6 +99,7 @@
     <button class="sub-tab"        data-tab="meetings"      type="button">Meetings</button>
     <button class="sub-tab"        data-tab="responses"     type="button">Responses</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
+    <button class="sub-tab"        data-tab="content"       type="button">Content</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
     <button class="sub-tab"        data-tab="followups"     type="button" data-internal>Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"       type="button" data-internal>Cadence</button>
@@ -718,6 +719,114 @@
       </div>
     </section>
 
+    <!-- =================== CONTENT ==================== -->
+    <!-- LinkedIn post + follower analytics from LinkedIn's official
+         Community Management API (Member Post Analytics + Member
+         Follower Statistics). Operators paste post URLs on this tab; the
+         linkedin-content edge function pulls the numbers nightly and on
+         "Sync now". The connect card and the add/remove controls are
+         operator-only (data-share-hidden); the numbers are client-visible.
+         Edge functions: linkedin-oauth-init / -callback, linkedin-content. -->
+    <section id="panel-content" class="sub-panel hidden">
+      <section class="panel-card" id="ct-connect-card" data-share-hidden>
+        <div class="panel-card-head">
+          <h2>LinkedIn Connection</h2>
+          <span id="ct-status-pill" class="hubspot-status-pill hidden"></span>
+        </div>
+        <p class="section-blurb">
+          Connect the LinkedIn profile this account posts from and the Tracker pulls post and follower
+          numbers every night through LinkedIn's official API. Click Connect from a browser that is signed
+          in to <strong>that</strong> LinkedIn account - whoever is signed in is who gets connected.
+          The member can revoke access any time under LinkedIn Settings, Permitted services.
+        </p>
+        <div id="ct-disconnected" class="hidden">
+          <button id="ct-connect-btn" type="button" class="btn-linkedin-connect">
+            Connect LinkedIn <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+        <div id="ct-connected" class="hidden">
+          <div class="ct-member-row">
+            <img id="ct-member-pic" class="ct-member-pic hidden" alt="" referrerpolicy="no-referrer">
+            <div>
+              Connected as <strong id="ct-member-name">LinkedIn member</strong>
+              <div id="ct-last-synced" class="ct-muted"></div>
+            </div>
+          </div>
+          <div class="hubspot-actions">
+            <button id="ct-sync-btn" type="button" class="btn-primary">Sync now</button>
+            <button id="ct-disconnect-btn" type="button" class="btn-row-action btn-row-action-danger">Disconnect</button>
+          </div>
+        </div>
+        <div id="ct-feedback" class="hubspot-feedback"></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Content Performance</h2>
+          <div class="timeframe-pills" id="ct-pills">
+            <button class="timeframe-pill"        data-tf="1m"  type="button">1 Month</button>
+            <button class="timeframe-pill active" data-tf="3m"  type="button">3 Months</button>
+            <button class="timeframe-pill"        data-tf="yr"  type="button">This Year</button>
+            <button class="timeframe-pill"        data-tf="all" type="button">All Time</button>
+          </div>
+        </div>
+        <div class="panel-card-sub">
+          Posts published in the window, with their latest numbers from LinkedIn.
+          Engagements = reactions + comments + reposts. Refreshes nightly.
+        </div>
+        <div id="ct-kpi" class="kpi-strip">
+          <div class="kpi-card"><div class="kpi-label">Loading…</div></div>
+        </div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Followers</h2>
+        </div>
+        <div id="ct-followers-note" class="panel-card-sub"></div>
+        <div id="ct-followers-wrap" class="ct-chart-wrap hidden">
+          <canvas id="ct-followers-chart"></canvas>
+        </div>
+      </section>
+
+      <section class="panel-card">
+        <div class="panel-card-head">
+          <h2>Posts</h2>
+          <select id="ct-sort" class="filter-date" aria-label="Sort posts">
+            <option value="newest">Newest first</option>
+            <option value="impressions">Most impressions</option>
+          </select>
+        </div>
+        <form id="ct-add-form" class="ct-add-form" data-share-hidden autocomplete="off">
+          <input id="ct-url"   class="ml-input ct-url"   type="url"  placeholder="Paste the post link (LinkedIn → ⋯ → Copy link to post)" required>
+          <input id="ct-date"  class="ml-input ct-date"  type="date" required aria-label="Posted on" title="Posted on">
+          <input id="ct-title" class="ml-input ct-title" type="text" placeholder="Title (optional)" maxlength="140">
+          <button id="ct-add-btn" class="cad-add" type="submit">+ Add post</button>
+          <span id="ct-add-msg" class="cad-feedback"></span>
+        </form>
+        <div class="table-wrap">
+          <table class="client-table" id="ct-posts-table">
+            <thead>
+              <tr>
+                <th>Posted</th>
+                <th>Post</th>
+                <th class="num">Impressions</th>
+                <th class="num">Reactions</th>
+                <th class="num">Comments</th>
+                <th class="num">Reposts</th>
+                <th class="num" title="Engagements divided by impressions">Eng. rate</th>
+                <th>Updated</th>
+                <th class="col-actions" data-share-hidden aria-label="Row actions"></th>
+              </tr>
+            </thead>
+            <tbody id="ct-posts-tbody">
+              <tr><td colspan="9" class="loading">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
     <!-- =================== MEETING LINKS ==================== -->
     <!-- Up to 10 meeting links per account. Each link = a name + URL +
          optional Calendly/HubSpot integration. Connected integrations
@@ -1224,9 +1333,29 @@
       // doesn't block page render.
       initDangerZone(client);
 
+      // Content tab is client-visible, but a share visitor on an account with
+      // nothing tracked gets no tab rather than an empty one. Async; by the
+      // time the promise settles the tab plumbing below (VALID_TABS,
+      // selectTab) exists, so touching it here is safe.
+      if (document.body.classList.contains("is-share-view")) {
+        sb.sbFetch(`/rest/v1/content_posts?select=id&client_id=eq.${encodeURIComponent(clientId)}&limit=1`)
+          .then(rows => {
+            if (rows && rows.length) return;
+            const strip = document.getElementById("sub-tabs");
+            strip.querySelector('.sub-tab[data-tab="content"]')?.remove();
+            const mobSel = strip.nextElementSibling;
+            if (mobSel && mobSel.classList.contains("mobile-pill-select")) {
+              [...mobSel.options].forEach(o => { if (o.value === "content") o.remove(); });
+            }
+            VALID_TABS.delete("content");
+            if (location.hash === "#content") selectTab("summary");
+          })
+          .catch(() => {});
+      }
+
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
-      const loaded = { summary: false, analysis: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false, meetings: false, responses: false };
+      const loaded = { summary: false, analysis: false, prospects: false, followups: false, assets: false, replyinst: false, cadence: false, "meeting-links": false, integrations: false, meetings: false, responses: false, content: false };
 
       // Three tabs (Analysis, Meetings, Responses) are served by the ONE
       // initAnalysis() closure - its four cards share a single anState, one
@@ -1284,6 +1413,7 @@
           else if (name === "replyinst") initReplyInstructions();
           else if (name === "cadence")   initCadence();
           else if (name === "meeting-links") initMeetingLinks();
+          else if (name === "content")       initContent();
           else if (name === "integrations")  initIntegrations();
           loaded[name] = true;
         }
@@ -10483,6 +10613,462 @@
         }
 
         load();
+      }
+
+      // ================= CONTENT (LinkedIn post analytics) =============
+      //
+      // Numbers come from LinkedIn's official Community Management API
+      // after the member connects via OAuth. Posts enter the system when
+      // an operator pastes the post URL here (the API cannot list a
+      // member's posts). Edge functions:
+      //   linkedin-oauth-init     — POST {client_id} → {authorize_url}
+      //   linkedin-oauth-callback — LinkedIn redirects here; writes integrations row
+      //   linkedin-content        — POST {action:'sync'|'disconnect', client_id}
+      // Reads go straight to PostgREST: integrations (metadata columns
+      // only - token columns are ungranted), content_posts_latest (view:
+      // posts + latest snapshot), content_follower_snapshots.
+
+      function initContent() {
+        const $ = (id) => document.getElementById(id);
+        const discView     = $("ct-disconnected");
+        const connView     = $("ct-connected");
+        const statusPill   = $("ct-status-pill");
+        const feedbackEl   = $("ct-feedback");
+        const nameEl       = $("ct-member-name");
+        const picEl        = $("ct-member-pic");
+        const syncedEl     = $("ct-last-synced");
+        const connectBtn   = $("ct-connect-btn");
+        const syncBtn      = $("ct-sync-btn");
+        const disconnectBtn= $("ct-disconnect-btn");
+        const pillsEl      = $("ct-pills");
+        const kpiEl        = $("ct-kpi");
+        const chartWrap    = $("ct-followers-wrap");
+        const chartNote    = $("ct-followers-note");
+        const tbody        = $("ct-posts-tbody");
+        const sortSel      = $("ct-sort");
+        const addForm      = $("ct-add-form");
+        const urlIn        = $("ct-url");
+        const dateIn       = $("ct-date");
+        const titleIn      = $("ct-title");
+        const addBtn       = $("ct-add-btn");
+        const addMsg       = $("ct-add-msg");
+
+        const isShare = document.body.classList.contains("is-share-view");
+
+        let integration = null;   // integrations row (metadata columns) or null
+        let posts       = [];     // content_posts_latest rows
+        let followers   = [];     // {captured_on, followers} ascending
+        let tf          = "3m";
+        let chart       = null;
+
+        // --- helpers ---------------------------------------------------
+        let feedbackTimer = null;
+        function showFeedback(msg, kind = "ok") {
+          if (feedbackTimer) clearTimeout(feedbackTimer);
+          feedbackEl.textContent = msg;
+          feedbackEl.className   = `hubspot-feedback ${kind}`;
+          feedbackTimer = setTimeout(() => {
+            feedbackEl.textContent = "";
+            feedbackEl.className   = "hubspot-feedback";
+          }, 6000);
+        }
+        let addMsgTimer = null;
+        function showAddMsg(msg, kind = "ok") {
+          if (addMsgTimer) clearTimeout(addMsgTimer);
+          addMsg.textContent = msg;
+          addMsg.className   = `cad-feedback ${kind}`;
+          addMsgTimer = setTimeout(() => { addMsg.textContent = ""; addMsg.className = "cad-feedback"; }, 6000);
+        }
+        const fmtInt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString();
+        const fmtPct = (num, den) => (!den || num === null || num === undefined) ? "—" : `${(100 * num / den).toFixed(1)}%`;
+        // YYYY-MM-DD → MM/DD/YYYY without a Date round-trip (no TZ shift).
+        function usDate(ymd) {
+          if (!ymd) return "—";
+          const [y, m, d] = String(ymd).slice(0, 10).split("-");
+          return `${m}/${d}/${y}`;
+        }
+        function ago(iso) {
+          if (!iso) return "";
+          const ms = Date.now() - new Date(iso).getTime();
+          const h = Math.floor(ms / 3600000);
+          if (h < 1)  return "just now";
+          if (h < 24) return `${h}h ago`;
+          const d = Math.floor(h / 24);
+          return d === 1 ? "yesterday" : `${d} days ago`;
+        }
+        // Pull the numeric post id out of anything an operator is likely
+        // to paste: a "Copy link to post" URL (…-activity-<id>-…), a feed
+        // URL (…/feed/update/urn:li:activity:<id>), a ugcPost/share URN or
+        // URL, or the bare number.
+        function parseActivityId(s) {
+          s = String(s || "").trim();
+          let m = s.match(/(?:activity|ugcPost|share)[-:](\d{15,25})/i);
+          if (m) return m[1];
+          m = s.match(/^(\d{15,25})$/);
+          return m ? m[1] : null;
+        }
+        function cutoffFor(tfKey) {
+          const now = new Date();
+          if (tfKey === "1m") { now.setMonth(now.getMonth() - 1); return now.toISOString().slice(0, 10); }
+          if (tfKey === "3m") { now.setMonth(now.getMonth() - 3); return now.toISOString().slice(0, 10); }
+          if (tfKey === "yr") return `${now.getFullYear()}-01-01`;
+          return null;
+        }
+        const engagements = (p) => (p.reactions || 0) + (p.comments || 0) + (p.reshares || 0);
+
+        // --- load --------------------------------------------------------
+        async function load() {
+          const INTEG_COLS = [
+            "id","client_id","provider","purpose","scope_metadata",
+            "last_sync_ok_at","last_sync_error_at","last_sync_error",
+            "connected_by","created_at",
+          ].join(",");
+          const cid = encodeURIComponent(clientId);
+          // Consts above, await below - keep it that way (TDZ trap).
+          try {
+            const [integRows, postRows, folRows] = await Promise.all([
+              isShare ? Promise.resolve([]) : sb.sbFetch(
+                `/rest/v1/integrations?select=${INTEG_COLS}&client_id=eq.${cid}&purpose=eq.content_analytics&limit=1`),
+              sb.sbFetch(`/rest/v1/content_posts_latest?select=*&client_id=eq.${cid}&order=posted_on.desc,created_at.desc`),
+              sb.sbFetch(`/rest/v1/content_follower_snapshots?select=captured_on,followers&client_id=eq.${cid}&order=captured_on.asc`),
+            ]);
+            integration = (integRows && integRows[0]) || null;
+            posts       = postRows || [];
+            followers   = folRows  || [];
+          } catch (err) {
+            console.warn("content load failed:", err);
+            kpiEl.innerHTML = `<div class="placeholder"><strong>Couldn't load content data</strong>${esc(err.message || "")}</div>`;
+            tbody.innerHTML = `<tr><td colspan="9" class="loading">${esc(err.message || "Couldn't load posts")}</td></tr>`;
+            return;
+          }
+          render();
+        }
+
+        function render() {
+          if (!isShare) renderConnect();
+          renderKpis();
+          renderFollowers();
+          renderTable();
+        }
+
+        // --- connect card ------------------------------------------------
+        function renderConnect() {
+          if (!integration) {
+            discView.classList.remove("hidden");
+            connView.classList.add("hidden");
+            statusPill.classList.add("hidden");
+            return;
+          }
+          discView.classList.add("hidden");
+          connView.classList.remove("hidden");
+
+          const meta = integration.scope_metadata || {};
+          nameEl.textContent = meta.member_name || "LinkedIn member";
+          if (meta.member_picture) { picEl.src = meta.member_picture; picEl.classList.remove("hidden"); }
+          else picEl.classList.add("hidden");
+
+          syncedEl.textContent = integration.last_sync_ok_at
+            ? `Last synced ${ago(integration.last_sync_ok_at)} · ${new Date(integration.last_sync_ok_at).toLocaleString()}`
+            : "Not synced yet";
+
+          statusPill.classList.remove("hidden");
+          const err = integration.last_sync_error || "";
+          if (err.startsWith("reconnect_required")) {
+            statusPill.textContent = "Reconnect needed";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-err";
+            statusPill.title       = "LinkedIn no longer accepts this connection's token. Click Connect LinkedIn again from the member's browser.";
+            discView.classList.remove("hidden"); // show the Connect button alongside
+          } else if (err) {
+            statusPill.textContent = "Last sync had issues";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-err";
+            statusPill.title       = err;
+          } else if (integration.last_sync_ok_at) {
+            statusPill.textContent = "Active";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-ok";
+            statusPill.title       = "";
+          } else {
+            statusPill.textContent = "Connected";
+            statusPill.className   = "hubspot-status-pill hubspot-status-pill-neutral";
+            statusPill.title       = "Waiting for the first sync";
+          }
+        }
+
+        // --- KPIs ---------------------------------------------------------
+        function renderKpis() {
+          const cutoff = cutoffFor(tf);
+          const inWin  = cutoff ? posts.filter(p => p.posted_on >= cutoff) : posts.slice();
+          const withData = inWin.filter(p => p.impressions !== null && p.impressions !== undefined);
+          const impressions = withData.reduce((s, p) => s + (p.impressions || 0), 0);
+          const eng         = withData.reduce((s, p) => s + engagements(p), 0);
+
+          const latestF = followers.length ? followers[followers.length - 1] : null;
+          let followerDelta = null;
+          if (latestF && cutoff) {
+            const first = followers.find(f => f.captured_on >= cutoff);
+            if (first && first.captured_on !== latestF.captured_on) followerDelta = latestF.followers - first.followers;
+          } else if (latestF && followers.length > 1) {
+            followerDelta = latestF.followers - followers[0].followers;
+          }
+
+          const tiles = [
+            ["Posts",        fmtInt(inWin.length)],
+            ["Impressions",  fmtInt(withData.length ? impressions : null)],
+            ["Engagements",  fmtInt(withData.length ? eng : null)],
+            ["Eng. rate",    fmtPct(eng, impressions)],
+            ["Followers",    latestF ? fmtInt(latestF.followers) : "—",
+              followerDelta === null ? "" : `${followerDelta >= 0 ? "+" : ""}${fmtInt(followerDelta)} in window`],
+          ];
+          kpiEl.innerHTML = tiles.map(([l, v, sub]) => `
+            <div class="kpi-card">
+              <div class="kpi-label">${esc(l)}</div>
+              <div class="kpi-value">${esc(v)}</div>
+              ${sub ? `<div class="ct-kpi-sub">${esc(sub)}</div>` : ""}
+            </div>`).join("");
+
+          if (!posts.length) {
+            kpiEl.insertAdjacentHTML("beforeend",
+              `<div class="placeholder ct-kpi-empty"><strong>No posts tracked yet</strong>${isShare ? "" : "Paste a post link below to start."}</div>`);
+          }
+        }
+
+        // --- followers chart --------------------------------------------
+        function renderFollowers() {
+          if (followers.length < 2) {
+            chartWrap.classList.add("hidden");
+            chartNote.textContent = followers.length === 1
+              ? `${fmtInt(followers[0].followers)} followers as of ${usDate(followers[0].captured_on)}. The trend line appears after the second nightly sync.`
+              : (integration ? "Follower history builds from the first sync." : "Connect LinkedIn to start tracking followers.");
+            return;
+          }
+          chartNote.textContent = `Follower count each day since ${usDate(followers[0].captured_on)}.`;
+          chartWrap.classList.remove("hidden");
+          if (typeof Chart === "undefined") { chartNote.textContent += " (Chart library did not load.)"; return; }
+          if (chart) { chart.destroy(); chart = null; }
+          const ctx = $("ct-followers-chart").getContext("2d");
+          chart = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: followers.map(f => usDate(f.captured_on)),
+              datasets: [{
+                data: followers.map(f => f.followers),
+                borderColor: "#1EB683",
+                backgroundColor: "rgba(30,182,131,.12)",
+                fill: true, tension: .25, pointRadius: followers.length > 60 ? 0 : 2, borderWidth: 2,
+              }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${fmtInt(c.parsed.y)} followers` } } },
+              scales: {
+                x: { ticks: { maxTicksLimit: 8, font: { size: 11 } }, grid: { display: false } },
+                y: { ticks: { precision: 0, font: { size: 11 } }, grid: { color: "rgba(0,0,0,.05)" } },
+              },
+            },
+          });
+        }
+
+        // --- posts table ------------------------------------------------
+        function renderTable() {
+          if (!posts.length) {
+            tbody.innerHTML = `<tr><td colspan="9" class="loading">No posts tracked yet.</td></tr>`;
+            return;
+          }
+          const rows = posts.slice();
+          if (sortSel.value === "impressions") {
+            rows.sort((a, b) => (b.impressions ?? -1) - (a.impressions ?? -1) || (a.posted_on < b.posted_on ? 1 : -1));
+          }
+          tbody.innerHTML = rows.map(p => {
+            const title = p.title || `Post from ${usDate(p.posted_on)}`;
+            let note = "";
+            if (p.urn_status === "unresolved") {
+              note = `<span class="ct-post-warn" title="${esc(p.last_sync_error || "")}">Couldn't match this link to a post on the connected profile</span>`;
+            } else if (p.impressions === null || p.impressions === undefined) {
+              note = `<span class="ct-post-sub">${integration || isShare ? "Waiting for first sync" : "Numbers arrive once LinkedIn is connected"}</span>`;
+            } else if (p.last_sync_error) {
+              note = `<span class="ct-post-warn" title="${esc(p.last_sync_error)}">Last refresh failed</span>`;
+            }
+            const eng = engagements(p);
+            return `
+              <tr data-post-id="${esc(p.id)}">
+                <td>${usDate(p.posted_on)}</td>
+                <td class="ct-post-title"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(title)}</a>${note}</td>
+                <td class="num">${fmtInt(p.impressions)}</td>
+                <td class="num">${fmtInt(p.reactions)}</td>
+                <td class="num">${fmtInt(p.comments)}</td>
+                <td class="num">${fmtInt(p.reshares)}</td>
+                <td class="num">${p.impressions ? fmtPct(eng, p.impressions) : "—"}</td>
+                <td title="${esc(p.metrics_at || "")}">${p.metrics_at ? ago(p.metrics_at) : "—"}</td>
+                <td class="col-actions" data-share-hidden>
+                  <button type="button" class="btn-row-action btn-row-action-danger" data-ct-remove="${esc(p.id)}">Remove</button>
+                </td>
+              </tr>`;
+          }).join("");
+        }
+
+        // --- actions ------------------------------------------------------
+        async function onConnect() {
+          connectBtn.disabled = true;
+          const prev = connectBtn.textContent;
+          connectBtn.textContent = "Opening LinkedIn...";
+          try {
+            const result = await sb.sbFetch("/functions/v1/linkedin-oauth-init", {
+              method: "POST",
+              body:   JSON.stringify({ client_id: clientId }),
+            });
+            if (!result?.authorize_url) throw new Error("no_authorize_url");
+            // Full navigation, not a popup - same as the HubSpot flow.
+            window.location.href = result.authorize_url;
+          } catch (err) {
+            const msg = String(err.message || err);
+            showFeedback(msg.includes("linkedin_not_configured")
+              ? "LinkedIn isn't set up on the server yet (developer app credentials missing)."
+              : `Couldn't start the LinkedIn connection: ${msg}`, "err");
+            connectBtn.disabled = false;
+            connectBtn.textContent = prev;
+          }
+        }
+
+        async function onSync(quiet = false) {
+          if (!integration) return;
+          syncBtn.disabled = true;
+          const prev = syncBtn.textContent;
+          syncBtn.textContent = "Syncing...";
+          try {
+            const res = await sb.sbFetch("/functions/v1/linkedin-content", {
+              method: "POST",
+              body:   JSON.stringify({ action: "sync", client_id: clientId }),
+            });
+            const r = res?.result || {};
+            const bits = [];
+            if (r.followers !== null && r.followers !== undefined) bits.push(`${fmtInt(r.followers)} followers`);
+            bits.push(`${r.posts_synced || 0} post${r.posts_synced === 1 ? "" : "s"} refreshed`);
+            if (r.posts_unresolved) bits.push(`${r.posts_unresolved} couldn't be matched`);
+            if (r.posts_skipped)    bits.push(`${r.posts_skipped} already fresh`);
+            if (r.error) showFeedback(`Synced with issues: ${r.error}`, "err");
+            else if (!quiet) showFeedback(`Synced: ${bits.join(", ")}.`);
+          } catch (err) {
+            showFeedback(`Sync failed: ${err.message || err}`, "err");
+          } finally {
+            syncBtn.disabled = false;
+            syncBtn.textContent = prev;
+          }
+          await load();
+        }
+
+        async function onDisconnect() {
+          if (!integration) return;
+          if (!confirm("Disconnect LinkedIn for this account? Tracked posts and their history stay; nightly refreshes stop until it is reconnected.")) return;
+          disconnectBtn.disabled = true;
+          try {
+            await sb.sbFetch("/functions/v1/linkedin-content", {
+              method: "POST",
+              body:   JSON.stringify({ action: "disconnect", client_id: clientId }),
+            });
+            showFeedback("LinkedIn disconnected.");
+          } catch (err) {
+            showFeedback(`Couldn't disconnect: ${err.message || err}`, "err");
+          } finally {
+            disconnectBtn.disabled = false;
+          }
+          await load();
+        }
+
+        async function onAdd(e) {
+          e.preventDefault();
+          const url        = urlIn.value.trim();
+          const activityId = parseActivityId(url);
+          const postedOn   = dateIn.value;
+          if (!activityId) { showAddMsg("That doesn't look like a LinkedIn post link. Use the post's ⋯ menu → Copy link to post.", "err"); urlIn.focus(); return; }
+          if (!postedOn)   { showAddMsg("Enter the date the post went live.", "err"); dateIn.focus(); return; }
+          addBtn.disabled = true;
+          try {
+            const sess = sb.getSession();
+            await sb.sbFetch("/rest/v1/content_posts", {
+              method:  "POST",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({
+                client_id:   clientId,
+                url,
+                activity_id: activityId,
+                posted_on:   postedOn,
+                title:       titleIn.value.trim() || null,
+                created_by:  sess?.user?.id || null,
+              }),
+            });
+            urlIn.value = ""; titleIn.value = "";
+            showAddMsg(integration ? "Post added. Pulling its numbers…" : "Post added. Numbers arrive once LinkedIn is connected.");
+            if (integration) await onSync(true);
+            else await load();
+          } catch (err) {
+            const msg = String(err.message || err);
+            showAddMsg(/duplicate|23505|unique/i.test(msg) ? "That post is already tracked on this account." : `Couldn't add the post: ${msg}`, "err");
+          } finally {
+            addBtn.disabled = false;
+          }
+        }
+
+        async function onRemove(postId) {
+          const p = posts.find(x => x.id === postId);
+          if (!confirm(`Remove "${p?.title || "this post"}" from tracking? Its saved numbers are deleted too.`)) return;
+          try {
+            await sb.sbFetch(`/rest/v1/content_posts?id=eq.${encodeURIComponent(postId)}`, { method: "DELETE" });
+          } catch (err) {
+            showAddMsg(`Couldn't remove: ${err.message || err}`, "err");
+          }
+          await load();
+        }
+
+        // --- OAuth callback landing -------------------------------------
+        // linkedin-oauth-callback redirects to ?integration_purpose=content_analytics
+        // &integration_status=… #content. Toast it, strip the params, and on
+        // success run the first sync so the tab fills in immediately.
+        let syncAfterLoad = false;
+        (function handleCallbackParams() {
+          const params = new URLSearchParams(location.search);
+          if (params.get("integration_purpose") !== "content_analytics") return;
+          const status = params.get("integration_status");
+          const reason = params.get("integration_reason") || "";
+          if (status === "success") { showFeedback("LinkedIn connected. Pulling the first numbers…"); syncAfterLoad = true; }
+          else if (status) {
+            const friendly = {
+              provider_user_cancelled_login: "The LinkedIn sign-in was cancelled.",
+              provider_user_cancelled_authorize: "Access was declined on LinkedIn's consent screen.",
+              token_exchange_failed: "LinkedIn rejected the token exchange. Check the app's redirect URL and secret.",
+              linkedin_not_configured: "LinkedIn isn't set up on the server yet.",
+              bad_state: "The connection link expired. Click Connect LinkedIn again.",
+            }[reason];
+            showFeedback(`Connection failed: ${friendly || reason || "unknown error"}`, "err");
+          }
+          ["integration_status","integration_provider","integration_purpose","integration_reason"].forEach(k => params.delete(k));
+          history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params.toString() : "") + "#content");
+        })();
+
+        // --- wiring -------------------------------------------------------
+        if (!isShare) {
+          connectBtn.addEventListener("click", onConnect);
+          syncBtn.addEventListener("click", () => onSync(false));
+          disconnectBtn.addEventListener("click", onDisconnect);
+          addForm.addEventListener("submit", onAdd);
+          tbody.addEventListener("click", (e) => {
+            const b = e.target.closest("[data-ct-remove]");
+            if (b) onRemove(b.dataset.ctRemove);
+          });
+          // Default the date picker to today - most posts get added the day they go live.
+          if (!dateIn.value) {
+            const d = new Date();
+            dateIn.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          }
+        }
+        pillsEl.addEventListener("click", (e) => {
+          const b = e.target.closest(".timeframe-pill");
+          if (!b) return;
+          tf = b.dataset.tf;
+          pillsEl.querySelectorAll(".timeframe-pill").forEach(x => x.classList.toggle("active", x === b));
+          renderKpis();
+        });
+        sortSel.addEventListener("change", renderTable);
+
+        load().then(() => { if (syncAfterLoad && integration) onSync(false); });
       }
 
       // ================= INTEGRATIONS =================================

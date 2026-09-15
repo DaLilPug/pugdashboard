@@ -7402,3 +7402,109 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
+/* ==============================================================
+   Content tab (LinkedIn post + follower analytics)
+   --------------------------------------------------------------
+   Operator-only controls inside client-visible panels carry
+   data-share-hidden; initShare() puts .is-share-view on <body> for
+   share-link visitors. Same mechanism as the internal tab strip rule
+   above (.sub-tab[data-internal]), extended to arbitrary elements.
+   ============================================================== */
+body.is-share-view [data-share-hidden] { display: none; }
+
+.btn-linkedin-connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: #0a66c2;
+  border: 1px solid #0a66c2;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+.btn-linkedin-connect:hover { background: #004182; }
+.btn-linkedin-connect:disabled { opacity: .6; cursor: default; }
+.btn-linkedin-connect:focus-visible { outline: 2px solid #0f2138; outline-offset: 2px; }
+
+.ct-member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 4px;
+  font-family: Inter, sans-serif;
+  font-size: 13px;
+  color: var(--gray-600, #6e7a87);
+}
+.ct-member-row strong { color: var(--navy, #013A52); }
+.ct-member-pic {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.ct-muted {
+  font-size: 12px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
+.ct-kpi-sub {
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 4px;
+}
+.ct-kpi-empty { grid-column: 1 / -1; }
+
+.ct-chart-wrap {
+  position: relative;
+  height: 220px;
+}
+
+.ct-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+.ct-add-form .ct-url   { flex: 2 1 320px; }
+.ct-add-form .ct-date  { flex: 0 0 150px; }
+.ct-add-form .ct-title { flex: 1 1 200px; }
+.ct-add-form .cad-add  { margin: 0; }
+@media (max-width: 700px) {
+  .ct-add-form .ct-date, .ct-add-form .ct-title { flex-basis: 100%; }
+}
+
+#ct-posts-table th.num,
+#ct-posts-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+#ct-posts-table td.ct-post-title a {
+  color: var(--navy, #013A52);
+  font-weight: 600;
+  text-decoration: none;
+}
+#ct-posts-table td.ct-post-title a:hover { text-decoration: underline; }
+.ct-post-warn {
+  display: block;
+  font-size: 11px;
+  color: #b45309;
+  margin-top: 2px;
+}
+.ct-post-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
