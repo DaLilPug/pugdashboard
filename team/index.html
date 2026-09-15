@@ -1033,9 +1033,13 @@
           case "positive_cadence.disabled":
             return `${actor} turned <strong>positive cadence</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
           case "auto_enrich.enabled":
-            return `${actor} turned <strong>auto-enrich on acceptance</strong> ON for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+            // Mode-aware since 2026-09-15 (payload.new_mode); older events
+            // carried only the boolean.
+            return p.new_mode
+              ? `${actor} set <strong>auto-enrich</strong> to <strong>${esc(p.new_mode)}</strong> for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`
+              : `${actor} turned <strong>auto-enrich on acceptance</strong> ON for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
           case "auto_enrich.disabled":
-            return `${actor} turned <strong>auto-enrich on acceptance</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
+            return `${actor} turned <strong>auto-enrich</strong> OFF for <strong>${esc(p.client_name || "(unnamed account)")}</strong>`;
 
           // Native HubSpot outreach-sync (Phase 2) + meeting-link
           // connect / disconnect lifecycle. Payloads carry client_name.

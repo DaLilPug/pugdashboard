@@ -2340,9 +2340,9 @@
         The <strong>Email</strong> column has an <em>Enrich ↗</em> button on
         any empty cell. Clicking it fetches the prospect's email from Apollo;
         the bulk action bar exposes the same as <em>Enrich N</em> for
-        multi-select. There's also a per-account <em>Auto-enrich on
-        acceptance</em> toggle that fires Apollo automatically when a
-        prospect's status moves into Messaged, Responded, or Meeting.
+        multi-select. There's also a per-account <em>Auto-enrich</em> setting
+        that fires Apollo automatically when a prospect reaches a stage you
+        choose: accepted, responded, positive reply, or every prospect.
       </p>
       <p>
         See <a href="#dash-enrichment-section">8.17 - Enrichment</a> for the
@@ -3444,12 +3444,16 @@
             clean <code>/in/&lt;slug&gt;</code> LinkedIn URL gets skipped by
             bulk, even though the per-row <em>Enrich ↗</em> button will still
             find them. Admin only.</li>
-        <li><strong>Auto-enrich on acceptance</strong>: per-account toggle
-            (off by default). Click the <em>Auto-enrich: off ▾</em> pill at
-            the top of the Prospects tab and check the box. From then on,
-            whenever a prospect's status moves into Messaged, Responded, or
-            Meeting (i.e. they accepted your connection request), Apollo
-            fires automatically if the email is unknown. Admin only.</li>
+        <li><strong>Auto-enrich</strong>: per-account setting (off by
+            default). Click the <em>Auto-enrich: off ▾</em> pill at the top
+            of the Prospects tab and pick who gets enriched automatically:
+            <em>Accepted</em> (status reaches Messaged, Responded, or Meeting -
+            the original behavior), <em>Responded</em> (Responded or Meeting),
+            <em>Positive</em> (the latest reply is classified positive), or
+            <em>All prospects</em> (everyone you send a request to, accepted or
+            not - this one uses the most Apollo credits). In every mode Apollo
+            is only asked about prospects with no email on file, and only once
+            per prospect. Admin only.</li>
       </ul>
 
       <h4>What you'll see</h4>

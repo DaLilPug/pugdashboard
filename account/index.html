@@ -453,14 +453,35 @@
               </button>
               <div id="pr-enrich-popover" class="pr-enrich-popover hidden" role="dialog"
                    aria-label="Auto-enrich settings">
-                <label class="pr-enrich-label">
-                  <input type="checkbox" id="pr-enrich-toggle" />
-                  <span>Auto-enrich on connection acceptance</span>
-                </label>
+                <!-- Five-way mode (2026-09-15; was an on/off checkbox).
+                     Saved through set_auto_enrich_mode; the queue trigger
+                     on prospects reads clients.auto_enrich_mode. -->
+                <div class="pr-enrich-title">Fetch emails from Apollo automatically for:</div>
+                <div id="pr-enrich-modes" class="pr-enrich-modes" role="radiogroup" aria-label="Auto-enrich mode">
+                  <label class="pr-enrich-label">
+                    <input type="radio" name="pr-enrich-mode" value="off" />
+                    <span>Nobody <small>Auto-enrich off. Enrich by hand from the Email column.</small></span>
+                  </label>
+                  <label class="pr-enrich-label">
+                    <input type="radio" name="pr-enrich-mode" value="accepted" />
+                    <span>Accepted <small>Status reaches Messaged, Responded, or Meeting.</small></span>
+                  </label>
+                  <label class="pr-enrich-label">
+                    <input type="radio" name="pr-enrich-mode" value="responded" />
+                    <span>Responded <small>Status reaches Responded or Meeting.</small></span>
+                  </label>
+                  <label class="pr-enrich-label">
+                    <input type="radio" name="pr-enrich-mode" value="positive" />
+                    <span>Positive <small>The latest reply is classified positive.</small></span>
+                  </label>
+                  <label class="pr-enrich-label">
+                    <input type="radio" name="pr-enrich-mode" value="all" />
+                    <span>All prospects <small>Everyone you send a request to, accepted or not. Uses the most Apollo credits.</small></span>
+                  </label>
+                </div>
                 <p class="pr-enrich-help">
-                  When a prospect's status moves into Messaged, Responded, or Meeting
-                  (i.e. they accepted your request), automatically fetch their email
-                  via Apollo if we don't already have one. Uses your org's Apollo key.
+                  Runs only for prospects without an email on file, once per prospect,
+                  using your org's Apollo key. Admins only.
                 </p>
 
                 <div id="pr-enrich-popover-status" class="pr-enrich-status"></div>
@@ -1075,7 +1096,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,auto_enrich_on_acceptance&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,auto_enrich_on_acceptance,auto_enrich_mode&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -6100,14 +6121,24 @@
           const btn      = document.getElementById("pr-enrich-settings");
           const popover  = document.getElementById("pr-enrich-popover");
           const stateEl  = document.getElementById("pr-enrich-state");
-          const toggle   = document.getElementById("pr-enrich-toggle");
+          const radios   = Array.from(document.querySelectorAll("input[name='pr-enrich-mode']"));
           const statusEl = document.getElementById("pr-enrich-popover-status");
           if (!wrap || !btn) return;
           wrap.classList.remove("hidden");
 
-          const currentlyOn = !!client.auto_enrich_on_acceptance;
-          toggle.checked = currentlyOn;
-          stateEl.textContent = currentlyOn ? "on" : "off";
+          // Pill label per mode. Older client rows (before the mode column)
+          // fall back to the boolean: on -> accepted.
+          const MODE_LABEL = { off: "off", accepted: "accepted", responded: "responded", positive: "positive", all: "all" };
+          const currentMode = () => {
+            const m = client.auto_enrich_mode;
+            if (m && MODE_LABEL[m]) return m;
+            return client.auto_enrich_on_acceptance ? "accepted" : "off";
+          };
+          const paintMode = (m) => {
+            radios.forEach(r => { r.checked = (r.value === m); });
+            stateEl.textContent = MODE_LABEL[m] || "off";
+          };
+          paintMode(currentMode());
 
           btn.addEventListener("click", () => {
             const isOpen = !popover.classList.contains("hidden");
@@ -6122,23 +6153,26 @@
             btn.setAttribute("aria-expanded", "false");
           });
 
-          toggle.addEventListener("change", async () => {
-            const want = toggle.checked;
+          radios.forEach(radio => radio.addEventListener("change", async () => {
+            if (!radio.checked) return;
+            const want = radio.value;
+            const prev = currentMode();
             statusEl.textContent = "Saving…";
             try {
-              await sb.sbFetch("/rest/v1/rpc/set_auto_enrich_on_acceptance", {
+              await sb.sbFetch("/rest/v1/rpc/set_auto_enrich_mode", {
                 method: "POST",
-                body:   JSON.stringify({ p_client_id: clientId, p_enabled: want }),
+                body:   JSON.stringify({ p_client_id: clientId, p_mode: want }),
               });
-              client.auto_enrich_on_acceptance = want;
-              stateEl.textContent = want ? "on" : "off";
+              client.auto_enrich_mode          = want;
+              client.auto_enrich_on_acceptance = (want !== "off");
+              paintMode(want);
               statusEl.textContent = "Saved.";
               setTimeout(() => { statusEl.textContent = ""; }, 1500);
             } catch (err) {
-              toggle.checked = !want;
+              paintMode(prev);
               statusEl.textContent = "Couldn't save: " + (err.message || err);
             }
-          });
+          }));
         }
 
         async function handleEnrichProspect(btnEl) {
