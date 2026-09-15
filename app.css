@@ -7480,7 +7480,7 @@ body.is-share-view [data-share-hidden] { display: none; }
 .ct-add-form .ct-url   { flex: 2 1 320px; }
 .ct-add-form .ct-date  { flex: 0 0 150px; }
 .ct-add-form .ct-title { flex: 1 1 200px; }
-.ct-add-form .cad-add  { margin: 0; }
+.ct-add-form .cad-add  { margin: 0; width: auto; flex: 0 0 auto; padding: 8px 14px; }
 @media (max-width: 700px) {
   .ct-add-form .ct-date, .ct-add-form .ct-title { flex-basis: 100%; }
 }
