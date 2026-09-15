@@ -3657,6 +3657,17 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   color: var(--gray-500);
   line-height: 1.35;
 }
+/* Narrow layouts: the pill sits near the left edge, so a right-anchored
+   320px popover would run off the left of the viewport. Anchor left and
+   cap the width instead. (After the base .pr-enrich-popover rule on
+   purpose - source order breaks the tie.) */
+@media (max-width: 900px) {
+  .pr-enrich-popover {
+    left: 0;
+    right: auto;
+    width: min(320px, calc(100vw - 32px));
+  }
+}
 .pr-enrich-help {
   font-size: 12px;
   color: var(--gray-500);
