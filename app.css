@@ -7407,12 +7407,10 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 /* ==============================================================
    Content tab (LinkedIn post + follower analytics)
    --------------------------------------------------------------
-   Operator-only controls inside client-visible panels carry
-   data-share-hidden; initShare() puts .is-share-view on <body> for
-   share-link visitors. Same mechanism as the internal tab strip rule
-   above (.sub-tab[data-internal]), extended to arbitrary elements.
+   Internal tab for now (data-internal on the button). Nothing here is
+   gated by share status: when the tab goes client-visible, share
+   visitors can connect LinkedIn and add posts, same as Meeting Links.
    ============================================================== */
-body.is-share-view [data-share-hidden] { display: none; }
 
 .btn-linkedin-connect {
   display: inline-flex;

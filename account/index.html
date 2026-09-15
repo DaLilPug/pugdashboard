@@ -99,7 +99,6 @@
     <button class="sub-tab"        data-tab="meetings"      type="button">Meetings</button>
     <button class="sub-tab"        data-tab="responses"     type="button">Responses</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
-    <button class="sub-tab"        data-tab="content"       type="button">Content</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
     <button class="sub-tab"        data-tab="followups"     type="button" data-internal>Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"       type="button" data-internal>Cadence</button>
@@ -107,6 +106,7 @@
     <button class="sub-tab"        data-tab="assets"        type="button" data-internal>Assets</button>
     <button class="sub-tab"        data-tab="integrations"  type="button" data-internal>Integrations</button>
     <button class="sub-tab"        data-tab="analysis"      type="button" data-internal>Analysis</button>
+    <button class="sub-tab"        data-tab="content"       type="button" data-internal>Content</button>
   </div>
 
   <main class="main main-wide">
@@ -724,11 +724,12 @@
          Community Management API (Member Post Analytics + Member
          Follower Statistics). Operators paste post URLs on this tab; the
          linkedin-content edge function pulls the numbers nightly and on
-         "Sync now". The connect card and the add/remove controls are
-         operator-only (data-share-hidden); the numbers are client-visible.
+         "Sync now". Internal-only (data-internal) while it is being worked
+         on; once client-visible, share visitors can connect and add posts
+         too, same as Meeting Links.
          Edge functions: linkedin-oauth-init / -callback, linkedin-content. -->
     <section id="panel-content" class="sub-panel hidden">
-      <section class="panel-card" id="ct-connect-card" data-share-hidden>
+      <section class="panel-card" id="ct-connect-card">
         <div class="panel-card-head">
           <h2>LinkedIn Connection</h2>
           <span id="ct-status-pill" class="hubspot-status-pill hidden"></span>
@@ -797,7 +798,7 @@
             <option value="impressions">Most impressions</option>
           </select>
         </div>
-        <form id="ct-add-form" class="ct-add-form" data-share-hidden autocomplete="off">
+        <form id="ct-add-form" class="ct-add-form" autocomplete="off">
           <input id="ct-url"   class="ml-input ct-url"   type="url"  placeholder="Paste the post link (LinkedIn → ⋯ → Copy link to post)" required>
           <input id="ct-date"  class="ml-input ct-date"  type="date" required aria-label="Posted on" title="Posted on">
           <input id="ct-title" class="ml-input ct-title" type="text" placeholder="Title (optional)" maxlength="140">
@@ -816,7 +817,7 @@
                 <th class="num">Reposts</th>
                 <th class="num" title="Engagements divided by impressions">Eng. rate</th>
                 <th>Updated</th>
-                <th class="col-actions" data-share-hidden aria-label="Row actions"></th>
+                <th class="col-actions" aria-label="Row actions"></th>
               </tr>
             </thead>
             <tbody id="ct-posts-tbody">
@@ -1333,25 +1334,6 @@
       // doesn't block page render.
       initDangerZone(client);
 
-      // Content tab is client-visible, but a share visitor on an account with
-      // nothing tracked gets no tab rather than an empty one. Async; by the
-      // time the promise settles the tab plumbing below (VALID_TABS,
-      // selectTab) exists, so touching it here is safe.
-      if (document.body.classList.contains("is-share-view")) {
-        sb.sbFetch(`/rest/v1/content_posts?select=id&client_id=eq.${encodeURIComponent(clientId)}&limit=1`)
-          .then(rows => {
-            if (rows && rows.length) return;
-            const strip = document.getElementById("sub-tabs");
-            strip.querySelector('.sub-tab[data-tab="content"]')?.remove();
-            const mobSel = strip.nextElementSibling;
-            if (mobSel && mobSel.classList.contains("mobile-pill-select")) {
-              [...mobSel.options].forEach(o => { if (o.value === "content") o.remove(); });
-            }
-            VALID_TABS.delete("content");
-            if (location.hash === "#content") selectTab("summary");
-          })
-          .catch(() => {});
-      }
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
@@ -10653,8 +10635,6 @@
         const addBtn       = $("ct-add-btn");
         const addMsg       = $("ct-add-msg");
 
-        const isShare = document.body.classList.contains("is-share-view");
-
         let integration = null;   // integrations row (metadata columns) or null
         let posts       = [];     // content_posts_latest rows
         let followers   = [];     // {captured_on, followers} ascending
@@ -10727,8 +10707,7 @@
           // Consts above, await below - keep it that way (TDZ trap).
           try {
             const [integRows, postRows, folRows] = await Promise.all([
-              isShare ? Promise.resolve([]) : sb.sbFetch(
-                `/rest/v1/integrations?select=${INTEG_COLS}&client_id=eq.${cid}&purpose=eq.content_analytics&limit=1`),
+              sb.sbFetch(`/rest/v1/integrations?select=${INTEG_COLS}&client_id=eq.${cid}&purpose=eq.content_analytics&limit=1`),
               sb.sbFetch(`/rest/v1/content_posts_latest?select=*&client_id=eq.${cid}&order=posted_on.desc,created_at.desc`),
               sb.sbFetch(`/rest/v1/content_follower_snapshots?select=captured_on,followers&client_id=eq.${cid}&order=captured_on.asc`),
             ]);
@@ -10745,7 +10724,7 @@
         }
 
         function render() {
-          if (!isShare) renderConnect();
+          renderConnect();
           renderKpis();
           renderFollowers();
           renderTable();
@@ -10827,7 +10806,7 @@
 
           if (!posts.length) {
             kpiEl.insertAdjacentHTML("beforeend",
-              `<div class="placeholder ct-kpi-empty"><strong>No posts tracked yet</strong>${isShare ? "" : "Paste a post link below to start."}</div>`);
+              `<div class="placeholder ct-kpi-empty"><strong>No posts tracked yet</strong>Paste a post link below to start.</div>`);
           }
         }
 
@@ -10883,7 +10862,7 @@
             if (p.urn_status === "unresolved") {
               note = `<span class="ct-post-warn" title="${esc(p.last_sync_error || "")}">Couldn't match this link to a post on the connected profile</span>`;
             } else if (p.impressions === null || p.impressions === undefined) {
-              note = `<span class="ct-post-sub">${integration || isShare ? "Waiting for first sync" : "Numbers arrive once LinkedIn is connected"}</span>`;
+              note = `<span class="ct-post-sub">${integration ? "Waiting for first sync" : "Numbers arrive once LinkedIn is connected"}</span>`;
             } else if (p.last_sync_error) {
               note = `<span class="ct-post-warn" title="${esc(p.last_sync_error)}">Last refresh failed</span>`;
             }
@@ -10898,7 +10877,7 @@
                 <td class="num">${fmtInt(p.reshares)}</td>
                 <td class="num">${p.impressions ? fmtPct(eng, p.impressions) : "—"}</td>
                 <td title="${esc(p.metrics_at || "")}">${p.metrics_at ? ago(p.metrics_at) : "—"}</td>
-                <td class="col-actions" data-share-hidden>
+                <td class="col-actions">
                   <button type="button" class="btn-row-action btn-row-action-danger" data-ct-remove="${esc(p.id)}">Remove</button>
                 </td>
               </tr>`;
@@ -11044,20 +11023,18 @@
         })();
 
         // --- wiring -------------------------------------------------------
-        if (!isShare) {
-          connectBtn.addEventListener("click", onConnect);
-          syncBtn.addEventListener("click", () => onSync(false));
-          disconnectBtn.addEventListener("click", onDisconnect);
-          addForm.addEventListener("submit", onAdd);
-          tbody.addEventListener("click", (e) => {
-            const b = e.target.closest("[data-ct-remove]");
-            if (b) onRemove(b.dataset.ctRemove);
-          });
-          // Default the date picker to today - most posts get added the day they go live.
-          if (!dateIn.value) {
-            const d = new Date();
-            dateIn.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-          }
+        connectBtn.addEventListener("click", onConnect);
+        syncBtn.addEventListener("click", () => onSync(false));
+        disconnectBtn.addEventListener("click", onDisconnect);
+        addForm.addEventListener("submit", onAdd);
+        tbody.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-ct-remove]");
+          if (b) onRemove(b.dataset.ctRemove);
+        });
+        // Default the date picker to today - most posts get added the day they go live.
+        if (!dateIn.value) {
+          const d = new Date();
+          dateIn.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         }
         pillsEl.addEventListener("click", (e) => {
           const b = e.target.closest(".timeframe-pill");
