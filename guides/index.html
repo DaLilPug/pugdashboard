@@ -1990,9 +1990,11 @@
       <p>
         Above the table, a KPI strip totals the funnel across every account
         currently passing your filters, so you can read the org-wide number and
-        the per-account breakdown without changing views. The strip ends with
-        <em>Opportunity value</em> and <em>Revenue closed</em> cards - totals of
-        the deal fields typed on prospects, each prospect counted once.
+        the per-account breakdown without changing views. The strip opens with
+        <em>Accounts</em>, <em>Opportunity value</em> and <em>Revenue closed</em>
+        (the money cards total the deal fields typed on prospects, each prospect
+        counted once), then runs through the funnel in the same order as the
+        table's columns: Meetings first, Connections last.
       </p>
 
       <h4>The Meetings view</h4>
@@ -2030,16 +2032,20 @@
             automatically), grey for Not Integrated. Click to change. It's a
             hand-maintained flag for at-a-glance coverage, not a live health
             check.</li>
-        <li><strong>Connections</strong> - connection requests sent in the timeframe.</li>
-        <li><strong>Messages</strong> - Message 1 sends (= new accepted connections).</li>
-        <li><strong>Acc. rate</strong> - Messages ÷ Connections. Color-coded against
-            the 30% benchmark (good ≥30%, ok ≥15%, bad below).</li>
-        <li><strong>Responses</strong> - replies received.</li>
-        <li><strong>Resp. rate</strong> - Responses ÷ Messages. Benchmark 20%.</li>
-        <li><strong>Positives</strong> - replies you tagged as positive sentiment.</li>
-        <li><strong>Pos. resp. rate</strong> - Positives ÷ Responses. Benchmark 15%.</li>
+        <li>The metric columns run outcome-first, from Meetings back to
+            Connections, each count followed by its rate. The four rate headers
+            are abbreviated to keep the columns narrow; hover a header for the
+            full name and formula. Rates are color-coded against their
+            benchmark (good at or above it, ok at half of it, bad below).</li>
         <li><strong>Meetings</strong> - meetings booked in the timeframe.</li>
-        <li><strong>Pos. booking rate</strong> - Meetings ÷ Positives. Benchmark 40%.</li>
+        <li><strong>PBR %</strong> (Pos. booking rate) - Meetings ÷ Positives. Benchmark 40%.</li>
+        <li><strong>Positives</strong> - replies you tagged as positive sentiment.</li>
+        <li><strong>PRR %</strong> (Pos. resp. rate) - Positives ÷ Responses. Benchmark 15%.</li>
+        <li><strong>Responses</strong> - replies received.</li>
+        <li><strong>RR %</strong> (Resp. rate) - Responses ÷ Messages. Benchmark 20%.</li>
+        <li><strong>Messages</strong> - Message 1 sends (= new accepted connections).</li>
+        <li><strong>AR %</strong> (Acc. rate) - Messages ÷ Connections. Benchmark 30%.</li>
+        <li><strong>Connections</strong> - connection requests sent in the timeframe.</li>
         <li><strong>Trend</strong> - a tiny cumulative chart (orange = positives,
             green = meetings) over the selected timeframe. Quick visual on whether
             an account is building momentum or flat-lining.</li>
