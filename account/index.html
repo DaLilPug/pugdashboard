@@ -352,14 +352,6 @@
                 <button class="an-hl-chip an-hl-sw-red"    data-hl="red"    type="button" title="Only red"    aria-label="Only red"></button>
               </div>
             </div>
-            <div class="pr-filter-group an-handoff-filter">
-              <span class="pr-filter-label">Handed off</span>
-              <div class="pr-filter-chips" data-an-handoff-filter="meet">
-                <button class="pr-chip active" data-handoff="all" type="button">All</button>
-                <button class="pr-chip"        data-handoff="yes" type="button">Handed off</button>
-                <button class="pr-chip"        data-handoff="no"  type="button">Not handed off</button>
-              </div>
-            </div>
             <div class="timeframe-pills" id="an-meet-tfpills" data-an-table-pills="meet">
               <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
               <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
@@ -2127,9 +2119,7 @@
           // either, and a remembered filter that silently hides rows
           // on load reads as missing data.
           respNotes: "all",
-          // Per-table "Handed off" chips: "all" | "yes" | "no".
           respStage: "all",   // Responses tab Status chips: "all" | "response" | "handed_off" | "meeting"
-          meetHandoff: "all",
           meetNotes: "all",
           // Row highlights are an internal auditing overlay, NOT prospect
           // or activity data - deliberately no database column. They live
@@ -3005,8 +2995,8 @@
           return `<th class="sortable ${cls} ${extraClass}" data-an-sort="${kind}" data-sort-key="${key}" title="Click to sort">${esc(label)}<span class="sort-caret">${on ? (s.dir === "asc" ? "▲" : "▼") : ""}</span></th>`;
         }
 
-        // Newest handed_off per prospect. Drives the "Handed off" checkbox on
-        // the Responses + Meetings rows and the per-table filter chips.
+        // Newest handed_off per prospect. Drives the Status column and Status
+        // filter on the Responses tab.
         function handoffByProspect() {
           const map = {};
           for (const h of (anState.handoffs || [])) {
@@ -3018,71 +3008,6 @@
           }
           return map;
         }
-        function handoffFilterKeeps(mode, prospectId, map) {
-          if (mode === "all") return true;
-          const has = !!(prospectId && map[prospectId]);
-          return mode === "yes" ? has : !has;
-        }
-        // Checkbox = "the client owns this conversation". Ticking logs a
-        // handed_off event (stops our cadences, moves the stage); unticking
-        // deletes that event. The date under it is when it was handed off.
-        function handoffCellHtml(r, map) {
-          if (!r.prospect_id) return `<span class="an-rate-na">—</span>`;
-          const h = map[r.prospect_id];
-          return `
-            <label class="an-handoff-wrap" title="${h ? `Handed off ${esc(anDate(h.occurred_at))}. Untick to take it back.` : "Tick when the client takes over this conversation. Stops our follow-ups for them."}">
-              <input type="checkbox" class="pr-check an-handoff-toggle" data-an-handoff-toggle data-prospect-id="${esc(r.prospect_id)}" data-row-id="${esc(r.id)}"${h ? " checked" : ""} aria-label="Handed off">
-              ${h ? `<span class="an-handoff-flag">Handed off</span><span class="an-handoff-date">${esc(anDate(h.occurred_at))}</span>` : ""}
-            </label>`;
-        }
-        // Log or undo a handoff from a Responses / Meetings row.
-        async function toggleHandoff(cb) {
-          const prospectId = cb.dataset.prospectId;
-          const rowId      = cb.dataset.rowId;
-          const wantOn     = cb.checked;
-          cb.disabled = true;
-          try {
-            if (wantOn) {
-              const src = (anState.responses || []).find(x => x.id === rowId)
-                       || (anState.meetings  || []).find(x => x.id === rowId);
-              if (!src) throw new Error("row not found");
-              const created = await sb.sbFetch("/rest/v1/outreach", {
-                method:  "POST",
-                headers: { Prefer: "return=representation" },
-                body: JSON.stringify([{
-                  client_id:     clientId,
-                  operator_id:   session.user.id,
-                  type:          "handed_off",
-                  prospect_name: src.prospect_name || "",
-                  email:         src.email         || null,
-                  company:       src.company       || null,
-                  title:         src.title         || null,
-                  linkedin_id:   src.linkedin_id   || null,
-                  profile_url:   src.profile_url   || null,
-                  sales_nav_url: src.sales_nav_url || null,
-                }]),
-              });
-              for (const row of (created || [])) {
-                anState.handoffs.unshift({ id: row.id, prospect_id: row.prospect_id || prospectId, occurred_at: row.occurred_at, operator_id: row.operator_id });
-              }
-            } else {
-              const mine = (anState.handoffs || []).filter(h => h.prospect_id === prospectId);
-              if (mine.length) {
-                const ids = mine.map(h => h.id);
-                await sb.sbFetch(`/rest/v1/outreach?id=in.(${ids.map(encodeURIComponent).join(",")})`, { method: "DELETE" });
-                anState.handoffs = anState.handoffs.filter(h => h.prospect_id !== prospectId);
-              }
-            }
-          } catch (err) {
-            cb.checked = !wantOn;
-            alert(`Couldn't ${wantOn ? "log the handoff" : "undo the handoff"}: ${err.message || err}`);
-          } finally {
-            cb.disabled = false;
-          }
-          renderRespTable();
-          renderMeetings();
-        }
-
         // Stage of the prospect behind a Responses row. Furthest wins:
         // meeting > handed_off > response. Every row on that tab IS a
         // response, so "response" is the floor.
@@ -3325,14 +3250,12 @@
         // ---- meetings table ------------------------------------------
         function visibleMeetings() {
           const { sinceMs, untilMs } = rangeMs(anState.meetRange);
-          const hoMap = handoffByProspect();
           const rows = (anState.meetings || []).filter(r => {
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.meetNotes, r.prospect_id)) return false;
             if (!hlFilterKeeps(anState.meetHl, r.id)) return false;
-            if (!handoffFilterKeeps(anState.meetHandoff, r.prospect_id, hoMap)) return false;
             return true;
           });
           return sortByDate(rows, anState.meetSort.key, anState.meetSort.dir);
@@ -3356,7 +3279,6 @@
             return;
           }
           const shown = rows.slice(0, anState.meetLimit);
-          const hoByProspect = handoffByProspect();
           meetRoot.innerHTML = `
             <div id="an-meet-bulk">${bulkBarHtml("meet", anState.meetSelected.size)}</div>
             <div class="pr-table-scroll">
@@ -3368,7 +3290,6 @@
                   <th>Prospect</th><th>Links</th>
                   <th class="num">Opportunity value</th><th class="num">Revenue closed</th>
                   <th>Notes</th>
-                  <th class="an-handoff-col" title="Ticked = the client owns this conversation now">Handed off</th>
                   <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
@@ -3387,7 +3308,6 @@
                       <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "opportunity_value")}</td>
                       <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "revenue_closed")}</td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
-                      <td class="an-handoff-cell">${handoffCellHtml(r, hoByProspect)}</td>
                       <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
                     </tr>`;
                   }).join("")}
@@ -3841,26 +3761,6 @@
             anState.respLimit = 50;
             anState.respSelected.clear();
             if (anState.listsLoaded) renderResponses();
-            return;
-          }
-          const hot = e.target.closest("[data-an-handoff-toggle]");
-          if (hot) { toggleHandoff(hot); return; }
-          const hf = e.target.closest("[data-an-handoff-filter] .pr-chip");
-          if (hf) {
-            const group = hf.closest("[data-an-handoff-filter]");
-            const kind  = group.dataset.anHandoffFilter;
-            group.querySelectorAll(".pr-chip").forEach(c => c.classList.toggle("active", c === hf));
-            if (kind === "resp") {
-              anState.respHandoff = hf.dataset.handoff;
-              anState.respLimit = 50;
-              anState.respSelected.clear();
-              if (anState.listsLoaded) renderResponses();
-            } else {
-              anState.meetHandoff = hf.dataset.handoff;
-              anState.meetLimit = 50;
-              anState.meetSelected.clear();
-              if (anState.listsLoaded) renderMeetings();
-            }
             return;
           }
           const nf = e.target.closest("[data-an-notes-filter] .pr-chip");

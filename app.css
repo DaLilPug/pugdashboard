@@ -7536,41 +7536,6 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
   margin-top: 2px;
 }
 
-/* ==============================================================
-   Handed off (Responses / Meetings rows, Prospects timeline)
-   --------------------------------------------------------------
-   Checkbox = the client owns this conversation now. A ticked row
-   shows the badge + handoff date under the box. Stage badge colour
-   (.pr-status-handed_off, above) sits between response and meeting.
-   ============================================================== */
-.an-handoff-col  { white-space: nowrap; }
-.an-handoff-cell { white-space: nowrap; vertical-align: top; }
-.an-handoff-wrap {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  cursor: pointer;
-}
-.an-handoff-toggle { cursor: pointer; }
-.an-handoff-toggle:disabled { cursor: progress; }
-.an-handoff-flag {
-  display: inline-block;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(124, 58, 237, 0.12);
-  color: #5b21b6;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-.an-handoff-date {
-  font-size: 11px;
-  color: var(--gray-400);
-}
-
 /* Status select on Responses rows (Responded / Handed off / Meeting).
    Reuses .pr-sent-edit for the control shape; colour per stage. */
 .an-stage-col  { white-space: nowrap; }
