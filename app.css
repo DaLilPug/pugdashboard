@@ -7581,4 +7581,3 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .an-stage-select.an-stage-meeting    { background: rgba(30,182,131,.16); color: #107a3e; }
 .an-stage-select option:disabled { color: #9aa3ad; }
 .an-stage-date { font-size: 11px; color: var(--gray-400); }
-.an-stage-note { font-size: 10.5px; color: var(--gray-400); max-width: 150px; white-space: normal; line-height: 1.3; }

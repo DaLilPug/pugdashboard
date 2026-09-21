@@ -3099,8 +3099,8 @@
         // ends our follow-ups). Earlier stages are disabled - history only
         // moves backward by deleting the event on the Prospects tab, never
         // by flipping a dropdown (Austin, 9/21/26). Disabled <option>s don't
-        // show hover text reliably, so the explanation sits on the select
-        // and in a note under it once the stage is above Responded.
+        // show hover text reliably, so the explanation is the select's hover
+        // text; nothing is printed under it (Austin: too noisy).
         function stageCellHtml(r, hoMap, mtMap) {
           if (!r.prospect_id) return `<span class="an-rate-na">—</span>`;
           const stage = stageOf(r.prospect_id, hoMap, mtMap);
@@ -3122,7 +3122,6 @@
                 ${opt("response", "Responded")}${opt("handed_off", "Handed off")}${opt("meeting", "Meeting")}
               </select>
               ${when ? `<div class="an-stage-date">${esc(when)}</div>` : ""}
-              ${rank > 1 ? `<div class="an-stage-note">To move back, delete the event on the Prospects tab.</div>` : ""}
             </div>`;
         }
         async function changeStage(sel) {
