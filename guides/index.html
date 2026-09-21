@@ -939,6 +939,15 @@
       <p>
         All three are one click, no modal. A toast confirms each save.
       </p>
+      <p>
+        The <em>+</em> button beside them opens a small menu with the rest of
+        the one-click types: Connection, Message, InMail, Retargeting,
+        <strong>Handed off</strong> and Meeting. <em>Handed off</em> records that
+        your team is taking the conversation over from here (email, phone, your
+        own follow-up). Like a booked meeting it ends any active cadence for
+        that prospect, and it moves their status to <em>Handed off</em> on the
+        dashboard.
+      </p>
 
       <h3 id="rb-instructions">2.5 - Editing reply instructions inline</h3>
       <p>
@@ -1139,6 +1148,8 @@
       <ul>
         <li>The prospect responds (you log any sentiment in Reply Buddy).</li>
         <li>You click <em>Log Meeting Booked</em> on the thread.</li>
+        <li>You mark the prospect <em>Handed off</em> - your team is taking the
+            conversation over, so the automated follow-ups stop.</li>
         <li>You cancel the cadence manually from the prospect's row in
             <a href="#dash-prospects">Prospects</a> or from the follow-up
             task itself.</li>
@@ -1149,9 +1160,10 @@
         response.
       </p>
       <p>
-        <strong>All three stops are reversible.</strong> Each one works by
-        putting an event on the prospect - a response, a meeting booked, or a
-        cancellation - dated after the message the cadence anchored on. Open the
+        <strong>All of these stops are reversible.</strong> Each one works by
+        putting an event on the prospect - a response, a meeting booked, a
+        handoff, or a cancellation - dated after the message the cadence anchored
+        on. Open the
         prospect's row on the <a href="#dash-prospects">Prospects</a> tab, delete
         that event, and the remaining steps come back on their scheduled dates.
         So a response logged against the wrong person, or a cadence you cancelled
@@ -1197,6 +1209,10 @@
       <ul>
         <li><em>Log Meeting Booked</em> in Reply Buddy (the success state
             this cadence is built around).</li>
+        <li><em>Handed off</em> - your team has taken the conversation over, so
+            Uptown's nudges stop. Available from the <em>+</em> menu in Reply
+            Buddy, the pencil on a follow-up task, or the Status dropdown on the
+            dashboard's Responses tab.</li>
         <li>Manual cancellation.</li>
       </ul>
       <p>
@@ -1221,6 +1237,10 @@
             the <em>+</em> overflow next to <em>Log Response</em> and
             pick <em>Schedule follow-up</em>. Set the date, type the
             message you want to send.</li>
+        <li><strong>From a follow-up task</strong> - the pencil on any task in
+            the Follow-ups panel opens the same form, with <em>Handed off</em> and
+            <em>Meeting booked</em> buttons at the top for the two outcomes that
+            end the cadence instead.</li>
         <li><strong>From the Prospects table</strong> - find the prospect
             in <a href="#dash-prospects">Prospects</a> and use the
             schedule-follow-up action on their row.</li>
@@ -2129,7 +2149,9 @@
             logged) and <em>Meeting date</em> (when the meeting happens), both
             click-to-edit, then the prospect with their title and company,
             LinkedIn / Sales Nav links, the two money fields, your prospect notes,
-            and the highlight dot. Meeting dates fill automatically from Calendly
+            a <em>Handed off</em> checkbox (ticked when the client's team owns the
+            conversation; tick to log a handoff, untick to undo it), and the
+            highlight dot. Meeting dates fill automatically from Calendly
             and HubSpot bookings; meetings logged before Jul 16, 2026 have a blank
             meeting date until you set one.</li>
         <li><strong>Opportunity value and Revenue closed</strong> - two optional
@@ -2169,16 +2191,24 @@
             was sent, the reply lag between them (tracked since Jul 8, 2026),
             the prospect with title and company, LinkedIn / Sales Nav links, the
             message you sent, the full reply text, sentiment (editable, positives
-            show green), your prospect notes (click to edit, saves on blur), and
-            the highlight dot. Long sent messages clamp to a few lines - click one
-            to expand it.</li>
-        <li><strong>Meeting booked flag</strong> - when the prospect has a meeting
-            on the books, a green <em>Meeting booked</em> flag sits under their
-            sentiment; hover it for the booked date and the meeting date. The flag
-            marks the prospect, not the single reply, so someone who replied three
-            times carries it on all three.</li>
+            show green), the prospect's <em>Status</em>, your prospect notes
+            (click to edit, saves on blur), and the highlight dot. Long sent
+            messages clamp to a few lines - click one to expand it.</li>
+        <li><strong>Status column</strong> - where the prospect stands after this
+            reply: <em>Responded</em>, <em>Handed off</em> or <em>Meeting</em>. It
+            is a dropdown that only moves forward. Pick <em>Handed off</em> when
+            the client's team takes the conversation over, or <em>Meeting</em>
+            when a meeting gets booked, and the matching event is logged on the
+            prospect with the date shown under the badge. Either one ends Uptown's
+            follow-up cadence for that person. Earlier stages are greyed out: a
+            status only moves back by deleting the event from the prospect's
+            timeline on the <a href="#dash-prospects">Prospects</a> tab, never by
+            flipping the dropdown, so a booked meeting can't be erased by a
+            mis-click. The status belongs to the prospect, not the single reply,
+            so someone who replied three times shows it on all three rows.</li>
         <li><strong>Filters</strong> - timeframe pills and a From / To pair,
-            <em>Notes</em>, <em>Highlight</em>, sentiment, and a search box. The
+            <em>Notes</em>, <em>Highlight</em>, <em>Status</em> (Responded,
+            Handed off, Meeting), sentiment, and a search box. The
             count above the table reads "X of Y" so you can always see how much
             the filters are hiding.</li>
         <li><strong>Sorting</strong> - click <em>Received</em> to flip between
@@ -2231,9 +2261,11 @@
             corrections).</li>
         <li><strong>Status</strong> - the furthest stage of the funnel this
             prospect reached inside the active timeframe, not their latest event.
-            The chips are Meeting, Response, Messaged, Connection request and
-            InMail, checked in that order, so a booked meeting keeps reading
-            Meeting even after later touches. Prospects with a booked meeting
+            The chips are Meeting, Handed off, Response, Messaged, Connection
+            request and InMail, checked in that order, so a booked meeting keeps
+            reading Meeting even after later touches, and <em>Handed off</em> means
+            the client's team owns the conversation but no meeting is on record
+            yet. Prospects with a booked meeting
             show the <em>meeting date</em> under the chip when it's known (see
             <a href="#dash-analysis">8.13 - Analysis</a> for where meeting dates
             come from and how to edit them).</li>
@@ -2684,6 +2716,12 @@
           conversational context.
         </li>
         <li>
+          <strong>New Handoff</strong> - a conversation was handed off to your
+          team (marked <em>Handed off</em> on the dashboard or in Reply Buddy).
+          Hydrates with the prospect's prior response the same way New Meeting
+          Booked does, so a zap can hand your rep the full context in one step.
+        </li>
+        <li>
           <strong>New Connection Request Sent</strong> - you sent a CR.
           Fires with the prospect's identity (name, email, title, company,
           profile URLs). The CR note itself isn't captured.
@@ -2720,8 +2758,8 @@
       <ul>
         <li><strong>id</strong>, <strong>occurred_at</strong>, <strong>account_name</strong> - always populated.</li>
         <li><strong>prospect_name</strong>, <strong>prospect_email</strong>, <strong>prospect_phone</strong>, <strong>company</strong>, <strong>title</strong>, <strong>profile_url</strong>, <strong>sales_nav_url</strong> - the prospect's identity. Populated on every trigger.</li>
-        <li><strong>outbound_message_text</strong> - on <em>response</em> triggers, the outbound message the prospect is replying to. On <em>meeting-booked</em> triggers, the outbound message that prompted the prior response, if one exists. Null on all other triggers (the extension logs the act of sending, not the message body, for CRs, first messages, InMails, and retargeting messages).</li>
-        <li><strong>response_text</strong>, <strong>sentiment</strong>, <strong>sentiment_detail</strong> - populated on response triggers, and on meeting-booked rows that have a known prior response. Null on all other triggers.</li>
+        <li><strong>outbound_message_text</strong> - on <em>response</em> triggers, the outbound message the prospect is replying to. On <em>meeting-booked</em> and <em>handoff</em> triggers, the outbound message that prompted the prior response, if one exists. Null on all other triggers (the extension logs the act of sending, not the message body, for CRs, first messages, InMails, and retargeting messages).</li>
+        <li><strong>response_text</strong>, <strong>sentiment</strong>, <strong>sentiment_detail</strong> - populated on response triggers, and on meeting-booked and handoff rows that have a known prior response. Null on all other triggers.</li>
       </ul>
 
       <h4>Actions: pushing activity in</h4>
@@ -2729,7 +2767,7 @@
         The triggers above pull events <em>out</em> of an account. One action
         writes <em>into</em> it: <strong>Create Activity</strong>. Pick the
         account, choose a type (connection, message, InMail, retargeting,
-        response, or meeting booked), and pass the prospect's name plus any
+        response, handed off, or meeting booked), and pass the prospect's name plus any
         optional details (company, title, email, phone, LinkedIn URL, Sales
         Navigator URL, message sent, response, response sentiment, and when it
         happened). Only the activity type and prospect name are required.
@@ -2852,7 +2890,7 @@
           </tr>
           <tr>
             <td style="padding:10px; vertical-align:top;"><code>POST /activities</code></td>
-            <td style="padding:10px;">Logs one outreach activity into the account. This is the endpoint behind Zapier's Create Activity action. JSON body: <code>type</code> (one of <code>connection</code>, <code>message</code>, <code>inmail</code>, <code>retargeting</code>, <code>response</code>, <code>meeting_booked</code>) and <code>prospect_name</code> are required; <code>occurred_at</code>, <code>email</code>, <code>phone</code>, <code>company</code>, <code>title</code>, <code>profile_url</code>, <code>sales_nav_url</code>, <code>message_sent</code>, <code>response</code>, <code>response_sentiment</code> are optional. Returns <code>201</code> with <code>{ ok, id, type, prospect_name, occurred_at }</code>.</td>
+            <td style="padding:10px;">Logs one outreach activity into the account. This is the endpoint behind Zapier's Create Activity action. JSON body: <code>type</code> (one of <code>connection</code>, <code>message</code>, <code>inmail</code>, <code>retargeting</code>, <code>response</code>, <code>meeting_booked</code>, <code>handed_off</code>) and <code>prospect_name</code> are required; <code>occurred_at</code>, <code>email</code>, <code>phone</code>, <code>company</code>, <code>title</code>, <code>profile_url</code>, <code>sales_nav_url</code>, <code>message_sent</code>, <code>response</code>, <code>response_sentiment</code> are optional. Returns <code>201</code> with <code>{ ok, deduplicated: false, id, type, prospect_name, occurred_at }</code>. If the same activity for the same person was logged recently (see the duplicate guard in the FAQ), nothing new is written and the response is <code>200</code> with <code>deduplicated: true</code> and a null <code>id</code> - a success, since the event is already on record.</td>
           </tr>
         </tbody>
       </table>
@@ -2963,7 +3001,7 @@
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:8px 10px;"><code>400</code></td>
             <td style="padding:8px 10px;"><code>invalid_type</code></td>
-            <td style="padding:8px 10px;">Unknown activity type on <code>POST /activities</code>. The response echoes an <code>allowed</code> array of the six valid types.</td>
+            <td style="padding:8px 10px;">Unknown activity type on <code>POST /activities</code>. The response echoes an <code>allowed</code> array of the seven valid types.</td>
           </tr>
           <tr style="border-bottom:1px solid var(--gray-100);">
             <td style="padding:8px 10px;"><code>400</code></td>
@@ -3163,7 +3201,7 @@
 
       <h4>Triggers - which events fire a sync</h4>
       <p>
-        Five checkboxes control which outreach events push to HubSpot. Four are
+        Six checkboxes control which outreach events push to HubSpot. Four are
         on by default - <strong>First message sent</strong>,
         <strong>Response received</strong>, <strong>Meeting booked</strong> and
         <strong>Email address changed</strong>. <strong>Connection request
@@ -3182,6 +3220,10 @@
           HubSpot focused on engaged leads.
         </li>
         <li><strong>Meeting booked</strong> - a meeting was scheduled.</li>
+        <li><strong>Handed off</strong> - the conversation was handed to your
+            team. Off by default; turn it on if you want HubSpot to know the
+            moment a lead becomes yours to work. The synced
+            <em>last outreach type</em> reads "Handed off".</li>
         <li>
           <strong>Email address changed</strong> - the prospect's email went
           from missing to known (or got corrected to a different valid one).
@@ -4090,8 +4132,11 @@
             to be kept. A response with no text is never deduped.
           </p>
           <p>
-            <strong>Follow-ups and booked meetings are never deduped</strong> -
-            those legitimately repeat, so every one counts. A genuine follow-up
+            <strong>Follow-ups and handoffs are never deduped</strong> - those
+            legitimately repeat, so every one counts. A <strong>booked
+            meeting</strong> is only collapsed when the same person's meeting is
+            logged again within an hour (an integration re-firing), because a
+            real second meeting weeks later has to count. A genuine follow-up
             message is logged as a follow-up (through your cadence), not as a
             new "message," so it always counts.
           </p>
