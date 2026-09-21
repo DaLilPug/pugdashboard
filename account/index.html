@@ -352,6 +352,14 @@
                 <button class="an-hl-chip an-hl-sw-red"    data-hl="red"    type="button" title="Only red"    aria-label="Only red"></button>
               </div>
             </div>
+            <div class="pr-filter-group an-handoff-filter">
+              <span class="pr-filter-label">Handed off</span>
+              <div class="pr-filter-chips" data-an-handoff-filter="meet">
+                <button class="pr-chip active" data-handoff="all" type="button">All</button>
+                <button class="pr-chip"        data-handoff="yes" type="button">Handed off</button>
+                <button class="pr-chip"        data-handoff="no"  type="button">Not handed off</button>
+              </div>
+            </div>
             <div class="timeframe-pills" id="an-meet-tfpills" data-an-table-pills="meet">
               <button class="timeframe-pill" data-tf="1w" type="button">1 Week</button>
               <button class="timeframe-pill" data-tf="2w" type="button">2 Weeks</button>
@@ -400,6 +408,14 @@
                 <button class="an-hl-chip an-hl-sw-purple" data-hl="purple" type="button" title="Only purple" aria-label="Only purple"></button>
                 <button class="an-hl-chip an-hl-sw-green"  data-hl="green"  type="button" title="Only green"  aria-label="Only green"></button>
                 <button class="an-hl-chip an-hl-sw-red"    data-hl="red"    type="button" title="Only red"    aria-label="Only red"></button>
+              </div>
+            </div>
+            <div class="pr-filter-group an-handoff-filter">
+              <span class="pr-filter-label">Handed off</span>
+              <div class="pr-filter-chips" data-an-handoff-filter="resp">
+                <button class="pr-chip active" data-handoff="all" type="button">All</button>
+                <button class="pr-chip"        data-handoff="yes" type="button">Handed off</button>
+                <button class="pr-chip"        data-handoff="no"  type="button">Not handed off</button>
               </div>
             </div>
             <div class="timeframe-pills" id="an-resp-tfpills" data-an-table-pills="resp">
@@ -503,6 +519,7 @@
               <button class="pr-chip"        data-status="inmail"     type="button">InMail</button>
               <button class="pr-chip"        data-status="message"    type="button">Messaged</button>
               <button class="pr-chip"        data-status="response"   type="button">Responded</button>
+              <button class="pr-chip"        data-status="handed_off" type="button">Handed off</button>
               <button class="pr-chip"        data-status="meeting"    type="button">Meeting</button>
             </div>
           </div>
@@ -2080,6 +2097,10 @@
           titleView: "seniority",
           responses: null,  // ALL response rows, newest first
           meetings:  null,  // ALL meeting_booked rows, newest first
+          // ALL handed_off rows (id, prospect_id, occurred_at, operator_id).
+          // "Handed off" = the client owns this conversation now. One event
+          // per handoff; the newest per prospect drives the checkbox + badge.
+          handoffs:  null,
           notesByProspect: {},
           // { prospectId: { opportunity_value, revenue_closed } } - the
           // money fields live on the PROSPECT, so one person who books
@@ -2101,6 +2122,9 @@
           // either, and a remembered filter that silently hides rows
           // on load reads as missing data.
           respNotes: "all",
+          // Per-table "Handed off" chips: "all" | "yes" | "no".
+          respHandoff: "all",
+          meetHandoff: "all",
           meetNotes: "all",
           // Row highlights are an internal auditing overlay, NOT prospect
           // or activity data - deliberately no database column. They live
@@ -2334,7 +2358,8 @@
           const encId = encodeURIComponent(clientId);
           const RESP_SELECT = "id,prospect_id,prospect_name,company,title,email,linkedin_id,profile_url,sales_nav_url,occurred_at,message_sent_at,message_sent,response,response_sentiment,response_sentiment_detail";
           const MEET_SELECT = "id,prospect_id,prospect_name,company,title,email,linkedin_id,profile_url,sales_nav_url,occurred_at,meeting_at";
-          const [responses, meetings, notesRows] = await Promise.all([
+          const HANDOFF_SELECT = "id,prospect_id,occurred_at,operator_id";
+          const [responses, meetings, notesRows, handoffs] = await Promise.all([
             sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.response&select=${RESP_SELECT}&order=occurred_at.desc`),
             sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.meeting_booked&select=${MEET_SELECT}&order=occurred_at.desc`),
             // sbFetchAll, NOT sbFetch: an unpaged read silently truncates
@@ -2344,9 +2369,11 @@
             // applies to the money fields, so the `or` filter has to
             // catch a prospect carrying ANY of the three.
             sb.sbFetchAll(`/rest/v1/prospects?client_id=eq.${encId}&select=id,notes,opportunity_value,revenue_closed&or=(notes.not.is.null,opportunity_value.not.is.null,revenue_closed.not.is.null)`).catch(() => []),
+            sb.sbFetchAll(`/rest/v1/outreach?client_id=eq.${encId}&type=eq.handed_off&select=${HANDOFF_SELECT}&order=occurred_at.desc`).catch(() => []),
           ]);
           anState.responses = responses || [];
           anState.meetings  = meetings  || [];
+          anState.handoffs  = handoffs  || [];
           anState.notesByProspect = {};
           anState.dealsByProspect = {};
           for (const p of (notesRows || [])) {
@@ -2746,12 +2773,14 @@
         function visibleResponses(ignoreSentAndSearch = false) {
           const { sinceMs, untilMs } = rangeMs(anState.respRange);
           const q = anState.respSearch.trim().toLowerCase();
+          const hoMap = handoffByProspect();
           const rows = (anState.responses || []).filter(r => {
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.respNotes, r.prospect_id)) return false;
             if (!hlFilterKeeps(anState.respHl, r.id)) return false;
+            if (!handoffFilterKeeps(anState.respHandoff, r.prospect_id, hoMap)) return false;
             if (ignoreSentAndSearch) return true;
             if (anState.respSent === "unclassified") {
               if (r.response_sentiment) return false;
@@ -2970,6 +2999,84 @@
           return `<th class="sortable ${cls} ${extraClass}" data-an-sort="${kind}" data-sort-key="${key}" title="Click to sort">${esc(label)}<span class="sort-caret">${on ? (s.dir === "asc" ? "▲" : "▼") : ""}</span></th>`;
         }
 
+        // Newest handed_off per prospect. Drives the "Handed off" checkbox on
+        // the Responses + Meetings rows and the per-table filter chips.
+        function handoffByProspect() {
+          const map = {};
+          for (const h of (anState.handoffs || [])) {
+            if (!h.prospect_id) continue;
+            const prev = map[h.prospect_id];
+            if (!prev || String(h.occurred_at || "") > String(prev.occurred_at || "")) {
+              map[h.prospect_id] = h;
+            }
+          }
+          return map;
+        }
+        function handoffFilterKeeps(mode, prospectId, map) {
+          if (mode === "all") return true;
+          const has = !!(prospectId && map[prospectId]);
+          return mode === "yes" ? has : !has;
+        }
+        // Checkbox = "the client owns this conversation". Ticking logs a
+        // handed_off event (stops our cadences, moves the stage); unticking
+        // deletes that event. The date under it is when it was handed off.
+        function handoffCellHtml(r, map) {
+          if (!r.prospect_id) return `<span class="an-rate-na">—</span>`;
+          const h = map[r.prospect_id];
+          return `
+            <label class="an-handoff-wrap" title="${h ? `Handed off ${esc(anDate(h.occurred_at))}. Untick to take it back.` : "Tick when the client takes over this conversation. Stops our follow-ups for them."}">
+              <input type="checkbox" class="pr-check an-handoff-toggle" data-an-handoff-toggle data-prospect-id="${esc(r.prospect_id)}" data-row-id="${esc(r.id)}"${h ? " checked" : ""} aria-label="Handed off to client">
+              ${h ? `<span class="an-handoff-flag">Handed off</span><span class="an-handoff-date">${esc(anDate(h.occurred_at))}</span>` : ""}
+            </label>`;
+        }
+        // Log or undo a handoff from a Responses / Meetings row.
+        async function toggleHandoff(cb) {
+          const prospectId = cb.dataset.prospectId;
+          const rowId      = cb.dataset.rowId;
+          const wantOn     = cb.checked;
+          cb.disabled = true;
+          try {
+            if (wantOn) {
+              const src = (anState.responses || []).find(x => x.id === rowId)
+                       || (anState.meetings  || []).find(x => x.id === rowId);
+              if (!src) throw new Error("row not found");
+              const created = await sb.sbFetch("/rest/v1/outreach", {
+                method:  "POST",
+                headers: { Prefer: "return=representation" },
+                body: JSON.stringify([{
+                  client_id:     clientId,
+                  operator_id:   session.user.id,
+                  type:          "handed_off",
+                  prospect_name: src.prospect_name || "",
+                  email:         src.email         || null,
+                  company:       src.company       || null,
+                  title:         src.title         || null,
+                  linkedin_id:   src.linkedin_id   || null,
+                  profile_url:   src.profile_url   || null,
+                  sales_nav_url: src.sales_nav_url || null,
+                }]),
+              });
+              for (const row of (created || [])) {
+                anState.handoffs.unshift({ id: row.id, prospect_id: row.prospect_id || prospectId, occurred_at: row.occurred_at, operator_id: row.operator_id });
+              }
+            } else {
+              const mine = (anState.handoffs || []).filter(h => h.prospect_id === prospectId);
+              if (mine.length) {
+                const ids = mine.map(h => h.id);
+                await sb.sbFetch(`/rest/v1/outreach?id=in.(${ids.map(encodeURIComponent).join(",")})`, { method: "DELETE" });
+                anState.handoffs = anState.handoffs.filter(h => h.prospect_id !== prospectId);
+              }
+            }
+          } catch (err) {
+            cb.checked = !wantOn;
+            alert(`Couldn't ${wantOn ? "log the handoff" : "undo the handoff"}: ${err.message || err}`);
+          } finally {
+            cb.disabled = false;
+          }
+          renderRespTable();
+          renderMeetings();
+        }
+
         function bookedFlagHtml(mtg) {
           if (!mtg) return "";
           const when = mtg.meeting_at
@@ -3062,6 +3169,7 @@
           }
           const shown = rows.slice(0, anState.respLimit);
           const mtgByProspect = meetingByProspect();
+          const hoByProspect  = handoffByProspect();
           tableEl.innerHTML = `
             <div id="an-resp-bulk">${bulkBarHtml("resp", anState.respSelected.size)}</div>
             <div class="pr-table-scroll">
@@ -3071,6 +3179,7 @@
                   ${sortTh("resp", "occurred_at", "Received")}
                   <th>Sent date</th><th>Prospect</th><th>Links</th>
                   <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th>
+                  <th class="an-handoff-col" title="Ticked = the client owns this conversation now">Handed off</th>
                   <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
@@ -3102,6 +3211,7 @@
                         ${bookedFlagHtml(mtg)}
                       </td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
+                      <td class="an-handoff-cell">${handoffCellHtml(r, hoByProspect)}</td>
                       <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
                     </tr>`;
                   }).join("")}
@@ -3128,12 +3238,14 @@
         // ---- meetings table ------------------------------------------
         function visibleMeetings() {
           const { sinceMs, untilMs } = rangeMs(anState.meetRange);
+          const hoMap = handoffByProspect();
           const rows = (anState.meetings || []).filter(r => {
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.meetNotes, r.prospect_id)) return false;
             if (!hlFilterKeeps(anState.meetHl, r.id)) return false;
+            if (!handoffFilterKeeps(anState.meetHandoff, r.prospect_id, hoMap)) return false;
             return true;
           });
           return sortByDate(rows, anState.meetSort.key, anState.meetSort.dir);
@@ -3157,6 +3269,7 @@
             return;
           }
           const shown = rows.slice(0, anState.meetLimit);
+          const hoByProspect = handoffByProspect();
           meetRoot.innerHTML = `
             <div id="an-meet-bulk">${bulkBarHtml("meet", anState.meetSelected.size)}</div>
             <div class="pr-table-scroll">
@@ -3168,6 +3281,7 @@
                   <th>Prospect</th><th>Links</th>
                   <th class="num">Opportunity value</th><th class="num">Revenue closed</th>
                   <th>Notes</th>
+                  <th class="an-handoff-col" title="Ticked = the client owns this conversation now">Handed off</th>
                   <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
@@ -3186,6 +3300,7 @@
                       <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "opportunity_value")}</td>
                       <td class="an-money-cell">${moneyCellHtml(r.prospect_id, "revenue_closed")}</td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
+                      <td class="an-handoff-cell">${handoffCellHtml(r, hoByProspect)}</td>
                       <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
                     </tr>`;
                   }).join("")}
@@ -3628,6 +3743,26 @@
               anState.respLimit = 50;
               anState.respSelected.clear();
               if (anState.listsLoaded) renderResponses();
+            }
+            return;
+          }
+          const hot = e.target.closest("[data-an-handoff-toggle]");
+          if (hot) { toggleHandoff(hot); return; }
+          const hf = e.target.closest("[data-an-handoff-filter] .pr-chip");
+          if (hf) {
+            const group = hf.closest("[data-an-handoff-filter]");
+            const kind  = group.dataset.anHandoffFilter;
+            group.querySelectorAll(".pr-chip").forEach(c => c.classList.toggle("active", c === hf));
+            if (kind === "resp") {
+              anState.respHandoff = hf.dataset.handoff;
+              anState.respLimit = 50;
+              anState.respSelected.clear();
+              if (anState.listsLoaded) renderResponses();
+            } else {
+              anState.meetHandoff = hf.dataset.handoff;
+              anState.meetLimit = 50;
+              anState.meetSelected.clear();
+              if (anState.listsLoaded) renderMeetings();
             }
             return;
           }
@@ -4686,7 +4821,7 @@
         // computes server-side; kept here so we can patch state
         // immediately rather than waiting on a server round-trip.
         function summarizeEvents(events, since) {
-          const counts = { connection:0, message:0, response:0, meeting_booked:0, followup:0, retargeting:0, inmail:0 };
+          const counts = { connection:0, message:0, response:0, handed_off:0, meeting_booked:0, followup:0, retargeting:0, inmail:0 };
           let positives = 0;
           let firstTouch = null;
           let lastTouch  = null;
@@ -4709,6 +4844,7 @@
 
           let status;
           if      (counts.meeting_booked > 0) status = "meeting";
+          else if (counts.handed_off     > 0) status = "handed_off";
           else if (counts.response       > 0) status = "response";
           else if (counts.message        > 0) status = "message";
           else if (counts.connection     > 0) status = "connection";
@@ -4717,7 +4853,7 @@
 
           const eventCount =
             counts.connection + counts.message + counts.response +
-            counts.meeting_booked + counts.followup + counts.retargeting +
+            counts.meeting_booked + counts.handed_off + counts.followup + counts.retargeting +
             counts.inmail;
 
           return {
@@ -4901,6 +5037,7 @@
         function renderRow(p, idx) {
           const statusLabel = {
             meeting:    "Meeting",
+            handed_off: "Handed off",
             response:   "Response",
             message:    "Messaged",
             connection: "Connection request",
@@ -5096,6 +5233,14 @@
             ? `<span class="pr-action-status" title="A meeting_booked event is already logged — delete it from the timeline below to undo">Meeting logged ✓</span>`
             : `<button class="btn-secondary pr-action" data-action="log-meeting" type="button">Mark meeting booked</button>`;
 
+          // Handed off: the client owns this conversation now. Same shape as
+          // the meeting button - one event, undone by deleting it from the
+          // timeline. Stops our cadences for this prospect.
+          const hasHandoff = p.events.some(e => e.type === "handed_off");
+          const handoffBtn = hasHandoff
+            ? `<span class="pr-action-status" title="A handed_off event is logged — delete it from the timeline below to take the conversation back">Handed off ✓</span>`
+            : `<button class="btn-secondary pr-action" data-action="log-handoff" type="button" title="The client is taking this conversation over. Stops our follow-ups for them.">Hand off to client</button>`;
+
           // Email + phone contact line. Either can be clicked (mailto / tel);
           // both live in the same row so the head doesn't grow vertically
           // when only one is present.
@@ -5121,6 +5266,7 @@
               <div class="pr-timeline-actions">
                 <button class="btn-secondary pr-action" data-action="show-info-form" type="button">Edit info</button>
                 ${meetingBtn}
+                ${handoffBtn}
                 <button class="btn-secondary pr-action" data-action="show-response-form" type="button">Mark responded</button>
                 <button class="btn-secondary pr-action" data-action="show-add-followup-form" type="button" title="Schedule a one-off follow-up reminder for this prospect">Add follow-up</button>
                 ${p.eventCount >= 2 ? `<button class="btn-secondary pr-action" data-action="enter-split-mode" type="button" title="Peel events off this prospect into a new prospect">Split events…</button>` : ""}
@@ -5258,6 +5404,8 @@
             retargeting:    "Re-touch",
             response:       "Response",
             meeting_booked: "Meeting booked",
+            handed_off:     "Handed off to client",
+            cadence_cancelled: "Follow-ups ended",
           }[e.type] || e.type;
 
           // Responses carry TWO body fields: message_sent (the outreach
@@ -5843,6 +5991,11 @@
             handleLogMeeting(actionEl, prospect);
             return;
           }
+          if (action === "log-handoff") {
+            clickEvt.preventDefault();
+            handleLogHandoff(actionEl, prospect);
+            return;
+          }
           if (action === "show-response-form") {
             clickEvt.preventDefault();
             const form = timelineRow.querySelector(".pr-response-form");
@@ -6422,6 +6575,26 @@
             btn.disabled = false;
             btn.textContent = prevLabel;
             alert("Couldn't log meeting: " + (err.message || err));
+          }
+        }
+
+        async function handleLogHandoff(btn, prospect) {
+          const prevLabel = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = "Logging…";
+          try {
+            const payload = buildOutreachPayload(prospect, { type: "handed_off" });
+            const created = await sb.sbFetch("/rest/v1/outreach", {
+              method:  "POST",
+              body:    JSON.stringify([payload]),
+              headers: { Prefer: "return=representation" },
+            });
+            applyNewEvents(prospect, created);
+            reopenAfterMutation(prospect);
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = prevLabel;
+            alert("Couldn't log the handoff: " + (err.message || err));
           }
         }
 
