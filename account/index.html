@@ -3265,8 +3265,9 @@
                   ${checkHeadHtml("resp")}
                   ${sortTh("resp", "occurred_at", "Received")}
                   <th>Sent date</th><th>Prospect</th><th>Links</th>
-                  <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th>
+                  <th>Message sent</th><th>Response</th><th>Sentiment</th>
                   <th class="an-stage-col" title="Responded, Handed off, or Meeting. Picking a later stage logs that event.">Status</th>
+                  <th>Notes</th>
                   <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
@@ -3296,8 +3297,8 @@
                           <option value="negative"${s === "negative" ? " selected" : ""}>Negative</option>
                         </select>
                       </td>
-                      <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
                       <td class="an-stage-cell">${stageCellHtml(r, hoByProspect, mtgByProspect)}</td>
+                      <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
                       <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
                     </tr>`;
                   }).join("")}
