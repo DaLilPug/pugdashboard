@@ -410,12 +410,13 @@
                 <button class="an-hl-chip an-hl-sw-red"    data-hl="red"    type="button" title="Only red"    aria-label="Only red"></button>
               </div>
             </div>
-            <div class="pr-filter-group an-handoff-filter">
-              <span class="pr-filter-label">Handed off</span>
-              <div class="pr-filter-chips" data-an-handoff-filter="resp">
-                <button class="pr-chip active" data-handoff="all" type="button">All</button>
-                <button class="pr-chip"        data-handoff="yes" type="button">Handed off</button>
-                <button class="pr-chip"        data-handoff="no"  type="button">Not handed off</button>
+            <div class="pr-filter-group an-stage-filter">
+              <span class="pr-filter-label">Status</span>
+              <div class="pr-filter-chips" data-an-stage-filter="resp">
+                <button class="pr-chip active" data-stage="all"        type="button">All</button>
+                <button class="pr-chip"        data-stage="response"   type="button">Responded</button>
+                <button class="pr-chip"        data-stage="handed_off" type="button">Handed off</button>
+                <button class="pr-chip"        data-stage="meeting"    type="button">Meeting</button>
               </div>
             </div>
             <div class="timeframe-pills" id="an-resp-tfpills" data-an-table-pills="resp">
@@ -1010,6 +1011,10 @@
                 <label class="hubspot-trigger-row">
                   <input type="checkbox" data-trigger="meeting_booked" />
                   <span>Meeting booked</span>
+                </label>
+                <label class="hubspot-trigger-row">
+                  <input type="checkbox" data-trigger="handed_off" />
+                  <span>Handed off</span>
                 </label>
                 <label class="hubspot-trigger-row">
                   <input type="checkbox" data-trigger="email_changed" />
@@ -2123,7 +2128,7 @@
           // on load reads as missing data.
           respNotes: "all",
           // Per-table "Handed off" chips: "all" | "yes" | "no".
-          respHandoff: "all",
+          respStage: "all",   // Responses tab Status chips: "all" | "response" | "handed_off" | "meeting"
           meetHandoff: "all",
           meetNotes: "all",
           // Row highlights are an internal auditing overlay, NOT prospect
@@ -2774,13 +2779,14 @@
           const { sinceMs, untilMs } = rangeMs(anState.respRange);
           const q = anState.respSearch.trim().toLowerCase();
           const hoMap = handoffByProspect();
+          const mtMap = meetingByProspect();
           const rows = (anState.responses || []).filter(r => {
             const t = new Date(r.occurred_at).getTime();
             if (sinceMs !== null && t < sinceMs) return false;
             if (untilMs !== null && t > untilMs) return false;
             if (!notesFilterKeeps(anState.respNotes, r.prospect_id)) return false;
             if (!hlFilterKeeps(anState.respHl, r.id)) return false;
-            if (!handoffFilterKeeps(anState.respHandoff, r.prospect_id, hoMap)) return false;
+            if (!stageFilterKeeps(anState.respStage, stageOf(r.prospect_id, hoMap, mtMap))) return false;
             if (ignoreSentAndSearch) return true;
             if (anState.respSent === "unclassified") {
               if (r.response_sentiment) return false;
@@ -3025,7 +3031,7 @@
           const h = map[r.prospect_id];
           return `
             <label class="an-handoff-wrap" title="${h ? `Handed off ${esc(anDate(h.occurred_at))}. Untick to take it back.` : "Tick when the client takes over this conversation. Stops our follow-ups for them."}">
-              <input type="checkbox" class="pr-check an-handoff-toggle" data-an-handoff-toggle data-prospect-id="${esc(r.prospect_id)}" data-row-id="${esc(r.id)}"${h ? " checked" : ""} aria-label="Handed off to client">
+              <input type="checkbox" class="pr-check an-handoff-toggle" data-an-handoff-toggle data-prospect-id="${esc(r.prospect_id)}" data-row-id="${esc(r.id)}"${h ? " checked" : ""} aria-label="Handed off">
               ${h ? `<span class="an-handoff-flag">Handed off</span><span class="an-handoff-date">${esc(anDate(h.occurred_at))}</span>` : ""}
             </label>`;
         }
@@ -3072,6 +3078,88 @@
             alert(`Couldn't ${wantOn ? "log the handoff" : "undo the handoff"}: ${err.message || err}`);
           } finally {
             cb.disabled = false;
+          }
+          renderRespTable();
+          renderMeetings();
+        }
+
+        // Stage of the prospect behind a Responses row. Furthest wins:
+        // meeting > handed_off > response. Every row on that tab IS a
+        // response, so "response" is the floor.
+        const STAGE_RANK = { response: 1, handed_off: 2, meeting: 3 };
+        function stageOf(prospectId, hoMap, mtMap) {
+          if (prospectId && mtMap[prospectId]) return "meeting";
+          if (prospectId && hoMap[prospectId]) return "handed_off";
+          return "response";
+        }
+        function stageFilterKeeps(mode, stage) { return mode === "all" || stage === mode; }
+
+        // Status select on a Responses row. Forward moves log the matching
+        // event: Handed off -> handed_off, Meeting -> meeting_booked (either
+        // ends our follow-ups). Earlier stages are disabled - history only
+        // moves backward by deleting the event on the Prospects tab, never
+        // by flipping a dropdown (Austin, 9/21/26). Disabled <option>s don't
+        // show hover text reliably, so the explanation sits on the select
+        // and in a note under it once the stage is above Responded.
+        function stageCellHtml(r, hoMap, mtMap) {
+          if (!r.prospect_id) return `<span class="an-rate-na">—</span>`;
+          const stage = stageOf(r.prospect_id, hoMap, mtMap);
+          const rank  = STAGE_RANK[stage];
+          const opt = (val, label) => {
+            const dis = STAGE_RANK[val] < rank ? " disabled" : "";
+            const sel = val === stage ? " selected" : "";
+            return `<option value="${val}"${sel}${dis}>${label}</option>`;
+          };
+          const h = hoMap[r.prospect_id], m = mtMap[r.prospect_id];
+          const when = stage === "meeting" && m ? `Meeting booked ${anDate(m.occurred_at)}`
+                     : stage === "handed_off" && h ? `Handed off ${anDate(h.occurred_at)}` : "";
+          const title = rank > 1
+            ? `${when}. Earlier stages are greyed out - to move back, delete the event on the Prospects tab.`
+            : "Pick the next stage to log it. Handed off = the client owns this conversation now. Meeting = a meeting was booked. Both end our follow-ups for this person.";
+          return `
+            <div class="an-stage-wrap">
+              <select class="pr-sent-edit an-stage-select an-stage-${stage}" data-an-stage data-prospect-id="${esc(r.prospect_id)}" data-row-id="${esc(r.id)}" aria-label="Status" title="${esc(title)}">
+                ${opt("response", "Responded")}${opt("handed_off", "Handed off")}${opt("meeting", "Meeting")}
+              </select>
+              ${when ? `<div class="an-stage-date">${esc(when)}</div>` : ""}
+              ${rank > 1 ? `<div class="an-stage-note">To move back, delete the event on the Prospects tab.</div>` : ""}
+            </div>`;
+        }
+        async function changeStage(sel) {
+          const prospectId = sel.dataset.prospectId;
+          const rowId      = sel.dataset.rowId;
+          const target     = sel.value;
+          const src = (anState.responses || []).find(x => x.id === rowId);
+          if (!src || !(target === "handed_off" || target === "meeting")) { renderRespTable(); return; }
+          sel.disabled = true;
+          const type = target === "meeting" ? "meeting_booked" : "handed_off";
+          try {
+            const created = await sb.sbFetch("/rest/v1/outreach", {
+              method:  "POST",
+              headers: { Prefer: "return=representation" },
+              body: JSON.stringify([{
+                client_id:     clientId,
+                operator_id:   session.user.id,
+                type,
+                prospect_name: src.prospect_name || "",
+                email:         src.email         || null,
+                company:       src.company       || null,
+                title:         src.title         || null,
+                linkedin_id:   src.linkedin_id   || null,
+                profile_url:   src.profile_url   || null,
+                sales_nav_url: src.sales_nav_url || null,
+              }]),
+            });
+            for (const row of (created || [])) {
+              const pid = row.prospect_id || prospectId;
+              if (type === "handed_off") {
+                anState.handoffs.unshift({ id: row.id, prospect_id: pid, occurred_at: row.occurred_at, operator_id: row.operator_id });
+              } else {
+                anState.meetings.unshift({ ...row, prospect_id: pid });
+              }
+            }
+          } catch (err) {
+            alert(`Couldn't log ${type === "meeting_booked" ? "the meeting" : "the handoff"}: ${err.message || err}`);
           }
           renderRespTable();
           renderMeetings();
@@ -3179,7 +3267,7 @@
                   ${sortTh("resp", "occurred_at", "Received")}
                   <th>Sent date</th><th>Prospect</th><th>Links</th>
                   <th>Message sent</th><th>Response</th><th>Sentiment</th><th>Notes</th>
-                  <th class="an-handoff-col" title="Ticked = the client owns this conversation now">Handed off</th>
+                  <th class="an-stage-col" title="Responded, Handed off, or Meeting. Picking a later stage logs that event.">Status</th>
                   <th class="an-hl-col" title="Highlight"><span class="sr-only">Highlight</span></th>
                 </tr></thead>
                 <tbody>
@@ -3208,10 +3296,9 @@
                           <option value="neutral"${s === "neutral" ? " selected" : ""}>Neutral</option>
                           <option value="negative"${s === "negative" ? " selected" : ""}>Negative</option>
                         </select>
-                        ${bookedFlagHtml(mtg)}
                       </td>
                       <td class="pr-notes-cell">${notesCellHtml(r.prospect_id)}</td>
-                      <td class="an-handoff-cell">${handoffCellHtml(r, hoByProspect)}</td>
+                      <td class="an-stage-cell">${stageCellHtml(r, hoByProspect, mtgByProspect)}</td>
                       <td class="an-hl-cell">${highlightCellHtml(r.id)}</td>
                     </tr>`;
                   }).join("")}
@@ -3746,6 +3833,16 @@
             }
             return;
           }
+          const sf = e.target.closest("[data-an-stage-filter] .pr-chip");
+          if (sf) {
+            const group = sf.closest("[data-an-stage-filter]");
+            group.querySelectorAll(".pr-chip").forEach(c => c.classList.toggle("active", c === sf));
+            anState.respStage = sf.dataset.stage;
+            anState.respLimit = 50;
+            anState.respSelected.clear();
+            if (anState.listsLoaded) renderResponses();
+            return;
+          }
           const hot = e.target.closest("[data-an-handoff-toggle]");
           if (hot) { toggleHandoff(hot); return; }
           const hf = e.target.closest("[data-an-handoff-filter] .pr-chip");
@@ -3882,6 +3979,8 @@
         });
 
         panelEl.addEventListener("change", async (e) => {
+          const stSel = e.target.closest("[data-an-stage]");
+          if (stSel) { changeStage(stSel); return; }
           // Row + select-all checkboxes (Responses / Meetings tables).
           const rowCheck = e.target.closest("[data-an-check]");
           if (rowCheck) {
@@ -5404,7 +5503,7 @@
             retargeting:    "Re-touch",
             response:       "Response",
             meeting_booked: "Meeting booked",
-            handed_off:     "Handed off to client",
+            handed_off:     "Handed off",
             cadence_cancelled: "Follow-ups ended",
           }[e.type] || e.type;
 

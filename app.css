@@ -7570,3 +7570,15 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
   font-size: 11px;
   color: var(--gray-400);
 }
+
+/* Status select on Responses rows (Responded / Handed off / Meeting).
+   Reuses .pr-sent-edit for the control shape; colour per stage. */
+.an-stage-col  { white-space: nowrap; }
+.an-stage-cell { white-space: nowrap; vertical-align: top; }
+.an-stage-wrap { display: inline-flex; flex-direction: column; gap: 3px; }
+.an-stage-select.an-stage-response   { background: rgba(245,158,11,.14); color: #b97706; }
+.an-stage-select.an-stage-handed_off { background: rgba(124,58,237,.14); color: #5b21b6; }
+.an-stage-select.an-stage-meeting    { background: rgba(30,182,131,.16); color: #107a3e; }
+.an-stage-select option:disabled { color: #9aa3ad; }
+.an-stage-date { font-size: 11px; color: var(--gray-400); }
+.an-stage-note { font-size: 10.5px; color: var(--gray-400); max-width: 150px; white-space: normal; line-height: 1.3; }
