@@ -1127,6 +1127,8 @@
       }
 
       document.getElementById("account-name").textContent = client.name;
+      // Browser tab shows the account's name (regular and share links).
+      document.title = `${client.name} - Uptown Tracker`;
       const metaEl = document.getElementById("account-meta");
       metaEl.innerHTML = [
         client.slug ? `<span>${esc(client.slug)}</span>` : "",
@@ -11960,7 +11962,7 @@
               body:   JSON.stringify({ seat_id: client.id, new_name: nextName }),
             });
             client.name = nextName;
-            document.title = `${nextName} — Uptown`;
+            document.title = `${nextName} - Uptown Tracker`;
             restore(nextName);
           } catch (err) {
             const m = err.message || "";
