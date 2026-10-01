@@ -308,7 +308,7 @@
             </div>
           </div>
         </div>
-        <div class="panel-card-sub">How each initial message variation performs, in this card's own timeframe. Message logs from the extension carry the variation selected at log time. Each prospect counts once per variation; responses, positives, and meetings count when they happened after that prospect's first send of it. Click a message to expand.</div>
+        <div class="panel-card-sub">How each initial message variation performs, in this card's own timeframe. Message logs from the extension carry the variation selected at log time. Each prospect counts once per variation; responses, positives, and meetings count when they happened after that prospect's first send of it. Live means the text matches a message saved on the Cadence tab right now; the dates are the first and most recent send in this window. Click a message to expand.</div>
         <div id="an-initmsg"><div class="loading">Loading…</div></div>
       </section>
 
@@ -2343,6 +2343,9 @@
           });
           return (rows || []).map(r => ({
             template:  r.message_template || "",
+            isLive:    !!r.is_live,
+            firstSent: r.first_sent || null,
+            lastSent:  r.last_sent  || null,
             prospects: Number(r.prospects) || 0,
             sends:     Number(r.sends)     || 0,
             responded: Number(r.responded) || 0,
@@ -2664,10 +2667,25 @@
 
         // ---- Initial Message Testing ---------------------------------
         // One row per initial-message variation: the extension stamps the
-        // selected variation onto every Message log, and the RPC groups the
-        // stamps back into templates (de-rendering each row's prospect
-        // fields) and scores them. Rendered per prospect at log time, so
-        // the template shows {{first_name}}-style placeholders here.
+        // selected variation's raw text (tokens included) onto every Message
+        // log and the RPC groups by that exact text. A row is Live when its
+        // text matches a message saved on the Cadence tab right now, Retired
+        // otherwise. The RPC returns live rows first, then by last send.
+        // Dates are the first and last send of that text inside the card's
+        // window, sliced from the ISO string like fmtDate (UTC calendar day).
+        function fmtImtRange(firstIso, lastIso) {
+          const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+          const part = iso => {
+            const [y, m, d] = String(iso || "").slice(0, 10).split("-").map(Number);
+            return (y && m && d) ? { y, text: `${MON[m - 1]} ${d}` } : null;
+          };
+          const a = part(firstIso), b = part(lastIso);
+          if (!a || !b) return "";
+          if (a.y === b.y) {
+            return a.text === b.text ? `${a.text}, ${a.y}` : `${a.text} to ${b.text}, ${a.y}`;
+          }
+          return `${a.text}, ${a.y} to ${b.text}, ${b.y}`;
+        }
         function renderInitialMsgs() {
           if (anState.initMsgs === null) {
             initMsgEl.innerHTML = `<div class="placeholder"><strong>Couldn't load initial-message data</strong>Reload the page to retry.</div>`;
@@ -2690,7 +2708,7 @@
                 <tbody>
                   ${rows.map(r => `
                     <tr>
-                      <td class="an-msg-text"><div class="an-msg-clamp" title="Click to expand or collapse">${esc(r.template)}</div></td>
+                      <td class="an-msg-text"><div class="an-imt-status"><span class="an-imt-pill ${r.isLive ? "is-live" : "is-retired"}">${r.isLive ? "Live" : "Retired"}</span>${fmtImtRange(r.firstSent, r.lastSent) ? ` · ${fmtImtRange(r.firstSent, r.lastSent)}` : ""}</div><div class="an-msg-clamp" title="Click to expand or collapse">${esc(r.template)}</div></td>
                       <td class="num">${r.prospects}</td>
                       <td class="num">${r.sends}</td>
                       <td class="num">${r.responded}</td>

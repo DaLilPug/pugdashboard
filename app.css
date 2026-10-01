@@ -1827,6 +1827,28 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
   overflow: visible;
 }
 
+/* Initial Message Testing: status + send-date line above each message.
+   Sits outside the clamp so expanding the text never moves or hides it. */
+.an-imt-status {
+  white-space: normal;
+  font-size: 11.5px;
+  line-height: 18px;
+  color: var(--gray-400);
+  margin-bottom: 4px;
+}
+.an-imt-pill {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  line-height: 16px;
+  vertical-align: 1px;
+}
+.an-imt-pill.is-live    { background: rgba(30, 182, 131, 0.12); color: #0d7a4f; }
+.an-imt-pill.is-retired { background: var(--gray-100); color: var(--gray-600); }
+
 /* Row-cap footer (Show 50 more / Show all). */
 .an-more {
   display: flex;
