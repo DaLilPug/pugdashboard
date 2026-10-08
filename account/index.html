@@ -4515,6 +4515,10 @@
             name:           r.name || "",
             email:          r.email || "",
             phone:          r.phone || "",
+            // Self-reported on LinkedIn, captured by the extension. Kept
+            // apart from `email` (work email) and shown only in the Edit
+            // form and the export.
+            linkedin_email: r.linkedin_email || "",
             company:        r.company || "",
             title:          r.title || "",
             linkedin_id:    r.linkedin_id    || null,
@@ -5344,6 +5348,10 @@
                   <span class="pr-form-label">Phone</span>
                   <input type="text" name="pr_phone" value="${esc(p.phone || "")}" autocomplete="off" />
                 </label>
+                <label class="pr-info-field">
+                  <span class="pr-form-label">LinkedIn email</span>
+                  <input type="text" name="pr_linkedin_email" value="${esc(p.linkedin_email || "")}" autocomplete="off" />
+                </label>
                 <label class="pr-info-field pr-info-field-wide">
                   <span class="pr-form-label">LinkedIn URL</span>
                   <input type="text" name="pr_profile_url" value="${esc(p.profile_url || "")}" autocomplete="off" placeholder="https://www.linkedin.com/in/..." />
@@ -5646,7 +5654,7 @@
 
         function buildExportRows(prospects) {
           const header = [
-            "Name", "Email", "Email Source", "Phone", "Phone Source",
+            "Name", "Email", "Email Source", "Phone", "Phone Source", "LinkedIn Email",
             "Company", "Title", "Status", "Sentiment",
             "Rating", "Notes",
             "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
@@ -5682,6 +5690,7 @@
               p.email_source || "",
               p.phone || "",
               p.phone_source || "",
+              p.linkedin_email || "",
               p.company || "",
               p.title || "",
               p.status,
@@ -7339,17 +7348,19 @@
             title:         (fd.get("pr_title")         || "").trim(),
             email:         (fd.get("pr_email")         || "").trim(),
             phone:         (fd.get("pr_phone")         || "").trim(),
+            linkedin_email:(fd.get("pr_linkedin_email")|| "").trim(),
             profile_url:   (fd.get("pr_profile_url")   || "").trim(),
             sales_nav_url: (fd.get("pr_sales_nav_url") || "").trim(),
           };
           const current = {
-            prospect_name: prospect.name          || "",
-            company:       prospect.company       || "",
-            title:         prospect.title         || "",
-            email:         prospect.email         || "",
-            phone:         prospect.phone         || "",
-            profile_url:   prospect.profile_url   || "",
-            sales_nav_url: prospect.sales_nav_url || "",
+            prospect_name: prospect.name           || "",
+            company:       prospect.company        || "",
+            title:         prospect.title          || "",
+            email:         prospect.email          || "",
+            phone:         prospect.phone          || "",
+            linkedin_email:prospect.linkedin_email || "",
+            profile_url:   prospect.profile_url    || "",
+            sales_nav_url: prospect.sales_nav_url  || "",
           };
           const patch = {};
           for (const k of Object.keys(next)) {
@@ -7400,15 +7411,17 @@
             // keeps an existing email/phone on purpose (a value captured
             // from LinkedIn must never overwrite a known one), so a manual
             // edit of either has to be written explicitly. Manual wins.
-            if ("email" in patch || "phone" in patch) {
+            if ("email" in patch || "phone" in patch || "linkedin_email" in patch) {
               await sb.sbFetch("/rest/v1/rpc/set_prospect_contact_by_id", {
                 method: "POST",
                 body: JSON.stringify({
-                  p_prospect_id: prospect.id,
-                  p_email:       "email" in patch ? patch.email : null,
-                  p_phone:       "phone" in patch ? patch.phone : null,
-                  p_set_email:   "email" in patch,
-                  p_set_phone:   "phone" in patch,
+                  p_prospect_id:        prospect.id,
+                  p_email:              "email" in patch ? patch.email : null,
+                  p_phone:              "phone" in patch ? patch.phone : null,
+                  p_linkedin_email:     "linkedin_email" in patch ? patch.linkedin_email : null,
+                  p_set_email:          "email" in patch,
+                  p_set_phone:          "phone" in patch,
+                  p_set_linkedin_email: "linkedin_email" in patch,
                 }),
               });
             }
@@ -7426,6 +7439,7 @@
               if ("title"         in patch) canonical.title         = patch.title         || "";
               if ("email"         in patch) canonical.email         = patch.email         || "";
               if ("phone"         in patch) canonical.phone         = patch.phone         || "";
+              if ("linkedin_email" in patch) canonical.linkedin_email = patch.linkedin_email || "";
               if ("profile_url"   in patch) canonical.profile_url   = patch.profile_url   || null;
               if ("sales_nav_url" in patch) canonical.sales_nav_url = patch.sales_nav_url || null;
             }
