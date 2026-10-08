@@ -4987,10 +4987,11 @@
                     <th class="pr-col-rating">Rating</th>
                     <th class="pr-col-events num">Events</th>
                     <th class="pr-col-last sortable ${lastSortClass}" data-action="sort-column" data-sort="lastTouch" title="Click to sort">Last touch<span class="sort-caret">${lastSortCaret}</span></th>
-                    <th class="pr-col-notes">Notes</th>
                     <th class="pr-col-email">Email</th>
+                    <th class="pr-col-phone">Phone</th>
                     <th class="pr-col-sn">Sales Nav</th>
                     <th class="pr-col-link">LinkedIn</th>
+                    <th class="pr-col-notes">Notes</th>
                   </tr>
                 </thead>
                 <tbody>${bodyHtml}</tbody>
@@ -5145,6 +5146,12 @@
           const emailCellHtml = p.email
             ? `<span class="pr-contact-text" data-action="copy-email" data-email="${esc(p.email)}" title="Click to copy: ${esc(p.email)}">${esc(p.email)}</span>`
             : (p.email_enrich_attempted_at ? naBtn : enrichBtn);
+          // Phone: same click-to-copy treatment. No enrich button here -
+          // phones arrive from the extension (self-reported on LinkedIn)
+          // or an import, never from Apollo enrichment.
+          const phoneCellHtml = p.phone
+            ? `<span class="pr-contact-text" data-action="copy-phone" data-phone="${esc(p.phone)}" title="Click to copy: ${esc(p.phone)}">${esc(p.phone)}</span>`
+            : `<span class="pr-link-empty">—</span>`;
 
           const isChecked = state.selected.has(p.key);
 
@@ -5171,13 +5178,14 @@
               <td class="pr-rating-cell">${ratingHtml}</td>
               <td class="num">${fmtInt(p.eventCount)}</td>
               <td class="pr-last">${esc(fmtDate(p.last_touch))}</td>
-              <td class="pr-notes-cell">${notesCellHtml}</td>
               <td class="pr-email-cell">${emailCellHtml}</td>
+              <td class="pr-phone-cell">${phoneCellHtml}</td>
               <td class="pr-sn">${snCell}</td>
               <td class="pr-link">${liCell}</td>
+              <td class="pr-notes-cell">${notesCellHtml}</td>
             </tr>
             <tr class="pr-timeline-row hidden" data-idx="${idx}">
-              <td colspan="13" class="pr-timeline-cell"></td>
+              <td colspan="14" class="pr-timeline-cell"></td>
             </tr>
           `;
         }
@@ -5638,7 +5646,7 @@
 
         function buildExportRows(prospects) {
           const header = [
-            "Name", "Email", "Email Source",
+            "Name", "Email", "Email Source", "Phone", "Phone Source",
             "Company", "Title", "Status", "Sentiment",
             "Rating", "Notes",
             "Connections", "InMails", "Messages", "Follow-ups", "Retargeting",
@@ -5672,6 +5680,8 @@
               p.name || "",
               p.email || "",
               p.email_source || "",
+              p.phone || "",
+              p.phone_source || "",
               p.company || "",
               p.title || "",
               p.status,
@@ -5890,7 +5900,7 @@
             handleRetryEnrich(actionEl);
             return;
           }
-          if (action === "copy-email") {
+          if (action === "copy-email" || action === "copy-phone") {
             clickEvt.preventDefault();
             clickEvt.stopPropagation();
             handleCopyEmail(actionEl);
@@ -6465,8 +6475,10 @@
           alert(`Bulk enrich complete: ${succeeded} matched, ${targets.length - succeeded - failed} no match, ${failed} failed.`);
         }
 
+        // Copies the cell's email or phone (data-email / data-phone) to the
+        // clipboard with a brief "Copied!" flash. Shared by both columns.
         function handleCopyEmail(el) {
-          const email = el.dataset.email;
+          const email = el.dataset.email || el.dataset.phone;
           if (!email) return;
           const flash = (msg, ok) => {
             const orig = el.textContent;
