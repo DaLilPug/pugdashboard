@@ -592,7 +592,7 @@
             <li><a href="#rb-surfaces">Where Reply Buddy works</a></li>
             <li><a href="#rb-sidebar">The sidebar layout</a></li>
             <li><a href="#rb-quick-buttons">Quick-action buttons</a></li>
-            <li><a href="#rb-instructions">Editing reply instructions inline</a></li>
+            <li><a href="#rb-instructions">Reply Instructions in the sidebar</a></li>
             <li><a href="#rb-blurb">Blurbs (AI-suggested replies)</a></li>
             <li><a href="#rb-sentiment">Sentiment + Log Response</a></li>
             <li><a href="#rb-multi-chat">Multiple chat overlays</a></li>
@@ -949,24 +949,33 @@
         dashboard.
       </p>
 
-      <h3 id="rb-instructions">2.5 - Editing reply instructions inline</h3>
+      <h3 id="rb-instructions">2.5 - Reply Instructions in the sidebar</h3>
       <p>
         Right below the LinkedIn Response card, there's a collapsible
-        <em>Edit reply instructions</em> drawer. Click to expand; you'll see a
-        textarea pre-filled with the current account's instructions (whatever
-        you set in the popup or on the dashboard's
-        <a href="#dash-replyinst">Reply Instructions tab</a>).
+        <em>Reply Instructions</em> row with a <strong>Notes | Prompt</strong>
+        switch. <em>Notes</em> are for the team working the account (who takes
+        over a technical reply, what not to promise), and the AI never reads
+        them. <em>Prompt</em> is what the AI follows when it drafts a blurb, the
+        same text as the dashboard's
+        <a href="#dash-replyinst">Reply Instructions tab</a>.
+      </p>
+      <p>
+        The row opens on its own only when the account has team notes; small
+        dots in the row header show which of the two exist. Click the expand
+        icon on the right to open a larger editor; Escape, the backdrop or the
+        x closes it.
       </p>
       <p>
         Edit, click <strong>Save</strong>, and the next blurb the AI drafts
-        will follow the new instructions immediately. The status line ("Unsaved"
-        → "Saving…" → "Saved") shows you where you are.
+        will follow the new prompt immediately. The status line ("Unsaved"
+        → "Saving…" → "Saved") shows you where you are. Under Notes, a
+        "Last edited by" line shows who wrote the note and when.
       </p>
       <p>
         Tip: this is where a tone change goes when you want it to stick. Add a
         one-liner like "Keep responses under 40 words" or "Always sign off with
-        my first name" and save. If you only want to fix the one blurb in front
-        of you, use the <em>Revise</em> box instead
+        my first name" to the Prompt and save. If you only want to fix the one
+        blurb in front of you, use the <em>Revise</em> box instead
         (<a href="#rb-blurb">2.6</a>).
       </p>
 
@@ -2583,9 +2592,14 @@
 
       <h3 id="dash-replyinst">8.10 - Per-account: Reply Instructions</h3>
       <p>
-        A free-form text box that guides the AI suggested replies in the
-        extension sidebar. When it drafts a reply, the AI reads these
-        instructions along with the message you sent and the prospect's reply.
+        Two boxes. <strong>Team Notes</strong> (on top) are for the people
+        working the account: who takes over a technical reply, what not to
+        promise. They show in the Reply Buddy sidebar with a "Last edited by"
+        line, and the AI never reads them. <strong>AI Reply Prompt</strong> is
+        the free-form text that guides the AI suggested replies in the
+        extension sidebar. When it drafts a reply, the AI reads this prompt
+        along with the message you sent and the prospect's reply. The rest of
+        this section is about the prompt.
       </p>
 
       <p>
@@ -2614,8 +2628,8 @@
         A few things that help: keep each sample short (the AI matches your
         length), use your real phrasing, and put any "always do this" rule
         (like where to send your booking link) right at the top. You can edit
-        these any time here or from the <em>Edit reply instructions</em> drawer
-        in the extension, and the next blurb picks up your changes right away.
+        these any time here or from the <em>Reply Instructions</em> row in the
+        extension (Prompt side), and the next blurb picks up your changes right away.
       </p>
 
       <h3 id="dash-assets">8.11 - Per-account: Assets</h3>
@@ -4038,9 +4052,9 @@
         <summary>The blurbs Reply Buddy generates don't sound like me. How do I fix that?</summary>
         <div class="details-body">
           <p>
-            Open the <em>Edit reply instructions</em> drawer right below the
-            LinkedIn Response card in the Reply Buddy sidebar
-            (<a href="#rb-instructions">section 2.5</a>). Add specifics: tone,
+            Open the <em>Reply Instructions</em> row right below the
+            LinkedIn Response card in the Reply Buddy sidebar and switch to
+            <em>Prompt</em> (<a href="#rb-instructions">section 2.5</a>). Add specifics: tone,
             length, signature, default closing, words to avoid. Save. The next
             blurb the AI drafts will follow the new instructions immediately.
           </p>
