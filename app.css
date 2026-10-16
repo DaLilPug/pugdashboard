@@ -2914,7 +2914,27 @@ textarea.fu-preview-edit:focus { border-color: var(--navy); }
 }
 .lnk-url-d:focus { border-color: var(--accent); outline: none; }
 
-/* ---------- Reply Instructions tab ---------- */
+/* ---------- Instructions tab (Team Notes + AI Reply Prompt) ---------- */
+
+.rpl-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+.rpl-stack > .cad-editor { max-width: none; }
+
+/* Team Notes are a few lines, not a page: shorter floor than the prompt. */
+.rpl-text-d.is-notes { min-height: 120px; }
+
+/* "Last edited by Sean Innerst, Oct 16, 2026" - quiet, right-aligned. */
+.rpl-meta {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--gray-400);
+  white-space: nowrap;
+}
+
 
 .rpl-text-d {
   width: 100%;

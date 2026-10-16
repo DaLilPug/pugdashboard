@@ -102,7 +102,7 @@
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
     <button class="sub-tab"        data-tab="followups"     type="button" data-internal>Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"       type="button" data-internal>Cadence</button>
-    <button class="sub-tab"        data-tab="replyinst"     type="button" data-internal>Reply Instructions</button>
+    <button class="sub-tab"        data-tab="replyinst"     type="button" data-internal>Instructions</button>
     <button class="sub-tab"        data-tab="assets"        type="button" data-internal>Assets</button>
     <button class="sub-tab"        data-tab="integrations"  type="button" data-internal>Integrations</button>
     <button class="sub-tab"        data-tab="analysis"      type="button" data-internal>Analysis</button>
@@ -624,21 +624,45 @@
       </div>
     </section>
 
-    <!-- =================== REPLY INSTRUCTIONS ==================== -->
+    <!-- =================== INSTRUCTIONS ==================== -->
+    <!-- Two boxes, Team Notes first. Team Notes are for the people working
+         the account (the strategist's "leave technical replies for Chris"
+         kind of note) and are never sent to the AI. The AI Reply Prompt is
+         what the suggest-reply Edge Function reads verbatim. The same two
+         fields show in Reply Buddy under the LinkedIn Response card. -->
     <section id="panel-replyinst" class="sub-panel hidden">
-      <div class="cad-editor">
-        <div class="cad-head">
-          <h2>Reply Instructions</h2>
-          <p class="page-sub">
-            Guidance for the AI when it drafts suggested replies in the Reply Buddy sidebar on LinkedIn.
-            Injected alongside the message sent and the pasted LinkedIn response.
-          </p>
+      <div class="rpl-stack">
+        <div class="cad-editor">
+          <div class="cad-head">
+            <h2>Team Notes</h2>
+            <p class="page-sub">
+              Notes for whoever works this account: when to hand a reply to the client, who to send
+              contact details to, anything the AI should not decide. Shown in Reply Buddy. The AI does not read these.
+            </p>
+          </div>
+          <textarea id="tn-text" class="rpl-text-d is-notes"
+                    placeholder="e.g. If a reply gets technical, leave it for Chris. Send phone numbers and emails to Richie and Michael."></textarea>
+          <div class="cad-actions">
+            <button id="tn-save" class="cad-save" type="button" disabled>Save</button>
+            <span   id="tn-feedback" class="cad-feedback"></span>
+            <span   id="tn-meta" class="rpl-meta"></span>
+          </div>
         </div>
-        <textarea id="rpl-text" class="rpl-text-d"
-                  placeholder="e.g. Warm but brief. We help SaaS teams cut churn. If pricing comes up, pivot to a quick call. Never quote numbers."></textarea>
-        <div class="cad-actions">
-          <button id="rpl-save" class="cad-save" type="button" disabled>Save</button>
-          <span   id="rpl-feedback" class="cad-feedback"></span>
+
+        <div class="cad-editor">
+          <div class="cad-head">
+            <h2>AI Reply Prompt</h2>
+            <p class="page-sub">
+              What the AI follows when it drafts suggested replies in the Reply Buddy sidebar on LinkedIn.
+              Injected alongside the message sent and the pasted LinkedIn response.
+            </p>
+          </div>
+          <textarea id="rpl-text" class="rpl-text-d"
+                    placeholder="e.g. Warm but brief. We help SaaS teams cut churn. If pricing comes up, pivot to a quick call. Never quote numbers."></textarea>
+          <div class="cad-actions">
+            <button id="rpl-save" class="cad-save" type="button" disabled>Save</button>
+            <span   id="rpl-feedback" class="cad-feedback"></span>
+          </div>
         </div>
       </div>
     </section>
@@ -1110,7 +1134,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,auto_enrich_on_acceptance,auto_enrich_mode&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,team_notes,team_notes_updated_at,team_notes_updated_by,auto_enrich_on_acceptance,auto_enrich_mode&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
@@ -10362,12 +10386,90 @@
         }
       }
 
-      // ================= REPLY INSTRUCTIONS ===========================
+      // ================= INSTRUCTIONS (Team Notes + AI Reply Prompt) ===
       //
-      // Single-field editor backing client.reply_instructions. The Edge
-      // Function that generates suggested replies reads this verbatim.
+      // Two single-field editors on one tab. Team Notes back
+      // client.team_notes (+ _updated_at / _updated_by, stamped here on
+      // save with the signed-in user's name so the team can see who wrote
+      // the note and when). The AI Reply Prompt backs
+      // client.reply_instructions, which the suggest-reply Edge Function
+      // reads verbatim. Team Notes never reach the AI.
+
+      function currentUserName() {
+        const u = session.user || {};
+        const m = u.user_metadata || {};
+        return (m.name || m.full_name || u.email || "").trim();
+      }
+
+      function fmtEditedLine(by, at) {
+        if (!at && !by) return "";
+        let when = "";
+        if (at) {
+          const d = new Date(at);
+          if (!isNaN(d)) when = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        }
+        if (by && when) return `Last edited by ${by}, ${when}`;
+        if (by)         return `Last edited by ${by}`;
+        return `Last edited ${when}`;
+      }
+
+      function initTeamNotes() {
+        const textEl     = document.getElementById("tn-text");
+        const saveBtn    = document.getElementById("tn-save");
+        const feedbackEl = document.getElementById("tn-feedback");
+        const metaEl     = document.getElementById("tn-meta");
+
+        textEl.value = typeof client.team_notes === "string" ? client.team_notes : "";
+        metaEl.textContent = fmtEditedLine(client.team_notes_updated_by, client.team_notes_updated_at);
+        autoGrow(textEl);
+
+        textEl.addEventListener("input", () => {
+          autoGrow(textEl);
+          saveBtn.disabled = false;
+          feedbackEl.textContent = "";
+          feedbackEl.className = "cad-feedback";
+        });
+
+        saveBtn.addEventListener("click", async () => {
+          const text = (textEl.value || "").trim();
+          const by   = currentUserName();
+          const at   = new Date().toISOString();
+          saveBtn.disabled = true;
+          feedbackEl.className = "cad-feedback";
+          feedbackEl.textContent = "Saving…";
+          try {
+            await sb.sbFetch(
+              `/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`,
+              {
+                method: "PATCH",
+                body:   JSON.stringify({
+                  team_notes:            text === "" ? null : text,
+                  team_notes_updated_at: at,
+                  team_notes_updated_by: by || null,
+                }),
+                headers:{ Prefer: "return=minimal" },
+              }
+            );
+            client.team_notes            = text === "" ? null : text;
+            client.team_notes_updated_at = at;
+            client.team_notes_updated_by = by || null;
+            textEl.value = text;
+            autoGrow(textEl);
+            metaEl.textContent = fmtEditedLine(by, at);
+            saveBtn.disabled = true;
+            feedbackEl.className = "cad-feedback ok";
+            feedbackEl.textContent = "Saved.";
+            setTimeout(() => { feedbackEl.textContent = ""; feedbackEl.className = "cad-feedback"; }, 2400);
+          } catch (err) {
+            saveBtn.disabled = false;
+            feedbackEl.className = "cad-feedback err";
+            feedbackEl.textContent = err.message || "Save failed";
+          }
+        });
+      }
 
       function initReplyInstructions() {
+        initTeamNotes();
         const textEl     = document.getElementById("rpl-text");
         const saveBtn    = document.getElementById("rpl-save");
         const feedbackEl = document.getElementById("rpl-feedback");
