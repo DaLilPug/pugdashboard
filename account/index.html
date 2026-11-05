@@ -4491,6 +4491,27 @@
         // win — sequential 12-page Josh load was ~1.5s; parallelized
         // it's ~300ms (2 batches × ~150ms).
         async function fetchAllProspectSummary(since, until) {
+          // One call that returns the whole list as JSON. The paged RPC
+          // below recomputes the full aggregation on every page, and 8
+          // pages in flight at once took 15-55s each on a 17k-prospect
+          // account (Conor, Nov 2026), so All Time never finished loading.
+          try {
+            const rows = await sb.sbFetch(`/rest/v1/rpc/prospect_summary_json_for_client`, {
+              method: "POST",
+              body: JSON.stringify({
+                p_client_id: clientId,
+                p_since: since ? new Date(since).toISOString() : null,
+                p_until: until,
+              }),
+            });
+            if (Array.isArray(rows)) return rows;
+          } catch (err) {
+            console.warn("prospect_summary_json_for_client failed, paging instead:", err.message || err);
+          }
+          return fetchPagedProspectSummary(since, until);
+        }
+
+        async function fetchPagedProspectSummary(since, until) {
           const PAGE  = 1000;
           const BATCH = 8;       // pages in flight per round
           const MAX_PAGES = 64;  // ceiling = 64k prospects (pragmatic)
