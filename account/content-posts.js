@@ -748,7 +748,7 @@
   // way, which now counts as posted. Without: a post we never held here.
   function openLink(post) {
     const m = openModal(`<div class="cp-modal-body"><h3>${post ? "Add the link to this post" : "Add a post that is already on LinkedIn"}</h3>
-        <p>On LinkedIn, open the post's menu and choose Copy link to post. ${post ? "With the link in place the post counts as posted and its numbers come in overnight." : "Its date and first line come from the link, and its numbers come in right after."}</p>
+        <p>On LinkedIn, click the three dots on the post and choose Copy link to post. Then paste it here.${post ? " This marks the post as posted." : ""}</p>
         <label class="cp-field-block">Link to the post<input type="url" class="cp-input" data-u placeholder="https://www.linkedin.com/posts/..." /></label>
         <p class="cp-modal-msg"></p></div>
       <div class="cp-modal-foot"><button type="button" class="cp-btn cp-btn-ghost" data-close>Cancel</button><button type="button" class="cp-btn cp-btn-primary" data-ok>Save</button></div>`, { cls: "cp-modal-md" });
