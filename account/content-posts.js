@@ -359,7 +359,7 @@
     const conn = connHtml();
     let html = `<div class="cp-top"><div><h2 class="cp-title">Posts</h2>
         ${team ? "" : `<p class="cp-sub">Read each post, approve it, or highlight any words to leave a comment.</p>`}
-        ${conn ? `<p class="cp-sub cp-conn-line">${conn}</p>` : ""}</div>
+        ${conn ? `<div class="cp-sub cp-conn-line">${conn}</div>` : ""}</div>
         ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
       </div>${perfHtml()}`;
     let any = false;
