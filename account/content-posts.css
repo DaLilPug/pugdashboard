@@ -14,7 +14,7 @@
   --cp-mark-on: #ffd95a;
 }
 .cp {
-  max-width: 940px;
+  max-width: 1010px;
   margin: 0 auto;
   padding-bottom: 80px;
 }
@@ -42,16 +42,18 @@
 .cp-more-sm { padding: 0 8px 6px; margin: -6px -8px -6px 0; }
 .cp-menu-note { padding: 8px 12px 6px; margin-top: 4px; border-top: 1px solid var(--li-line); font-size: 12px; line-height: 16px; color: var(--gray-400); }
 
+.cp-viewlink { font-size: 12.5px; margin-right: 10px; }
+.cp-when { margin-left: 6px; }
+
 /* the Posted section: the list on the left, its totals on the right */
-.cp-posted-grid { display: grid; grid-template-columns: minmax(0, 555px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.cp-posted-grid { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .cp-row-posted { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .cp-row-posted .cp-thread-foot, .cp-row-posted .cp-msg-del { display: none; }
 .cp-older { margin: 4px 2px 0; font-size: 13px; color: var(--gray-400); font-family: Inter, sans-serif; }
-.cp-totals { position: sticky; top: 88px; max-width: 365px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--li-line); padding: 14px 16px 8px; font-family: Inter, sans-serif; }
+.cp-totals { position: sticky; top: 88px; max-width: 365px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--li-line); padding: 6px 16px; font-family: Inter, sans-serif; }
 .cp-pills { display: flex; gap: 2px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
 .cp-pill { flex: 1 1 auto; border: 0; background: none; border-radius: 999px; padding: 6px 8px; font: 600 12px Inter, sans-serif; color: var(--gray-600); cursor: pointer; white-space: nowrap; }
 .cp-pill-on { background: var(--navy); color: #fff; }
-.cp-total-list { margin-top: 8px; }
 .cp-total { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; padding: 11px 2px; background: none; border: 0; border-bottom: 1px solid var(--li-line); text-align: left; font-family: Inter, sans-serif; }
 .cp-total:last-child { border-bottom: 0; }
 .cp-total-btn { cursor: pointer; }
@@ -82,7 +84,7 @@
 .cp-empty p:last-child { margin-bottom: 0; }
 
 /* ---- a post and its comments, side by side ---- */
-.cp-row { display: grid; grid-template-columns: minmax(0, 555px) minmax(0, 1fr); gap: 20px; align-items: start; margin-bottom: 22px; }
+.cp-row { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 20px; align-items: start; margin-bottom: 22px; }
 .cp-card {
   background: #fff; border-radius: 8px; box-shadow: 0 0 0 1px var(--li-line), 0 2px 6px rgba(1, 58, 82, .05);
   font-family: -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--li-text);
@@ -128,9 +130,9 @@ a.cp-blue:hover { text-decoration: underline; }
 .cp-imgs-5 .cp-img:nth-child(-n+2) { grid-column: span 3; }
 .cp-img-more { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); color: #fff; font-size: 26px; font-weight: 600; display: flex; align-items: center; justify-content: center; z-index: 1; }
 
-.cp-stats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; margin-top: 8px; border-top: 1px solid var(--li-line); font-size: 12.5px; color: var(--li-muted); }
+.cp-stats { padding: 10px 16px; margin-top: 8px; border-top: 1px solid var(--li-line); font-size: 12px; color: var(--li-muted); }
 .cp-stats b { color: var(--li-text); font-weight: 600; }
-.cp-dot { display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin: 0 7px; vertical-align: middle; opacity: .6; }
+.cp-dot { display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin: 0 6px; vertical-align: middle; opacity: .6; }
 .cp-error { margin: 10px 16px 0; padding: 9px 12px; background: var(--red-light); color: #b42318; border-radius: 8px; font-size: 13px; font-family: Inter, sans-serif; }
 .cp-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; margin-top: 8px; border-top: 1px solid var(--li-line); font-family: Inter, sans-serif; }
 

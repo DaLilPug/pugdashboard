@@ -178,10 +178,10 @@
       else if (p.status === "scheduled") main = b("edit", "Edit", "cp-btn-ghost");
     } else if (p.status === "draft") {
       main = b("send", "Send for approval", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["link", "Already posted? Add the link"], ["delete", "Delete", true]]);
+      more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["delete", "Delete", true]]);
     } else if (p.status === "ready") {
       main = b("approve", "Mark approved", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["todraft", "Back to draft"], ["link", "Already posted? Add the link"], ["delete", "Delete", true]]);
+      more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["todraft", "Back to draft"], ["delete", "Delete", true]]);
     } else if (p.status === "approved") {
       main = b("schedule", "Schedule", "cp-btn-primary") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost");
       more = menu([["unapprove", "Back to waiting for approval"], ["link", "Already posted? Add the link"], ["delete", "Delete", true]]);
@@ -195,16 +195,16 @@
     return main || more ? `<div class="cp-actions">${main}<span class="cp-grow"></span>${more}</div>` : "";
   }
 
-  function postedMenuHtml() {
-    if (S.isShare) return "";
-    return `<span class="cp-grow"></span><div class="cp-menu-wrap"><button type="button" class="cp-btn cp-btn-quiet cp-more cp-more-sm" data-act="menu" aria-label="More">&#8943;</button>
+  function postedMenuHtml(p) {
+    const link = p.url ? `<a class="cp-blue cp-viewlink" href="${esc(p.url)}" target="_blank" rel="noopener">View on LinkedIn</a>` : "";
+    if (S.isShare) return `<span class="cp-grow"></span>${link}`;
+    return `<span class="cp-grow"></span>${link}<div class="cp-menu-wrap"><button type="button" class="cp-btn cp-btn-quiet cp-more cp-more-sm" data-act="menu" aria-label="More">&#8943;</button>
       <div class="cp-menu cp-menu-down cp-menu-end hidden"><button type="button" class="cp-menu-item cp-danger" data-act="delete">Remove from this list</button></div></div>`;
   }
 
   function statsHtml(p) {
     if (p.status !== "posted") return "";
-    const link = p.url ? `<a class="cp-blue" href="${esc(p.url)}" target="_blank" rel="noopener">View on LinkedIn</a>` : "";
-    if (!p.metrics_at) return link ? `<div class="cp-stats">${link}</div>` : "";
+    if (!p.metrics_at) return "";
     const parts = [
       `<b>${num(p.impressions)}</b> impressions`, `<b>${num(p.reactions)}</b> reactions`,
       `<b>${num(p.comments)}</b> comments`, `<b>${num(p.reshares)}</b> reposts`,
@@ -213,7 +213,7 @@
     const has = (v) => v !== null && v !== undefined;
     if (has(p.cta_clicks)) parts.push(`<span title="Clicks on the profile button shown on the post, such as Visit my website"><b>${num(p.cta_clicks)}</b> button clicks</span>`);
     if (has(p.link_clicks)) parts.push(`<span title="Clicks on links inside the post"><b>${num(p.link_clicks)}</b> link clicks</span>`);
-    return `<div class="cp-stats"><span>${parts.join('<i class="cp-dot"></i>')}</span><span class="cp-grow"></span>${link}</div>`;
+    return `<div class="cp-stats">${parts.join('<i class="cp-dot"></i>')}</div>`;
   }
 
   // ---- comments beside the post ---------------------------------------------
@@ -277,7 +277,7 @@
     const viaEmbed = posted && !p.body && embedSrc(p);
     const err = p.publish_error && !S.isShare ? `<div class="cp-error">${esc(p.publish_error)}</div>` : "";
     const strip = p.status === "draft" || p.status === "ready" ? ""
-      : `<div class="cp-status cp-status-${p.status}"><span>${esc(statusLine(p))}</span>${posted ? postedMenuHtml() : ""}</div>`;
+      : `<div class="cp-status cp-status-${p.status}"><span>${esc(statusLine(p))}</span>${posted ? postedMenuHtml(p) : ""}</div>`;
     const head = viaEmbed ? "" : `<header class="cp-head">${avatarHtml()}
           <div class="cp-head-text"><div class="cp-name">${esc(pr.name)}</div>
           ${pr.headline ? `<div class="cp-headline">${esc(pr.headline)}</div>` : ""}</div></header>`;
@@ -300,7 +300,7 @@
   ];
 
   // ---- how the posts are doing ------------------------------------------------
-  const TIMEFRAMES = [["1m", "1 month"], ["3m", "3 months"], ["yr", "This year"], ["all", "All time"]];
+  const TIMEFRAMES = [["all", "All time"], ["yr", "This year"], ["3m", "Last 3 months"], ["1m", "Last month"]];
   function cutoffDay() {
     const now = new Date();
     if (S.tf === "1m") { now.setMonth(now.getMonth() - 1); return now.toISOString().slice(0, 10); }
@@ -339,11 +339,9 @@
       latest ? row("Followers", num(latest.followers),
         delta === null ? "" : `${delta >= 0 ? "+" : ""}${num(delta)}`, fol.length > 1 ? "chart" : "") : "",
     ].join("");
-    const pills = TIMEFRAMES.map(([k, label]) =>
-      `<button type="button" class="cp-pill${S.tf === k ? " cp-pill-on" : ""}" data-act="tf" data-tf="${k}">${label}</button>`).join("");
     const chart = S.showChart && fol.length > 1
       ? `<div class="cp-chart"><div class="cp-chart-note">Followers each day since ${fmtDate(fol[0].captured_on)}</div><div class="cp-chart-box"><canvas></canvas></div></div>` : "";
-    return `<aside class="cp-totals"><div class="cp-pills">${pills}</div><div class="cp-total-list">${rows}</div>${chart}</aside>`;
+    return `<aside class="cp-totals"><div class="cp-total-list">${rows}</div>${chart}</aside>`;
   }
 
   // The order of the posted list: newest, or highest on any one number.
@@ -461,8 +459,10 @@
   function postedToolsHtml(total) {
     const sort = total > 1 ? `<select class="cp-sort" aria-label="Order of posted posts">${SORTS.map(([k, label]) =>
       `<option value="${k}"${S.postedSort === k ? " selected" : ""}>${label}</option>`).join("")}</select>` : "";
+    const when = `<select class="cp-sort cp-when" aria-label="Timeframe">${TIMEFRAMES.map(([k, label]) =>
+      `<option value="${k}"${S.tf === k ? " selected" : ""}>${label}</option>`).join("")}</select>`;
     const add = S.isShare ? "" : `<button type="button" class="cp-btn cp-btn-quiet cp-addpost" data-act="external">+ Add a post</button>`;
-    return `<span class="cp-grow"></span>${sort}${add}`;
+    return `<span class="cp-grow"></span>${sort}${when}${add}`;
   }
 
   function refreshRow(postId) {
@@ -960,7 +960,11 @@
     S.root.addEventListener("keydown", onKey);
     S.root.addEventListener("mouseover", onHover);
     S.root.addEventListener("change", (e) => {
-      if (e.target.classList && e.target.classList.contains("cp-sort")) { S.postedSort = e.target.value; render(); }
+      const el = e.target;
+      if (!el.classList || !el.classList.contains("cp-sort")) return;
+      if (el.classList.contains("cp-when")) { S.tf = el.value; S.postedShown = POSTED_PAGE; }
+      else S.postedSort = el.value;
+      render();
     });
 
     // Back from LinkedIn's approval screen: say how it went, tidy the address,
