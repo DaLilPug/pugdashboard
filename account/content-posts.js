@@ -350,7 +350,7 @@
   const SORTS = [
     ["newest", "Newest first"], ["impressions", "Most impressions"], ["reactions", "Most reactions"],
     ["comments", "Most comments"], ["reshares", "Most reposts"], ["cta_clicks", "Most button clicks"],
-    ["link_clicks", "Most link clicks"], ["rate", "Highest engagement rate"],
+    ["link_clicks", "Most link clicks"], ["rate", "Highest engagement"],
   ];
   function sortPosted(list) {
     const newest = (a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || ""));
@@ -409,7 +409,7 @@
     const root = S.root;
     const team = !S.isShare;
     const conn = connHtml();
-    let html = `<div class="cp-top"><div><h2 class="cp-title">Posts</h2>
+    let html = `<div class="cp-top"><div>
         ${team ? "" : `<p class="cp-sub">Read each post, approve it, or highlight any words to leave a comment.</p>`}
         ${conn ? `<div class="cp-sub cp-conn-line">${conn}</div>` : ""}</div>
         ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
@@ -428,12 +428,13 @@
         const older = all.length - inWin.length;
         const list = sortPosted(inWin).slice(0, S.postedShown);
         const olderLine = older ? `<p class="cp-older">${older} older ${older === 1 ? "post is" : "posts are"} outside this timeframe. <button type="button" class="cp-conn cp-conn-link" data-act="tf" data-tf="all">Show all time</button></p>` : "";
-        html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${inWin.length}</span>${postedToolsHtml(inWin.length)}</h3>
-          <div class="cp-posted-grid"><div class="cp-posted-list">
+        html += `<section class="cp-section">
+          <div class="cp-posted-grid"><div class="cp-posted-list"><h3 class="cp-section-title cp-posted-head">${esc(title)}<span class="cp-count">${inWin.length}</span></h3>
             ${list.map(rowHtml).join("")}
             ${!all.length ? `<p class="cp-older">Nothing posted yet.</p>` : ""}
             ${inWin.length > list.length ? `<button type="button" class="cp-btn cp-btn-ghost cp-showmore" data-act="moreposted">Show ${Math.min(POSTED_PAGE, inWin.length - list.length)} more</button>` : ""}
-            ${olderLine}</div>${totalsHtml(inWin)}</div></section>`;
+            ${olderLine}</div>
+            <div class="cp-posted-side"><div class="cp-posted-tools">${postedToolsHtml(inWin.length)}</div>${totalsHtml(inWin)}</div></div></section>`;
         continue;
       }
       if (!all.length) continue;
@@ -463,7 +464,7 @@
     const when = `<select class="cp-sort cp-when" aria-label="Timeframe">${TIMEFRAMES.map(([k, label]) =>
       `<option value="${k}"${S.tf === k ? " selected" : ""}>${label}</option>`).join("")}</select>`;
     const add = S.isShare ? "" : `<button type="button" class="cp-btn cp-btn-quiet cp-addpost" data-act="external">+ Add a post</button>`;
-    return `<span class="cp-grow"></span>${sort}${when}${add}`;
+    return `${sort}${when}<span class="cp-grow"></span>${add}`;
   }
 
   // After a post moves to another section (sent, approved, scheduled...), bring
