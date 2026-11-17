@@ -4,7 +4,10 @@
 // from "waiting for approval" on, can approve it, edit it, and highlight any
 // words to comment on them. The team also sees drafts, writes posts in a
 // composer that looks like LinkedIn's, schedules and publishes them, and can
-// add the link of a post that went live some other way.
+// add the link of a post that went live some other way. The top of the tab
+// carries how the posts are doing (posts, impressions, engagement rate,
+// followers) and one quiet line for the LinkedIn connection; this tab replaced
+// the old internal Content tab on 11/17/26.
 //
 // Data: content_posts (+ content_posts_latest for numbers) and
 // content_post_comments, both gated by has_client_access; drafts are hidden
@@ -64,14 +67,16 @@
 
   // ---- loading -------------------------------------------------------------
   async function load() {
-    const [posts, comments, integ] = await Promise.all([
+    const [posts, comments, integ, followers] = await Promise.all([
       sb.sbFetch(`/rest/v1/content_posts_latest?select=*&client_id=eq.${cid()}&order=created_at.asc`),
       sb.sbFetch(`/rest/v1/content_post_comments?select=*&client_id=eq.${cid()}&order=created_at.asc`),
-      sb.sbFetch(`/rest/v1/integrations?select=id,scope_metadata&client_id=eq.${cid()}&purpose=eq.content_analytics&limit=1`).catch(() => []),
+      sb.sbFetch(`/rest/v1/integrations?select=id,scope_metadata,last_sync_ok_at,last_sync_error&client_id=eq.${cid()}&purpose=eq.content_analytics&limit=1`).catch(() => []),
+      sb.sbFetch(`/rest/v1/content_follower_snapshots?select=captured_on,followers&client_id=eq.${cid()}&order=captured_on.asc`).catch(() => []),
     ]);
     S.posts = posts || [];
     S.comments = comments || [];
     S.integ = (integ && integ[0]) || null;
+    S.followers = followers || [];
   }
 
   async function patchPost(id, fields) {
@@ -272,39 +277,130 @@
     { key: "posted",    title: "Posted",                  has: (p) => p.status === "posted" },
   ];
 
+  // ---- how the posts are doing ------------------------------------------------
+  const TIMEFRAMES = [["1m", "1 month"], ["3m", "3 months"], ["yr", "This year"], ["all", "All time"]];
+  function cutoffDay() {
+    const now = new Date();
+    if (S.tf === "1m") { now.setMonth(now.getMonth() - 1); return now.toISOString().slice(0, 10); }
+    if (S.tf === "3m") { now.setMonth(now.getMonth() - 3); return now.toISOString().slice(0, 10); }
+    if (S.tf === "yr") return `${now.getFullYear()}-01-01`;
+    return null;
+  }
+  function perfHtml() {
+    const posted = S.posts.filter((p) => p.status === "posted");
+    const fol = S.followers;
+    const latest = fol.length ? fol[fol.length - 1] : null;
+    if (!posted.length && !latest) return "";
+    const cut = cutoffDay();
+    const inWin = cut ? posted.filter((p) => String(p.posted_on || "") >= cut) : posted;
+    const measured = inWin.filter((p) => p.impressions !== null && p.impressions !== undefined);
+    const imp = measured.reduce((s, p) => s + (p.impressions || 0), 0);
+    const eng = measured.reduce((s, p) => s + (p.reactions || 0) + (p.comments || 0) + (p.reshares || 0), 0);
+    let delta = null;
+    if (latest) {
+      const first = cut ? fol.find((f) => f.captured_on >= cut) : fol[0];
+      if (first && first.captured_on !== latest.captured_on) delta = latest.followers - first.followers;
+    }
+    const tile = (label, value, sub, act) =>
+      `<${act ? `button type="button" data-act="${act}"` : "div"} class="cp-tile${act ? " cp-tile-btn" : ""}">
+        <span class="cp-tile-label">${label}</span><span class="cp-tile-value">${value}</span>${sub ? `<span class="cp-tile-sub">${sub}</span>` : ""}</${act ? "button" : "div"}>`;
+    const tiles = [
+      tile("Posts", num(inWin.length)),
+      tile("Impressions", measured.length ? num(imp) : "-"),
+      tile("Engagement rate", imp ? (100 * eng / imp).toFixed(1) + "%" : "-"),
+      latest ? tile("Followers", num(latest.followers),
+        delta === null ? "" : `${delta >= 0 ? "+" : ""}${num(delta)}`, fol.length > 1 ? "chart" : "") : "",
+    ].join("");
+    const pills = TIMEFRAMES.map(([k, label]) =>
+      `<button type="button" class="cp-pill${S.tf === k ? " cp-pill-on" : ""}" data-act="tf" data-tf="${k}">${label}</button>`).join("");
+    const chart = S.showChart && fol.length > 1
+      ? `<div class="cp-chart"><div class="cp-chart-note">Followers each day since ${fmtDate(fol[0].captured_on)}</div><div class="cp-chart-box"><canvas></canvas></div></div>` : "";
+    return `<div class="cp-perf"><div class="cp-tiles">${tiles}</div><div class="cp-pills">${pills}</div></div>${chart}`;
+  }
+  function drawChart() {
+    const canvas = S.root.querySelector(".cp-chart canvas");
+    if (S.chart) { S.chart.destroy(); S.chart = null; }
+    if (!canvas || typeof Chart === "undefined") return;
+    const fol = S.followers;
+    S.chart = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: { labels: fol.map((f) => fmtDate(f.captured_on)), datasets: [{
+        data: fol.map((f) => f.followers), borderColor: "#1EB683", backgroundColor: "rgba(30,182,131,.12)",
+        fill: true, tension: .25, pointRadius: fol.length > 60 ? 0 : 2, borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${num(c.parsed.y)} followers` } } },
+        scales: { x: { ticks: { maxTicksLimit: 8, font: { size: 11 } }, grid: { display: false } },
+                  y: { ticks: { precision: 0, font: { size: 11 } }, grid: { color: "rgba(0,0,0,.05)" } } },
+      },
+    });
+  }
+
+  // ---- the LinkedIn connection, in one quiet line -------------------------------
+  function connHtml() {
+    const link = (label) => `<button type="button" class="cp-conn cp-conn-link" data-act="connect">${label}</button>`;
+    if (!S.integ) return link("Connect LinkedIn");
+    const err = String(S.integ.last_sync_error || "");
+    if (err.startsWith("reconnect_required") || !canPublish()) {
+      return `<span class="cp-conn-warn">LinkedIn needs to be connected again.</span> ${link("Reconnect")}`;
+    }
+    if (S.isShare) return "";
+    const last = S.integ.last_sync_ok_at ? `Last refreshed ${fmtDate(S.integ.last_sync_ok_at)} at ${fmtTime(S.integ.last_sync_ok_at)}.` : "";
+    return `<span class="cp-menu-wrap"><button type="button" class="cp-conn" data-act="menu">Connected as ${esc(profile().name)} <span class="cp-caret">&#9662;</span></button>
+      <div class="cp-menu cp-menu-down hidden">
+        <button type="button" class="cp-menu-item" data-act="sync">Refresh numbers now</button>
+        <button type="button" class="cp-menu-item cp-danger" data-act="disconnect">Disconnect LinkedIn</button>
+        <div class="cp-menu-note">Numbers refresh on their own every night. ${last}</div></div></span>`;
+  }
+
   function render() {
     const root = S.root;
     const team = !S.isShare;
+    const conn = connHtml();
     let html = `<div class="cp-top"><div><h2 class="cp-title">Posts</h2>
-        <p class="cp-sub">${team
-          ? (canPublish() ? `Approved posts publish to LinkedIn as ${esc(profile().name)}.`
-                          : `LinkedIn is not connected for publishing on this account yet. <a href="#content" data-act="gocontent">Connect it on the Content tab</a>.`)
-          : "Read each post, approve it, or highlight any words to leave a comment."}</p></div>
+        ${team ? "" : `<p class="cp-sub">Read each post, approve it, or highlight any words to leave a comment.</p>`}
+        ${conn ? `<p class="cp-sub cp-conn-line">${conn}</p>` : ""}</div>
         ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
-      </div>`;
+      </div>${perfHtml()}`;
     let any = false;
     for (const sec of SECTIONS) {
       if (sec.team && !team) continue;
       let list = S.posts.filter(sec.has);
-      if (!list.length) continue;
+      const isPosted = sec.key === "posted";
+      if (!list.length && !(isPosted && team && S.posts.length)) continue;
       any = true;
-      if (sec.key === "posted") list = list.slice().sort((a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || "")));
+      if (isPosted) {
+        const newest = (a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || ""));
+        list = list.slice().sort(S.postedSort === "impressions" ? (a, b) => ((b.impressions ?? -1) - (a.impressions ?? -1)) || newest(a, b) : newest);
+      }
       if (sec.key === "approved") list = list.slice().sort((a, b) => String(a.scheduled_at || "9").localeCompare(String(b.scheduled_at || "9")));
       const total = list.length;
       if (sec.key === "posted") list = list.slice(0, S.postedShown);
       const title = typeof sec.title === "function" ? sec.title() : sec.title;
-      html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${total}</span>${sec.note ? `<em>${esc(sec.note)}</em>` : ""}</h3>
+      html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${total}</span>${sec.note ? `<em>${esc(sec.note)}</em>` : ""}${isPosted ? postedToolsHtml(total) : ""}</h3>
         ${list.map(rowHtml).join("")}
         ${total > list.length ? `<button type="button" class="cp-btn cp-btn-ghost cp-showmore" data-act="moreposted">Show ${Math.min(POSTED_PAGE, total - list.length)} more</button>` : ""}</section>`;
     }
     if (!any) {
       html += `<div class="cp-empty">${team
-        ? `<p>No posts here yet.</p><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write the first post</button>`
+        ? `<p>No posts here yet.</p><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write the first post</button>
+           <div><button type="button" class="cp-btn cp-btn-quiet cp-empty-alt" data-act="external">or add a post that is already on LinkedIn</button></div>`
         : `<p>Nothing to review right now. New posts show up here when they are ready for you.</p>`}</div>`;
     }
     root.innerHTML = html;
     hydrateImages(root);
     root.querySelectorAll(".cp-draft-input").forEach((el) => el.focus());
+    if (S.showChart) drawChart();
+  }
+
+  // Beside the Posted heading: how to order them and, for the team, the way to
+  // add a post that went out some other way.
+  function postedToolsHtml(total) {
+    const sort = total > 1 ? `<select class="cp-sort" aria-label="Order of posted posts">
+        <option value="newest"${S.postedSort === "newest" ? " selected" : ""}>Newest first</option>
+        <option value="impressions"${S.postedSort === "impressions" ? " selected" : ""}>Most impressions</option></select>` : "";
+    const add = S.isShare ? "" : `<button type="button" class="cp-btn cp-btn-quiet cp-addpost" data-act="external">+ Add a post</button>`;
+    return `<span class="cp-grow"></span>${sort}${add}`;
   }
 
   function refreshRow(postId) {
@@ -488,7 +584,7 @@
   }
 
   function openSchedule(post) {
-    if (!canPublish()) { toast("Connect LinkedIn for publishing on the Content tab first.", true); return; }
+    if (!canPublish()) { toast("Connect LinkedIn first, with the link under the Posts title.", true); return; }
     const base = post.scheduled_at ? new Date(post.scheduled_at) : (() => { const x = new Date(); x.setDate(x.getDate() + 1); x.setHours(9, 0, 0, 0); return x; })();
     const pad = (n) => String(n).padStart(2, "0");
     const dval = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
@@ -561,10 +657,11 @@
       <iframe class="cp-embed-frame" src="${esc(src)}" title="LinkedIn post" allowfullscreen></iframe>`, { cls: "cp-embed" });
   }
 
-  // A post written here that went live some other way: paste its link and it counts as posted.
+  // Paste a post's link. With a post: one written here that went live some other
+  // way, which now counts as posted. Without: a post we never held here.
   function openLink(post) {
-    const m = openModal(`<div class="cp-modal-body"><h3>Add the link to this post</h3>
-        <p>On LinkedIn, open the post's menu and choose Copy link to post. With the link in place the post counts as posted and its numbers come in overnight.</p>
+    const m = openModal(`<div class="cp-modal-body"><h3>${post ? "Add the link to this post" : "Add a post that is already on LinkedIn"}</h3>
+        <p>On LinkedIn, open the post's menu and choose Copy link to post. ${post ? "With the link in place the post counts as posted and its numbers come in overnight." : "Its date and first line come from the link, and its numbers come in right after."}</p>
         <label class="cp-field-block">Link to the post<input type="url" class="cp-input" data-u placeholder="https://www.linkedin.com/posts/..." /></label>
         <p class="cp-modal-msg"></p></div>
       <div class="cp-modal-foot"><button type="button" class="cp-btn cp-btn-ghost" data-close>Cancel</button><button type="button" class="cp-btn cp-btn-primary" data-ok>Save</button></div>`, { cls: "cp-modal-md" });
@@ -574,21 +671,61 @@
       out.textContent = "Checking the link...";
       const info = await readLink(S.clientId, m.el.querySelector("[data-u]").value);
       if (!info) { out.textContent = "That does not look like a link to a LinkedIn post."; return; }
+      const fields = {
+        url: info.url, activity_id: info.activity_id, status: "posted", source: "external",
+        posted_on: info.posted_on || new Date().toLocaleDateString("en-CA"),
+        published_at: info.published_at || new Date().toISOString(), scheduled_at: null, publish_error: null,
+      };
       try {
-        await patchPost(post.id, {
-          url: info.url, activity_id: info.activity_id, status: "posted", source: "external",
-          posted_on: info.posted_on || new Date().toLocaleDateString("en-CA"),
-          published_at: info.published_at || new Date().toISOString(), scheduled_at: null, publish_error: null,
-        });
-        m.close(); render(); toast("Saved as posted");
+        if (post) await patchPost(post.id, fields);
+        else {
+          const sess = sb.getSession();
+          await sb.sbFetch("/rest/v1/content_posts", {
+            method: "POST", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ ...fields, title: info.title, client_id: S.clientId, created_by: sess && sess.user ? sess.user.id : null }),
+          });
+        }
+        m.close();
+        toast(post ? "Saved as posted" : "Post added");
+        if (S.integ) await refreshNumbers(true); else { await load(); render(); }
       } catch (err) {
         out.textContent = /duplicate|unique/i.test(err.message) ? "That post is already in the list." : err.message;
       }
     };
   }
 
+  async function connectLinkedIn() {
+    try {
+      const r = await sb.invokeFunction("linkedin-oauth-init", { client_id: S.clientId });
+      if (!r || !r.authorize_url) throw new Error("LinkedIn did not answer.");
+      window.location.href = r.authorize_url;      // LinkedIn's own approval screen, then back here
+    } catch (err) {
+      toast("The LinkedIn connection could not start. " + err.message, true);
+    }
+  }
+  async function refreshNumbers(quiet) {
+    if (!quiet) toast("Refreshing numbers...");
+    try {
+      const res = await sb.invokeFunction("linkedin-content", { action: "sync", client_id: S.clientId });
+      const r = (res && res.result) || {};
+      await load(); render();
+      if (r.error && /reconnect_required/.test(r.error)) toast("LinkedIn needs to be connected again.", true);
+      else if (!quiet) toast(`Numbers refreshed for ${r.posts_synced || 0} ${r.posts_synced === 1 ? "post" : "posts"}`);
+    } catch (err) {
+      await load(); render();
+      if (!quiet) toast("The numbers did not refresh. " + err.message, true);
+    }
+  }
+  async function disconnectLinkedIn() {
+    const ok = await confirmBox("Disconnect LinkedIn?", "Posts and their numbers stay. Publishing and the nightly numbers stop until it is connected again.", "Disconnect", true);
+    if (!ok) return;
+    await sb.invokeFunction("linkedin-content", { action: "disconnect", client_id: S.clientId });
+    await load(); render();
+    toast("LinkedIn disconnected");
+  }
+
   async function publishNow(post) {
-    if (!canPublish()) { toast("Connect LinkedIn for publishing on the Content tab first.", true); return; }
+    if (!canPublish()) { toast("Connect LinkedIn first, with the link under the Posts title.", true); return; }
     const ok = await confirmBox("Publish to LinkedIn now?", `This goes live right away on ${profile().name}'s profile.`, "Publish now");
     if (!ok) return;
     post.status = "publishing";
@@ -643,7 +780,12 @@
         mn.classList.toggle("hidden", !was);
       }
       else if (act === "new") openComposer(null);
-      else if (act === "gocontent") { e.preventDefault(); if (S.selectTab) S.selectTab("content"); }
+      else if (act === "external") openLink(null);
+      else if (act === "connect") await connectLinkedIn();
+      else if (act === "sync") await refreshNumbers(false);
+      else if (act === "disconnect") await disconnectLinkedIn();
+      else if (act === "tf") { S.tf = actEl.dataset.tf; render(); }
+      else if (act === "chart") { S.showChart = !S.showChart; render(); }
       else if (act === "moreposted") { S.postedShown += POSTED_PAGE; render(); }
       else if (act === "edit") openComposer(post);
       else if (act === "approve") { await patchPost(post.id, { status: "approved", approved_at: new Date().toISOString() }); render(); toast("Approved"); }
@@ -730,6 +872,7 @@
       root: opts.root, selectTab: opts.selectTab || null,
       posts: [], comments: [], integ: null, urls: {}, draft: null, pending: null,
       showResolved: new Set(), postedShown: POSTED_PAGE,
+      followers: [], tf: "3m", postedSort: "newest", showChart: false, chart: null,
     };
     S.root.classList.add("cp");
     S.root.innerHTML = `<div class="cp-loading">Loading posts...</div>`;
@@ -754,11 +897,35 @@
     S.root.addEventListener("input", onInput);
     S.root.addEventListener("keydown", onKey);
     S.root.addEventListener("mouseover", onHover);
+    S.root.addEventListener("change", (e) => {
+      if (e.target.classList && e.target.classList.contains("cp-sort")) { S.postedSort = e.target.value; render(); }
+    });
+
+    // Back from LinkedIn's approval screen: say how it went, tidy the address,
+    // and on success pull the first numbers.
+    let justConnected = false;
+    const params = new URLSearchParams(location.search);
+    if (params.get("integration_purpose") === "content_analytics") {
+      const status = params.get("integration_status");
+      const reason = params.get("integration_reason") || "";
+      if (status === "success") justConnected = true;
+      else if (status) {
+        const why = {
+          provider_user_cancelled_login: "The LinkedIn sign-in was cancelled.",
+          provider_user_cancelled_authorize: "Access was declined on LinkedIn's screen.",
+          bad_state: "The connection link expired. Press Connect LinkedIn again.",
+        }[reason] || "LinkedIn did not complete the connection.";
+        toast(why, true);
+      }
+      ["integration_status", "integration_provider", "integration_purpose", "integration_reason"].forEach((k) => params.delete(k));
+      history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params.toString() : "") + "#posts");
+    }
     document.addEventListener("click", (e) => { if (!S.root.contains(e.target)) S.root.querySelectorAll(".cp-menu").forEach((mn) => mn.classList.add("hidden")); });
 
     try {
       await load();
       render();
+      if (justConnected && S.integ) { toast("LinkedIn connected"); refreshNumbers(true); }
     } catch (err) {
       S.root.innerHTML = `<div class="cp-empty"><p>The posts did not load. ${esc(err.message)}</p></div>`;
     }
