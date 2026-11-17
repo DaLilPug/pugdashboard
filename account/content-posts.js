@@ -81,20 +81,29 @@
   }
 
   async function patchPost(id, fields) {
-    const rows = await sb.sbFetch(`/rest/v1/content_posts?id=eq.${encodeURIComponent(id)}`, {
+    const cur = postById(id);
+    const guard = cur && cur.updated_at ? `&updated_at=eq.${encodeURIComponent(cur.updated_at)}` : "";
+    const rows = await sb.sbFetch(`/rest/v1/content_posts?id=eq.${encodeURIComponent(id)}${guard}`, {
       method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(fields),
     });
-    if (!rows || !rows.length) throw new Error("That change was not saved. Refresh the page and try again.");
+    if (!rows || !rows.length) {
+      await load(); render();
+      throw new Error("This post changed since the page loaded. It is up to date now, so look it over and try again.");
+    }
     Object.assign(postById(id) || {}, rows[0]);
     return rows[0];
   }
 
+  // Only ever link out to LinkedIn itself.
+  const liUrl = (u) => (/^https:\/\/([\w-]+\.)?linkedin\.com\//i.test(u || "") ? u : "");
+
   // ---- images ----------------------------------------------------------------
   function signedUrl(path) {
-    if (!S.urls[path]) {
-      S.urls[path] = sb.storageSignedUrl(BUCKET, path, 6 * 3600).catch(() => "");
+    const hit = S.urls[path];
+    if (!hit || Date.now() - hit.at > 5 * 3600 * 1000) {
+      S.urls[path] = { at: Date.now(), url: sb.storageSignedUrl(BUCKET, path, 6 * 3600).catch(() => "") };
     }
-    return S.urls[path];
+    return S.urls[path].url;
   }
   function hydrateImages(scope) {
     scope.querySelectorAll("img[data-path]").forEach(async (img) => {
@@ -178,7 +187,7 @@
       else if (p.status === "scheduled") main = b("edit", "Edit", "cp-btn-ghost");
     } else if (p.status === "draft") {
       main = b("send", "Send for approval", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["delete", "Delete", true]]);
+      more = menu([["schedule", "Schedule"], ["delete", "Delete", true]]);
     } else if (p.status === "ready") {
       main = b("approve", "Mark approved", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
       more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["todraft", "Back to draft"], ["delete", "Delete", true]]);
@@ -196,7 +205,7 @@
   }
 
   function postedMenuHtml(p) {
-    const link = p.url ? `<a class="cp-blue cp-viewlink" href="${esc(p.url)}" target="_blank" rel="noopener">View on LinkedIn</a>` : "";
+    const link = liUrl(p.url) ? `<a class="cp-blue cp-viewlink" href="${esc(p.url)}" target="_blank" rel="noopener">View on LinkedIn</a>` : "";
     if (S.isShare) return `<span class="cp-grow"></span>${link}`;
     return `<span class="cp-grow"></span>${link}<div class="cp-menu-wrap"><button type="button" class="cp-btn cp-btn-quiet cp-more cp-more-sm" data-act="menu" aria-label="More">&#8943;</button>
       <div class="cp-menu cp-menu-down cp-menu-end hidden"><button type="button" class="cp-menu-item cp-danger" data-act="delete">Remove from this list</button></div></div>`;
@@ -304,8 +313,9 @@
   const TIMEFRAMES = [["all", "All time"], ["yr", "This year"], ["3m", "Last 3 months"], ["1m", "Last month"]];
   function cutoffDay() {
     const now = new Date();
-    if (S.tf === "1m") { now.setMonth(now.getMonth() - 1); return now.toISOString().slice(0, 10); }
-    if (S.tf === "3m") { now.setMonth(now.getMonth() - 3); return now.toISOString().slice(0, 10); }
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (S.tf === "1m") { now.setMonth(now.getMonth() - 1); return ymd(now); }
+    if (S.tf === "3m") { now.setMonth(now.getMonth() - 3); return ymd(now); }
     if (S.tf === "yr") return `${now.getFullYear()}-01-01`;
     return null;
   }
@@ -430,12 +440,13 @@
         const list = sortPosted(inWin).slice(0, S.postedShown);
         const olderLine = older ? `<p class="cp-older">${older} older ${older === 1 ? "post is" : "posts are"} outside this timeframe. <button type="button" class="cp-conn cp-conn-link" data-act="tf" data-tf="all">Show all time</button></p>` : "";
         html += `<section class="cp-section">
-          <div class="cp-posted-grid"><div class="cp-posted-list"><h3 class="cp-section-title cp-posted-head">${esc(title)}<span class="cp-count">${inWin.length}</span></h3>
+          <div class="cp-posted-grid"><h3 class="cp-section-title cp-posted-head">${esc(title)}<span class="cp-count">${inWin.length}</span></h3>
+            <div class="cp-posted-side"><div class="cp-posted-tools">${postedToolsHtml(inWin.length)}</div>${totalsHtml(inWin)}</div>
+            <div class="cp-posted-list">
             ${list.map(rowHtml).join("")}
             ${!all.length ? `<p class="cp-older">Nothing posted yet.</p>` : ""}
             ${inWin.length > list.length ? `<button type="button" class="cp-btn cp-btn-ghost cp-showmore" data-act="moreposted">Show ${Math.min(POSTED_PAGE, inWin.length - list.length)} more</button>` : ""}
-            ${olderLine}</div>
-            <div class="cp-posted-side"><div class="cp-posted-tools">${postedToolsHtml(inWin.length)}</div>${totalsHtml(inWin)}</div></div></section>`;
+            ${olderLine}</div></div></section>`;
         continue;
       }
       if (!all.length) continue;
@@ -676,12 +687,21 @@
     const pad = (n) => String(n).padStart(2, "0");
     const dval = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`;
     const tval = `${pad(base.getHours())}:${pad(base.getMinutes())}`;
-    const m = openModal(`<div class="cp-modal-body"><h3>Schedule this post</h3>
+    const already = post.status === "scheduled";
+    const m = openModal(`<div class="cp-modal-body"><h3>${already ? "Change the time" : "Schedule this post"}</h3>
         <p>It publishes to LinkedIn as ${esc(profile().name)} at the time you pick. Times are in your own time zone.</p>
         <div class="cp-fields"><label>Date<input type="date" class="cp-input" data-d value="${dval}" /></label>
         <label>Time<input type="time" class="cp-input" data-t value="${tval}" step="300" /></label></div>
         <p class="cp-modal-msg"></p></div>
-      <div class="cp-modal-foot"><button type="button" class="cp-btn cp-btn-ghost" data-close>Cancel</button><button type="button" class="cp-btn cp-btn-primary" data-ok>Schedule</button></div>`, { cls: "cp-modal-sm" });
+      <div class="cp-modal-foot">${already ? `<button type="button" class="cp-btn cp-btn-quiet cp-danger" data-unschedule>Cancel schedule</button><span class="cp-grow"></span>` : ""}
+        <button type="button" class="cp-btn cp-btn-ghost" data-close>${already ? "Close" : "Cancel"}</button><button type="button" class="cp-btn cp-btn-primary" data-ok>${already ? "Save time" : "Schedule"}</button></div>`, { cls: "cp-modal-sm" });
+    const off = m.el.querySelector("[data-unschedule]");
+    if (off) off.onclick = async () => {
+      try {
+        await patchPost(post.id, { status: "approved", scheduled_at: null });
+        m.close(); renderAndShow(post.id); toast("Taken off the schedule");
+      } catch (err) { m.close(); toast(err.message, true); }
+    };
     m.el.querySelector("[data-ok]").onclick = async () => {
       const when = new Date(`${m.el.querySelector("[data-d]").value}T${m.el.querySelector("[data-t]").value}`);
       const out = m.el.querySelector(".cp-modal-msg");
@@ -721,7 +741,7 @@
     }
     let hit = null;
     try { hit = decodeURIComponent(url).match(ACTIVITY_RE); } catch (_) { hit = url.match(ACTIVITY_RE); }
-    if (!hit) return null;
+    if (!hit || !liUrl(url)) return null;
     const when = whenFromId(hit[2]);
     return { url, activity_id: hit[2], title, posted_on: when ? when.day : null, published_at: when ? when.iso : null };
   }
@@ -738,8 +758,8 @@
   }
   function showPost(p) {
     const src = embedSrc(p);
-    if (!src) { if (p.url) window.open(p.url, "_blank", "noopener"); return; }
-    openModal(`<div class="cp-embed-head">${p.url ? `<a class="cp-blue" href="${esc(p.url)}" target="_blank" rel="noopener">Open on LinkedIn</a>` : ""}
+    if (!src) { if (liUrl(p.url)) window.open(p.url, "_blank", "noopener"); return; }
+    openModal(`<div class="cp-embed-head">${liUrl(p.url) ? `<a class="cp-blue" href="${esc(p.url)}" target="_blank" rel="noopener">Open on LinkedIn</a>` : ""}
         <button type="button" class="cp-x" data-close aria-label="Close">&times;</button></div>
       <iframe class="cp-embed-frame" src="${esc(src)}" title="LinkedIn post" allowfullscreen></iframe>`, { cls: "cp-embed" });
   }
@@ -906,6 +926,7 @@
         const text = thread.querySelector(".cp-draft-input").value.trim();
         if (!text) return;
         const d = S.draft;
+        actEl.disabled = true;
         await addComment({ post_id: post.id, body: text, quote: d.quote, quote_start: d.start });
         S.draft = null; refreshRow(post.id);
       }
@@ -913,6 +934,7 @@
         const ta = thread.querySelector(".cp-reply");
         const text = ta.value.trim();
         if (!text) return;
+        actEl.disabled = true;
         await addComment({ post_id: post.id, thread_id: threadId, body: text });
         refreshRow(post.id);
       }
@@ -930,6 +952,7 @@
         if (mark) { mark.scrollIntoView({ block: "center", behavior: "smooth" }); mark.classList.add("cp-mark-on"); setTimeout(() => mark.classList.remove("cp-mark-on"), 1400); }
       }
     } catch (err) {
+      if (actEl.isConnected) actEl.disabled = false;
       toast(err.message || "Something went wrong.", true);
     }
   }

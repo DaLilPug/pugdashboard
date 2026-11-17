@@ -52,7 +52,12 @@
 .cp-posted-tools .cp-addpost { padding: 7px 4px; white-space: nowrap; }
 
 /* the Posted section: the list on the left, its totals on the right */
-.cp-posted-grid { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 20px; align-items: start; }
+/* In the page the order is title, controls + totals, list (which is the order a phone shows).
+   On a wide screen the title and list share the left column and the rest sits on the right. */
+.cp-posted-grid { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 0 20px; align-items: start; }
+.cp-posted-head { grid-column: 1; grid-row: 1; }
+.cp-posted-list { grid-column: 1; grid-row: 2; }
+.cp-posted-side { grid-column: 2; grid-row: 1 / span 2; }
 .cp-row-posted { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .cp-row-posted .cp-thread-foot, .cp-row-posted .cp-msg-del { display: none; }
 .cp-older { margin: 4px 2px 0; font-size: 13px; color: var(--gray-400); font-family: Inter, sans-serif; }
@@ -218,7 +223,7 @@ a.cp-blue:hover { text-decoration: underline; }
 .cp-modal-body h3 { margin: 0 0 8px; font: 700 18px Montserrat, sans-serif; color: var(--navy); }
 .cp-modal-body p { margin: 0 0 14px; font-size: 14px; line-height: 20px; color: var(--gray-600); }
 .cp-modal-msg { color: #b42318 !important; min-height: 0; margin: 0 !important; }
-.cp-modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px 20px; }
+.cp-modal-foot { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding: 14px 24px 20px; }
 .cp-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .cp-fields-wide { grid-template-columns: 1fr 170px; }
 .cp-fields label, .cp-field-block { display: block; font-size: 12.5px; font-weight: 600; color: var(--gray-600); }
@@ -263,7 +268,8 @@ a.cp-blue:hover { text-decoration: underline; }
 @media (max-width: 900px) {
   .cp-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .cp-posted-grid { grid-template-columns: minmax(0, 1fr); }
-  .cp-posted-side { position: static; order: -1; }
+  .cp-posted-head, .cp-posted-list, .cp-posted-side { grid-column: 1; grid-row: auto; }
+  .cp-posted-side { position: static; margin-bottom: 16px; }
   .cp-rail { padding: 0 4px; }
   .cp-overlay { padding: 0; }
   .cp-composer { max-width: none; max-height: 100vh; min-height: 100vh; border-radius: 0; }
