@@ -204,6 +204,10 @@
       `<b>${num(p.impressions)}</b> impressions`, `<b>${num(p.reactions)}</b> reactions`,
       `<b>${num(p.comments)}</b> comments`, `<b>${num(p.reshares)}</b> reposts`,
     ];
+    // Clicks: the profile's button on the post ("Visit my website"), and links inside the post.
+    const has = (v) => v !== null && v !== undefined;
+    if (has(p.cta_clicks)) parts.push(`<span title="Clicks on the profile button shown on the post, such as Visit my website"><b>${num(p.cta_clicks)}</b> button clicks</span>`);
+    if (has(p.link_clicks)) parts.push(`<span title="Clicks on links inside the post"><b>${num(p.link_clicks)}</b> link clicks</span>`);
     return `<div class="cp-stats"><span>${parts.join('<i class="cp-dot"></i>')}</span><span class="cp-grow"></span>${link}</div>`;
   }
 
@@ -301,13 +305,19 @@
       const first = cut ? fol.find((f) => f.captured_on >= cut) : fol[0];
       if (first && first.captured_on !== latest.captured_on) delta = latest.followers - first.followers;
     }
-    const tile = (label, value, sub, act) =>
-      `<${act ? `button type="button" data-act="${act}"` : "div"} class="cp-tile${act ? " cp-tile-btn" : ""}">
+    const sumOf = (col) => {
+      const rows = inWin.filter((p) => p[col] !== null && p[col] !== undefined);
+      return rows.length ? num(rows.reduce((s, p) => s + (p[col] || 0), 0)) : "-";
+    };
+    const tile = (label, value, sub, act, hint) =>
+      `<${act ? `button type="button" data-act="${act}"` : "div"} class="cp-tile${act ? " cp-tile-btn" : ""}"${hint ? ` title="${hint}"` : ""}>
         <span class="cp-tile-label">${label}</span><span class="cp-tile-value">${value}</span>${sub ? `<span class="cp-tile-sub">${sub}</span>` : ""}</${act ? "button" : "div"}>`;
     const tiles = [
       tile("Posts", num(inWin.length)),
       tile("Impressions", measured.length ? num(imp) : "-"),
       tile("Engagement rate", imp ? (100 * eng / imp).toFixed(1) + "%" : "-"),
+      tile("Button clicks", sumOf("cta_clicks"), "", "", "Clicks on the profile button shown on posts, such as Visit my website"),
+      tile("Link clicks", sumOf("link_clicks"), "", "", "Clicks on links inside posts"),
       latest ? tile("Followers", num(latest.followers),
         delta === null ? "" : `${delta >= 0 ? "+" : ""}${num(delta)}`, fol.length > 1 ? "chart" : "") : "",
     ].join("");
