@@ -90,7 +90,7 @@
 .cp-empty p:last-child { margin-bottom: 0; }
 
 /* ---- a post and its comments, side by side ---- */
-.cp-row { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 20px; align-items: start; margin-bottom: 22px; }
+.cp-row { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 20px; align-items: start; margin-bottom: 28px; }
 .cp-card {
   background: #fff; border-radius: 8px; box-shadow: 0 0 0 1px var(--li-line), 0 2px 6px rgba(1, 58, 82, .05);
   font-family: -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--li-text);
@@ -194,6 +194,9 @@ a.cp-blue:hover { text-decoration: underline; }
 .cp-draft-input { width: 100%; border-radius: 10px; background: #fff; margin-bottom: 8px; min-height: 56px; }
 .cp-reply:focus, .cp-draft-input:focus { border-color: var(--li-blue); background: #fff; }
 .cp-addcomment { align-self: flex-start; background: none; border: 1px dashed var(--gray-200); border-radius: 999px; padding: 8px 14px; font: 500 13px Inter, sans-serif; color: var(--gray-600); cursor: pointer; }
+/* a post with no comments yet: its button sits a little down the side of the card,
+   clear of the comments of the post above */
+.cp-rail > .cp-addcomment:first-child { margin-top: 14px; }
 .cp-addcomment:hover { border-color: var(--li-blue); color: var(--li-blue); }
 .cp-hint { margin: 0 2px; font-size: 12.5px; color: var(--gray-400); line-height: 17px; }
 .cp-resolved-toggle { align-self: flex-start; background: none; border: 0; padding: 2px; font: 500 12.5px Inter, sans-serif; color: var(--gray-400); cursor: pointer; text-decoration: underline; }
