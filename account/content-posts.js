@@ -258,7 +258,7 @@
         <header class="cp-head">${avatarHtml()}
           <div class="cp-head-text"><div class="cp-name">${esc(pr.name)}</div>
           ${pr.headline ? `<div class="cp-headline">${esc(pr.headline)}</div>` : ""}</div></header>
-        ${p.body ? `<div class="cp-text">${bodyHtml(p)}</div>` : (p.status === "posted" && p.url ? `<div class="cp-text cp-text-empty">Posted on LinkedIn. The text was not saved here.</div>` : "")}
+        ${p.body ? `<div class="cp-text">${bodyHtml(p)}</div>` : (p.status === "posted" && embedSrc(p) ? `<iframe class="cp-embed-inline" src="${esc(embedSrc(p))}" title="LinkedIn post" loading="lazy"></iframe>` : "")}
         ${imagesHtml(p.images)}${statsHtml(p)}${err}${actionsHtml(p)}
       </div>
       <aside class="cp-rail">${railHtml(p)}</aside>
@@ -513,50 +513,73 @@
     };
   }
 
-  const ACTIVITY_RE = /(?:activity|ugcPost|share)[-:](\d{15,25})/;
-  // Add the link of a post that is already on LinkedIn. With a post: that
-  // post becomes "posted". Without: a new row, for a post we never held here.
+  const ACTIVITY_RE = /(activity|ugcPost|share)[-:](\d{15,25})/;
+
+  // A LinkedIn post id carries the moment it was posted (its first 41 bits
+  // are the time in milliseconds), so nobody has to type a date.
+  function whenFromId(id) {
+    try {
+      const ms = Number(BigInt(id) >> 22n);
+      const d = new Date(ms);
+      if (ms < Date.UTC(2010, 0, 1) || ms > Date.now() + 86400000) return null;
+      return { iso: d.toISOString(), day: d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }) };
+    } catch (_) { return null; }
+  }
+
+  // Everything a pasted link tells us: the post's address, id, date and first line.
+  async function readLink(clientId, raw) {
+    let url = String(raw || "").trim(), title = null;
+    if (/^https:\/\/([\w-]+\.)?(lnkd\.in|linkedin\.com)\//i.test(url)) {
+      try {
+        const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: clientId, url });
+        if (r && r.url) url = r.url;
+        if (r && r.title) title = r.title;
+      } catch (_) {}
+    }
+    let hit = null;
+    try { hit = decodeURIComponent(url).match(ACTIVITY_RE); } catch (_) { hit = url.match(ACTIVITY_RE); }
+    if (!hit) return null;
+    const when = whenFromId(hit[2]);
+    return { url, activity_id: hit[2], title, posted_on: when ? when.day : null, published_at: when ? when.iso : null };
+  }
+
+  // The post as LinkedIn shows it, through LinkedIn's own embed (public posts).
+  function embedSrc(p) {
+    let urn = p.post_urn;
+    if (!urn && p.url) {
+      let hit = null;
+      try { hit = decodeURIComponent(p.url).match(ACTIVITY_RE); } catch (_) {}
+      if (hit) urn = `urn:li:${hit[1]}:${hit[2]}`;
+    }
+    return urn ? `https://www.linkedin.com/embed/feed/update/${urn}` : null;
+  }
+  function showPost(p) {
+    const src = embedSrc(p);
+    if (!src) { if (p.url) window.open(p.url, "_blank", "noopener"); return; }
+    openModal(`<div class="cp-embed-head">${p.url ? `<a class="cp-blue" href="${esc(p.url)}" target="_blank" rel="noopener">Open on LinkedIn</a>` : ""}
+        <button type="button" class="cp-x" data-close aria-label="Close">&times;</button></div>
+      <iframe class="cp-embed-frame" src="${esc(src)}" title="LinkedIn post" allowfullscreen></iframe>`, { cls: "cp-embed" });
+  }
+
+  // A post written here that went live some other way: paste its link and it counts as posted.
   function openLink(post) {
-    const today = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const dval = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-    const m = openModal(`<div class="cp-modal-body"><h3>${post ? "Add the link to this post" : "Add a post that is already live"}</h3>
+    const m = openModal(`<div class="cp-modal-body"><h3>Add the link to this post</h3>
         <p>On LinkedIn, open the post's menu and choose Copy link to post. With the link in place the post counts as posted and its numbers come in overnight.</p>
-        <div class="cp-fields cp-fields-wide"><label>Link to the post<input type="url" class="cp-input" data-u placeholder="https://www.linkedin.com/posts/..." /></label>
-        <label>Date it went live<input type="date" class="cp-input" data-d value="${dval}" /></label></div>
-        ${post ? "" : `<label class="cp-field-block">The post's text (optional)<textarea class="cp-input" data-b rows="5"></textarea></label>`}
+        <label class="cp-field-block">Link to the post<input type="url" class="cp-input" data-u placeholder="https://www.linkedin.com/posts/..." /></label>
         <p class="cp-modal-msg"></p></div>
       <div class="cp-modal-foot"><button type="button" class="cp-btn cp-btn-ghost" data-close>Cancel</button><button type="button" class="cp-btn cp-btn-primary" data-ok>Save</button></div>`, { cls: "cp-modal-md" });
     m.el.querySelector("[data-u]").focus();
     m.el.querySelector("[data-ok]").onclick = async () => {
-      let url = m.el.querySelector("[data-u]").value.trim();
-      const day = m.el.querySelector("[data-d]").value;
       const out = m.el.querySelector(".cp-modal-msg");
-      // LinkedIn's "Copy link to post" gives a short lnkd.in link; ask the server where it leads.
-      if (/^https:\/\/lnkd\.in\//i.test(url)) {
-        out.textContent = "Checking the link...";
-        try {
-          const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: S.clientId, url });
-          if (r && r.url) url = r.url;
-        } catch (_) {}
-        out.textContent = "";
-      }
-      const hit = url.match(ACTIVITY_RE);
-      if (!hit) { out.textContent = "That does not look like a link to a LinkedIn post."; return; }
-      if (!day) { out.textContent = "Add the date it went live."; return; }
-      const fields = { url, activity_id: hit[1], posted_on: day, status: "posted", source: "external",
-        published_at: new Date(day + "T12:00:00").toISOString(), scheduled_at: null, publish_error: null };
+      out.textContent = "Checking the link...";
+      const info = await readLink(S.clientId, m.el.querySelector("[data-u]").value);
+      if (!info) { out.textContent = "That does not look like a link to a LinkedIn post."; return; }
       try {
-        if (post) await patchPost(post.id, fields);
-        else {
-          const sess = sb.getSession();
-          const body = (m.el.querySelector("[data-b]").value || "").trim() || null;
-          const rows = await sb.sbFetch("/rest/v1/content_posts", {
-            method: "POST", headers: { Prefer: "return=representation" },
-            body: JSON.stringify({ ...fields, body, client_id: S.clientId, created_by: sess && sess.user ? sess.user.id : null }),
-          });
-          S.posts.push(rows[0]);
-        }
+        await patchPost(post.id, {
+          url: info.url, activity_id: info.activity_id, status: "posted", source: "external",
+          posted_on: info.posted_on || new Date().toLocaleDateString("en-CA"),
+          published_at: info.published_at || new Date().toISOString(), scheduled_at: null, publish_error: null,
+        });
         m.close(); render(); toast("Saved as posted");
       } catch (err) {
         out.textContent = /duplicate|unique/i.test(err.message) ? "That post is already in the list." : err.message;
@@ -741,5 +764,5 @@
     }
   }
 
-  window.ContentPosts = { init };
+  window.ContentPosts = { init, readLink, showPost };
 })();

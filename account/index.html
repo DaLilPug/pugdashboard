@@ -862,8 +862,6 @@
         </div>
         <form id="ct-add-form" class="ct-add-form" autocomplete="off">
           <input id="ct-url"   class="ml-input ct-url"   type="url"  placeholder="Paste the post link (LinkedIn → ⋯ → Copy link to post)" required>
-          <input id="ct-date"  class="ml-input ct-date"  type="date" required aria-label="Posted on" title="Posted on">
-          <input id="ct-title" class="ml-input ct-title" type="text" placeholder="Title (optional)" maxlength="140">
           <button id="ct-add-btn" class="cad-add" type="submit">+ Add post</button>
           <span id="ct-add-msg" class="cad-feedback"></span>
         </form>
@@ -11051,8 +11049,6 @@
         const sortSel      = $("ct-sort");
         const addForm      = $("ct-add-form");
         const urlIn        = $("ct-url");
-        const dateIn       = $("ct-date");
-        const titleIn      = $("ct-title");
         const addBtn       = $("ct-add-btn");
         const addMsg       = $("ct-add-msg");
 
@@ -11278,7 +11274,9 @@
             rows.sort((a, b) => (b.impressions ?? -1) - (a.impressions ?? -1) || (a.posted_on < b.posted_on ? 1 : -1));
           }
           tbody.innerHTML = rows.map(p => {
-            const title = p.title || `Post from ${usDate(p.posted_on)}`;
+            // The post's first line: saved when the link was added, or the start of a post written here.
+            const firstLine = String(p.body || "").split("\n").find(l => l.trim()) || "";
+            const title = p.title || (firstLine.length > 110 ? firstLine.slice(0, 110) + "…" : firstLine) || `Post from ${usDate(p.posted_on)}`;
             let note = "";
             if (p.urn_status === "unresolved") {
               note = `<span class="ct-post-warn" title="${esc(p.last_sync_error || "")}">Couldn't match this link to a post on the connected profile</span>`;
@@ -11291,7 +11289,7 @@
             return `
               <tr data-post-id="${esc(p.id)}">
                 <td>${usDate(p.posted_on)}</td>
-                <td class="ct-post-title"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(title)}</a>${note}</td>
+                <td class="ct-post-title"><a href="${esc(p.url)}" target="_blank" rel="noopener" data-ct-show="${esc(p.id)}" title="See the post">${esc(title)}</a>${note}</td>
                 <td class="num">${fmtInt(p.impressions)}</td>
                 <td class="num">${fmtInt(p.reactions)}</td>
                 <td class="num">${fmtInt(p.comments)}</td>
@@ -11375,18 +11373,12 @@
 
         async function onAdd(e) {
           e.preventDefault();
-          let url          = urlIn.value.trim();
-          // LinkedIn's "Copy link to post" gives a short lnkd.in link; ask the server where it leads.
-          if (/^https:\/\/lnkd\.in\//i.test(url)) {
-            try {
-              const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: clientId, url });
-              if (r && r.url) url = r.url;
-            } catch (_) {}
-          }
-          const activityId = parseActivityId(url);
-          const postedOn   = dateIn.value;
-          if (!activityId) { showAddMsg("That doesn't look like a LinkedIn post link. Use the post's ⋯ menu → Copy link to post.", "err"); urlIn.focus(); return; }
-          if (!postedOn)   { showAddMsg("Enter the date the post went live.", "err"); dateIn.focus(); return; }
+          // The link carries everything: the post's id, the date it went live and
+          // (through LinkedIn's public embed) its first line. See content-posts.js.
+          addBtn.disabled = true;
+          const info = await ContentPosts.readLink(clientId, urlIn.value);
+          addBtn.disabled = false;
+          if (!info) { showAddMsg("That doesn't look like a LinkedIn post link. Use the post's ⋯ menu → Copy link to post.", "err"); urlIn.focus(); return; }
           addBtn.disabled = true;
           try {
             const sess = sb.getSession();
@@ -11395,16 +11387,17 @@
               headers: { Prefer: "return=minimal" },
               body: JSON.stringify({
                 client_id:   clientId,
-                url,
-                activity_id: activityId,
-                posted_on:   postedOn,
-                title:       titleIn.value.trim() || null,
+                url:          info.url,
+                activity_id:  info.activity_id,
+                posted_on:    info.posted_on || new Date().toLocaleDateString("en-CA"),
+                published_at: info.published_at,
+                title:        info.title,
                 status:      "posted",
                 source:      "external",
                 created_by:  sess?.user?.id || null,
               }),
             });
-            urlIn.value = ""; titleIn.value = "";
+            urlIn.value = "";
             showAddMsg(integration ? "Post added. Pulling its numbers…" : "Post added. Numbers arrive once LinkedIn is connected.");
             if (integration) await onSync(true);
             else await load();
@@ -11459,13 +11452,14 @@
         addForm.addEventListener("submit", onAdd);
         tbody.addEventListener("click", (e) => {
           const b = e.target.closest("[data-ct-remove]");
-          if (b) onRemove(b.dataset.ctRemove);
+          if (b) { onRemove(b.dataset.ctRemove); return; }
+          // A plain click on a post shows the actual post; ctrl/middle click still opens LinkedIn.
+          const a = e.target.closest("[data-ct-show]");
+          if (a && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            const p = posts.find(x => x.id === a.dataset.ctShow);
+            if (p) { e.preventDefault(); ContentPosts.showPost(p); }
+          }
         });
-        // Default the date picker to today - most posts get added the day they go live.
-        if (!dateIn.value) {
-          const d = new Date();
-          dateIn.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-        }
         pillsEl.addEventListener("click", (e) => {
           const b = e.target.closest(".timeframe-pill");
           if (!b) return;
