@@ -744,19 +744,20 @@
 
   // Everything a pasted link tells us: the post's address, id, date and first line.
   async function readLink(clientId, raw) {
-    let url = String(raw || "").trim(), title = null;
+    let url = String(raw || "").trim(), title = null, text = null;
     if (/^https:\/\/([\w-]+\.)?(lnkd\.in|linkedin\.com)\//i.test(url)) {
       try {
         const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: clientId, url });
         if (r && r.url) url = r.url;
         if (r && r.title) title = r.title;
+        if (r && r.text) text = r.text;
       } catch (_) {}
     }
     let hit = null;
     try { hit = decodeURIComponent(url).match(ACTIVITY_RE); } catch (_) { hit = url.match(ACTIVITY_RE); }
     if (!hit || !liUrl(url)) return null;
     const when = whenFromId(hit[2]);
-    return { url, activity_id: hit[2], title, posted_on: when ? when.day : null, published_at: when ? when.iso : null };
+    return { url, activity_id: hit[2], title, text, posted_on: when ? when.day : null, published_at: when ? when.iso : null };
   }
 
   // The post as LinkedIn shows it, through LinkedIn's own embed (public posts).
@@ -802,7 +803,7 @@
           const sess = sb.getSession();
           await sb.sbFetch("/rest/v1/content_posts", {
             method: "POST", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ ...fields, title: info.title, client_id: S.clientId, created_by: sess && sess.user ? sess.user.id : null }),
+            body: JSON.stringify({ ...fields, title: info.title, body: info.text || null, client_id: S.clientId, created_by: sess && sess.user ? sess.user.id : null }),
           });
         }
         m.close();
@@ -829,11 +830,12 @@
       const info = await readLink(S.clientId, raw);
       if (!info) { toast("That does not look like a link to a LinkedIn post.", true); return; }
       // The easy mistake is the link to a different post. Speak up only when the openings differ.
-      const theirs = fingerprint(info.title), ours = fingerprint(post.body);
+      const linked = info.text || info.title;
+      const theirs = fingerprint(linked), ours = fingerprint(post.body);
       const n = Math.min(theirs.length, ours.length);
       if (n > 0 && theirs.slice(0, n) !== ours.slice(0, n)) {
         const ok = await confirmBox("Is this the right post?",
-          `The link's post starts with "${opening(info.title).slice(0, 80)}". This one starts with "${opening(post.body).slice(0, 80)}".`, "Yes, save it");
+          `The link's post starts with "${opening(linked).slice(0, 80)}". This one starts with "${opening(post.body).slice(0, 80)}".`, "Yes, save it");
         if (!ok) return;
       }
       await patchPost(post.id, {
