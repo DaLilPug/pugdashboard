@@ -870,7 +870,7 @@
       else if (act === "external") openLink(null);
       else if (act === "toposted") {
         const head = S.root.querySelector(".cp-posted-head");
-        if (head) window.scrollTo({ top: head.getBoundingClientRect().top + window.scrollY - 100, behavior: "smooth" });
+        if (head) window.scrollTo({ top: head.getBoundingClientRect().top + window.scrollY - 125, behavior: "smooth" });
       }
       else if (act === "connect") await connectLinkedIn();
       else if (act === "sync") await refreshNumbers(false);
