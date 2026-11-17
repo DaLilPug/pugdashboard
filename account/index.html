@@ -11375,7 +11375,14 @@
 
         async function onAdd(e) {
           e.preventDefault();
-          const url        = urlIn.value.trim();
+          let url          = urlIn.value.trim();
+          // LinkedIn's "Copy link to post" gives a short lnkd.in link; ask the server where it leads.
+          if (/^https:\/\/lnkd\.in\//i.test(url)) {
+            try {
+              const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: clientId, url });
+              if (r && r.url) url = r.url;
+            } catch (_) {}
+          }
           const activityId = parseActivityId(url);
           const postedOn   = dateIn.value;
           if (!activityId) { showAddMsg("That doesn't look like a LinkedIn post link. Use the post's ⋯ menu → Copy link to post.", "err"); urlIn.focus(); return; }

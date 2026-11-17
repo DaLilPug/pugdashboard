@@ -280,7 +280,7 @@
           ? (canPublish() ? `Approved posts publish to LinkedIn as ${esc(profile().name)}.`
                           : `LinkedIn is not connected for publishing on this account yet. <a href="#content" data-act="gocontent">Connect it on the Content tab</a>.`)
           : "Read each post, approve it, or highlight any words to leave a comment."}</p></div>
-        ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-ghost" data-act="external">Add a post that is already live</button><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
+        ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
       </div>`;
     let any = false;
     for (const sec of SECTIONS) {
@@ -529,9 +529,18 @@
       <div class="cp-modal-foot"><button type="button" class="cp-btn cp-btn-ghost" data-close>Cancel</button><button type="button" class="cp-btn cp-btn-primary" data-ok>Save</button></div>`, { cls: "cp-modal-md" });
     m.el.querySelector("[data-u]").focus();
     m.el.querySelector("[data-ok]").onclick = async () => {
-      const url = m.el.querySelector("[data-u]").value.trim();
+      let url = m.el.querySelector("[data-u]").value.trim();
       const day = m.el.querySelector("[data-d]").value;
       const out = m.el.querySelector(".cp-modal-msg");
+      // LinkedIn's "Copy link to post" gives a short lnkd.in link; ask the server where it leads.
+      if (/^https:\/\/lnkd\.in\//i.test(url)) {
+        out.textContent = "Checking the link...";
+        try {
+          const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: S.clientId, url });
+          if (r && r.url) url = r.url;
+        } catch (_) {}
+        out.textContent = "";
+      }
       const hit = url.match(ACTIVITY_RE);
       if (!hit) { out.textContent = "That does not look like a link to a LinkedIn post."; return; }
       if (!day) { out.textContent = "Add the date it went live."; return; }
@@ -611,7 +620,6 @@
         mn.classList.toggle("hidden", !was);
       }
       else if (act === "new") openComposer(null);
-      else if (act === "external") openLink(null);
       else if (act === "gocontent") { e.preventDefault(); if (S.selectTab) S.selectTab("content"); }
       else if (act === "moreposted") { S.postedShown += POSTED_PAGE; render(); }
       else if (act === "edit") openComposer(post);
