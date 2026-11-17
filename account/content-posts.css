@@ -37,7 +37,7 @@
 .cp-conn-link:hover { color: var(--li-blue-dark); text-decoration: underline; }
 .cp-conn-warn { color: #b42318; }
 .cp-caret { font-size: 10px; }
-.cp-menu-down { top: calc(100% + 6px); bottom: auto; left: 0; right: auto; }
+.cp-menu.cp-menu-down { top: calc(100% + 6px); bottom: auto; left: 0; right: auto; }
 .cp-menu-note { padding: 8px 12px 6px; margin-top: 4px; border-top: 1px solid var(--li-line); font-size: 12px; line-height: 16px; color: var(--gray-400); }
 
 .cp-perf { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; padding: 14px 18px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--li-line); }
