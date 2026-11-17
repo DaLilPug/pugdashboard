@@ -180,6 +180,15 @@
         `<button type="button" class="cp-menu-item${danger ? " cp-danger" : ""}" data-act="${act}">${label}</button>`).join("");
       return rows ? `<div class="cp-menu-wrap"><button type="button" class="cp-btn cp-btn-quiet cp-more" data-act="menu" aria-label="More">&#8943;</button><div class="cp-menu hidden">${rows}</div></div>` : "";
     };
+    // The team's menu: every stage except the one the post is in, in pipeline order, then Delete.
+    const stages = (here) => menu([
+      here !== "draft" && ["to-draft", "Move to draft"],
+      here !== "ready" && ["to-ready", "Move to waiting for approval"],
+      here !== "approved" && ["to-approved", "Move to approved"],
+      here !== "scheduled" && ["schedule", "Schedule"],
+      ["publish", "Publish now"],
+      ["delete", "Delete", true],
+    ]);
     let main = "", more = "", linkBox = false;
     if (S.isShare) {
       if (p.status === "ready") main = b("approve", "Approve", "cp-btn-approve") + b("edit", "Edit", "cp-btn-ghost");
@@ -187,17 +196,17 @@
       else if (p.status === "scheduled") main = b("edit", "Edit", "cp-btn-ghost");
     } else if (p.status === "draft") {
       main = b("send", "Send for approval", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["schedule", "Schedule"], ["delete", "Delete", true]]);
+      more = stages(p.status);
     } else if (p.status === "ready") {
       main = b("approve", "Mark approved", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["todraft", "Back to draft"], ["delete", "Delete", true]]);
+      more = stages(p.status);
     } else if (p.status === "approved") {
       main = b("schedule", "Schedule", "cp-btn-primary") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + `<button type="button" class="cp-btn cp-btn-ghost cp-copybtn" data-act="copytext" title="Copy the post's text" aria-label="Copy the post's text"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>`;
-      more = menu([["unapprove", "Back to waiting for approval"], ["delete", "Delete", true]]);
+      more = stages(p.status);
       linkBox = true;
     } else if (p.status === "scheduled") {
       main = b("schedule", "Change time", "cp-btn-ghost") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + `<button type="button" class="cp-btn cp-btn-ghost cp-copybtn" data-act="copytext" title="Copy the post's text" aria-label="Copy the post's text"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>`;
-      more = menu([["unschedule", "Take off the schedule"], ["delete", "Delete", true]]);
+      more = stages(p.status);
       linkBox = true;
     } else if (p.status === "publishing") {
       const stuck = Date.now() - new Date(p.updated_at).getTime() > 10 * 60 * 1000;
@@ -948,6 +957,10 @@
       else if (act === "unapprove") { await patchPost(post.id, { status: "ready", approved_at: null }); renderAndShow(post.id); }
       else if (act === "send") { await patchPost(post.id, { status: "ready" }); renderAndShow(post.id); toast("Sent for approval"); }
       else if (act === "todraft") { await patchPost(post.id, { status: "draft", approved_at: null }); renderAndShow(post.id); }
+      // Moving a post to another stage from its menu. Leaving "scheduled" always clears the time.
+      else if (act === "to-draft") { await patchPost(post.id, { status: "draft", approved_at: null, scheduled_at: null }); renderAndShow(post.id); }
+      else if (act === "to-ready") { await patchPost(post.id, { status: "ready", approved_at: null, scheduled_at: null }); renderAndShow(post.id); }
+      else if (act === "to-approved") { await patchPost(post.id, { status: "approved", approved_at: post.approved_at || new Date().toISOString(), scheduled_at: null }); renderAndShow(post.id); }
       else if (act === "schedule") openSchedule(post);
       else if (act === "unschedule") { await patchPost(post.id, { status: "approved", scheduled_at: null }); renderAndShow(post.id); }
       else if (act === "unstick") { await patchPost(post.id, { status: "approved", publish_error: "Publishing was stopped part way. Check LinkedIn before publishing again." }); render(); }
