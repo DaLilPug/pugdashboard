@@ -28,6 +28,7 @@
 .cp-sub { margin: 0; color: var(--gray-600); font-size: 14px; }
 .cp-sub a { color: var(--li-blue); font-weight: 600; }
 .cp-top-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cp-down { font-size: 13px; margin-left: 2px; }
 
 /* ---- how the posts are doing, and the LinkedIn connection ---- */
 .cp-conn-line { margin-top: 2px; font-size: 13px; }

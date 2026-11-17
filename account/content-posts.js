@@ -225,7 +225,7 @@
   function msgHtml(c) {
     const mine = (c.side === "client") === S.isShare;
     return `<div class="cp-msg${mine ? " cp-msg-mine" : ""}" data-comment="${c.id}">
-      <div class="cp-msg-meta"><b>${who(c.side)}</b><span>${fmtDate(c.created_at)}</span>${mine ? `<button type="button" class="cp-msg-del" data-act="delcomment" title="Delete">Delete</button>` : ""}</div>
+      <div class="cp-msg-meta">${mine ? "" : `<b>${who(c.side)}</b>`}<span>${fmtDate(c.created_at)}</span>${mine ? `<button type="button" class="cp-msg-del" data-act="delcomment" title="Delete">Delete</button>` : ""}</div>
       <div class="cp-msg-body">${esc(c.body)}</div></div>`;
   }
   function threadHtml(post, t) {
@@ -412,7 +412,8 @@
     let html = `<div class="cp-top"><div>
         ${team ? "" : `<p class="cp-sub">Read each post, approve it, or highlight any words to leave a comment.</p>`}
         ${conn ? `<div class="cp-sub cp-conn-line">${conn}</div>` : ""}</div>
-        ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
+        <div class="cp-top-actions">${S.posts.some((p) => p.status === "posted") ? `<button type="button" class="cp-btn cp-btn-ghost cp-btn-lg" data-act="toposted">Posted <span class="cp-down">&#8595;</span></button>` : ""}
+          ${team ? `<button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button>` : ""}</div>
       </div>`;
     let any = false;
     for (const sec of SECTIONS) {
@@ -497,18 +498,25 @@
   function selectionIn() {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount || sel.isCollapsed) return null;
-    const r = sel.getRangeAt(0);
-    const node = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentElement;
-    const text = node && node.closest ? node.closest(".cp-text") : null;
+    const r = sel.getRangeAt(0).cloneRange();
+    const inText = (n) => { const el = n && (n.nodeType === 1 ? n : n.parentElement); return el && el.closest ? el.closest(".cp-text") : null; };
+    const text = inText(r.startContainer) || inText(r.endContainer);
     if (!text || !S.root.contains(text) || text.classList.contains("cp-text-empty")) return null;
-    const quote = r.toString();
-    if (!quote.trim()) return null;
+    if (!text.contains(r.startContainer)) r.setStart(text, 0);
+    if (!text.contains(r.endContainer)) r.setEnd(text, text.childNodes.length);
+    const raw = r.toString();
+    const quote = raw.trim();
+    if (!quote) return null;
     const pre = document.createRange();
     pre.selectNodeContents(text);
     pre.setEnd(r.startContainer, r.startOffset);
+    const start = pre.toString().length + (raw.length - raw.trimStart().length);
     const postId = text.closest(".cp-row").dataset.post;
     if (postById(postId).status === "posted") return null;
-    return { postId, quote, start: pre.toString().length, rect: r.getBoundingClientRect() };
+    // Where to put the button: over the first line of what is highlighted.
+    const rects = r.getClientRects();
+    const rect = rects.length ? rects[0] : r.getBoundingClientRect();
+    return { postId, quote, start, rect };
   }
   function updateSelButton() {
     const btn = S.selBtn;
@@ -860,6 +868,10 @@
       }
       else if (act === "new") openComposer(null);
       else if (act === "external") openLink(null);
+      else if (act === "toposted") {
+        const head = S.root.querySelector(".cp-posted-head");
+        if (head) window.scrollTo({ top: head.getBoundingClientRect().top + window.scrollY - 100, behavior: "smooth" });
+      }
       else if (act === "connect") await connectLinkedIn();
       else if (act === "sync") await refreshNumbers(false);
       else if (act === "disconnect") await disconnectLinkedIn();
