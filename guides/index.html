@@ -656,6 +656,7 @@
             <li><a href="#dash-assets">Assets</a></li>
             <li><a href="#dash-integrations">Integrations (API keys + Zapier)</a></li>
             <li><a href="#dash-analysis">Analysis</a></li>
+            <li><a href="#dash-posts">Posts</a></li>
             <li><a href="#dash-hubspot-sync">Native HubSpot sync</a></li>
             <li><a href="#dash-team">Team page (admins + members)</a></li>
             <li><a href="#dash-billing">Billing</a></li>
@@ -1935,12 +1936,12 @@
 
       <h4>Which tabs a client sees</h4>
       <p>
-        A per-account page has eleven tabs. The first five - <strong>Summary,
+        A per-account page has twelve tabs. The first five - <strong>Summary,
         Meetings, Responses, Prospects, Meeting Links</strong> - are
-        client-facing. The remaining six - <strong>Follow-ups, Cadence, Reply
-        Instructions, Assets, Integrations, Analysis</strong> - are internal, and
+        client-facing. The remaining seven - <strong>Follow-ups, Cadence, Reply
+        Instructions, Assets, Integrations, Analysis, Posts</strong> - are internal, and
         carry a light blue tint so you can tell at a glance which is which. Open
-        a <a href="#dash-share">share link</a> and the internal six aren't there
+        a <a href="#dash-share">share link</a> and the internal seven aren't there
         at all.
       </p>
       <div class="callout warn">
@@ -2407,7 +2408,7 @@
         choose: accepted, responded, positive reply, or every prospect.
       </p>
       <p>
-        See <a href="#dash-enrichment-section">8.17 - Enrichment</a> for the
+        See <a href="#dash-enrichment-section">8.18 - Enrichment</a> for the
         full setup walkthrough (getting an Apollo account, finding your API
         key, wiring it up on the Team page) plus details on cost, match
         rates, and the auto-enrich behavior.
@@ -3172,7 +3173,105 @@
         </p>
       </div>
 
-      <h3 id="dash-hubspot-sync">8.14 - Per-account: Native HubSpot sync</h3>
+      <h3 id="dash-posts">8.14 - Per-account: Posts</h3>
+      <p>
+        Posts is where an account's LinkedIn posts are written, approved and
+        tracked, from first draft to results. It's an internal tab - clients on a
+        <a href="#dash-share">share link</a> never see it.
+      </p>
+
+      <h4>Connect LinkedIn</h4>
+      <p>
+        At the top of the tab, click <strong>Connect LinkedIn</strong> and approve
+        on LinkedIn's screen. LinkedIn connects whichever profile that browser is
+        signed into, so do this from a browser signed in as the person the account
+        belongs to. Once connected the line reads
+        <strong>Connected as [name]</strong>; click it for <strong>Refresh numbers
+        now</strong> and <strong>Disconnect LinkedIn</strong>. Numbers refresh on
+        their own every night. Disconnecting keeps every post and its numbers.
+      </p>
+
+      <h4>The five stages</h4>
+      <ul>
+        <li><strong>Drafts</strong> - being written. Only your team sees them.</li>
+        <li><strong>Waiting for approval</strong> - ready for the client to review.</li>
+        <li><strong>Approved</strong> - cleared to go out.</li>
+        <li><strong>Scheduled</strong> - approved and given a date and time.</li>
+        <li><strong>Posted</strong> - live on LinkedIn, with its results.</li>
+      </ul>
+
+      <h4>Write a post</h4>
+      <ol class="steps">
+        <li>Click <strong>Write a post</strong>. The box is laid out like
+            LinkedIn's own.</li>
+        <li>Type the post. Add photos with the picture icon (JPG, PNG or GIF, up
+            to 20).</li>
+        <li>Click <strong>Save draft</strong> to keep working on it, or
+            <strong>Send for approval</strong> when it's ready.</li>
+      </ol>
+
+      <h4>Comment on a post</h4>
+      <p>
+        Highlight any words in a post and a <strong>Comment</strong> button
+        appears; the comment stays attached to those words. Use <strong>Add a
+        comment</strong> for a note about the whole post. Each comment can be
+        replied to, and <strong>Resolve</strong> tucks it away once it's handled.
+      </p>
+
+      <h4>Move a post along</h4>
+      <p>
+        The buttons on a post are its usual next step - <strong>Send for
+        approval</strong>, <strong>Mark approved</strong>,
+        <strong>Schedule</strong>. The <strong>&#8943;</strong> menu lists every
+        other stage, so a post can be moved anywhere from anywhere, plus
+        <strong>Delete</strong>. <strong>Edit</strong> reopens the post's text
+        and photos at any stage before it's posted.
+      </p>
+
+      <h4>Getting a post onto LinkedIn</h4>
+      <p>There are two ways, and both end with the post in <strong>Posted</strong>.</p>
+      <ul>
+        <li><strong>Publish from here.</strong> <strong>Schedule</strong> picks a
+            date and time, and the post goes out to the connected profile at that
+            time. <strong>Publish now</strong> sends it right away. To change or
+            cancel a scheduled time, click <strong>Change time</strong>.</li>
+        <li><strong>Post it on LinkedIn yourself.</strong> Click the copy icon to
+            copy the post's text, post it on LinkedIn, then copy that post's link
+            (the three dots on the post, <em>Copy link to post</em>) and paste it
+            into <strong>Already posted? Paste URL</strong>. The post moves to
+            Posted and takes its date from the link. If the link is to a post that
+            starts differently, you're asked to confirm before it saves.</li>
+      </ul>
+      <div class="callout tip">
+        <div class="callout-title">Video, documents and polls</div>
+        <p>
+          Publishing from here covers text and photos. For a post with video, a
+          document or a poll, post it on LinkedIn yourself and paste the link.
+        </p>
+      </div>
+
+      <h4>Posted: results</h4>
+      <p>
+        Every posted post shows its <strong>impressions, reactions, comments,
+        reposts, button clicks</strong> and <strong>link clicks</strong>. The
+        panel on the right totals them, with the account's follower count. Two
+        dropdowns above it set the order (newest first, or highest on any one
+        number) and the timeframe; the timeframe decides both the totals and which
+        posts are listed. The <strong>Posted</strong> button at the top of the tab
+        jumps straight to this section.
+      </p>
+      <ul>
+        <li><strong>Button clicks</strong> - clicks on the profile button shown on
+            the post, such as <em>Visit my website</em> or <em>Book an
+            appointment</em>.</li>
+        <li><strong>Link clicks</strong> - clicks on links inside the post.</li>
+      </ul>
+      <p>
+        To track a post that went out without being written here, click
+        <strong>+ Add a post</strong> and paste its link.
+      </p>
+
+      <h3 id="dash-hubspot-sync">8.15 - Per-account: Native HubSpot sync</h3>
       <p>
         On the same Integrations tab, a separate card lets you connect HubSpot
         natively - no Zapier in the middle. Outreach events push out to HubSpot
@@ -3352,7 +3451,7 @@
         </p>
       </div>
 
-      <h3 id="dash-team">8.15 - Team page (admins + members)</h3>
+      <h3 id="dash-team">8.16 - Team page (admins + members)</h3>
       <p>
         Admins see a <strong>Team</strong> link in the top-right header.
         The page heading shows the organization name with a ✎ pencil next to
@@ -3396,7 +3495,7 @@
             links).</li>
         <li><strong>Billing card</strong> (admin-only, just above Enrichment) -
             add seat / remove seat / switch monthly↔annual / manage payment
-            &amp; invoices. See <a href="#dash-billing">8.16</a>.</li>
+            &amp; invoices. See <a href="#dash-billing">8.17</a>.</li>
         <li><strong>Leave organization</strong> (anyone) - at the very bottom.
             Members can always leave; admins can leave only if at least one
             other admin remains, or - if they're the last person - only after
@@ -3405,7 +3504,7 @@
             <a href="#faq">leaving an org to join another</a>.</li>
       </ul>
 
-      <h3 id="dash-billing">8.16 - Billing</h3>
+      <h3 id="dash-billing">8.17 - Billing</h3>
       <p>
         Uptown Tracker bills <strong>$15 per seat per month</strong> or
         <strong>$120 per seat per year</strong> (33% off when billed annually).
@@ -3445,7 +3544,7 @@
         </p>
       </div>
 
-      <h3 id="dash-enrichment-section">8.17 - Enrichment</h3>
+      <h3 id="dash-enrichment-section">8.18 - Enrichment</h3>
       <p>
         Uptown Tracker integrates with <strong>Apollo</strong> to enrich
         prospect emails directly inside the Prospects tab. Connection requests
@@ -3603,7 +3702,7 @@
         column on the table.
       </p>
 
-      <h3 id="dash-share">8.18 - Sharing an account with a link</h3>
+      <h3 id="dash-share">8.19 - Sharing an account with a link</h3>
       <p>
         The <strong>Share</strong> button at the top-right of an account page
         creates one public link to that account. Anyone you send it to gets
@@ -3620,7 +3719,7 @@
         <li><strong>Send it</strong> to whoever needs to work or review the
             account. They land directly on it and get the five client-facing
             tabs - <em>Summary, Meetings, Responses, Prospects, Meeting
-            Links</em>. The six internal tabs aren't shown.</li>
+            Links</em>. The seven internal tabs aren't shown.</li>
         <li><strong>Stop sharing</strong> any time: open Share and click
             <strong>Stop sharing</strong>. The link stops working immediately for
             everyone, and any open session loses access on the spot.</li>
