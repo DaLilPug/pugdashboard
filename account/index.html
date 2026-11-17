@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/app.css" />
-  <link rel="stylesheet" href="/account/content-posts.css?v=26" />
+  <link rel="stylesheet" href="/account/content-posts.css?v=27" />
   <!-- Chart.js for the cumulative chart. ~70KB gz. Loaded from jsdelivr. -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
 </head>
@@ -1056,7 +1056,9 @@
 
       document.getElementById("account-name").textContent = client.name;
       // Browser tab shows the account's name (regular and share links).
-      document.title = `${client.name} - Uptown Tracker`;
+      document.title = new URLSearchParams(location.search).get("view") === "posts"
+        || sb.getSession()?.user?.user_metadata?.posts_only
+        ? `${client.name} - Uptown` : `${client.name} - Uptown Tracker`;
       const metaEl = document.getElementById("account-meta");
       metaEl.innerHTML = [
         client.slug ? `<span>${esc(client.slug)}</span>` : "",
@@ -1083,6 +1085,30 @@
       // the tab plumbing that consumes it.
       let shareHiddenTabs = [];
       initShare();
+
+      // ---- Posts-only view ---------------------------------------------
+      // The account page with nothing but the Posts tab and Sign out: no tab
+      // strip, no header links, no Share, no footer, the plain Uptown logo.
+      // On for a login whose user_metadata has posts_only (the demo account
+      // LinkedIn's reviewers use), or for anyone who adds ?view=posts to the
+      // link (screen recordings). Presentation only, like the share view:
+      // access is still decided by has_client_access. Off by default, so no
+      // one else sees a change. CSS: body.is-posts-only in content-posts.css.
+      const postsOnly = new URLSearchParams(location.search).get("view") === "posts"
+        || !!(sb.getSession()?.user?.user_metadata?.posts_only);
+      if (postsOnly) {
+        document.body.classList.add("is-posts-only");
+        const logo = document.querySelector(".header-logo img");
+        if (logo) { logo.src = "/assets/logo-white.png"; logo.alt = "Uptown"; }
+        const strip = document.getElementById("sub-tabs");
+        const gone = [...strip.querySelectorAll('.sub-tab:not([data-tab="posts"])')]
+          .map(b => { const t = b.dataset.tab; b.remove(); return t; });
+        shareHiddenTabs.push(...gone);
+        const mobSel = strip.nextElementSibling;
+        if (mobSel && mobSel.classList.contains("mobile-pill-select")) {
+          [...mobSel.options].forEach(o => { if (gone.includes(o.value)) o.remove(); });
+        }
+      }
       function initShare() {
         const sess = sb.getSession();
         const meta = sess && sess.user && sess.user.user_metadata;
@@ -1415,6 +1441,7 @@
 
       const initialTab = (() => {
         const h = (location.hash || "").replace(/^#/, "").toLowerCase();
+        if (postsOnly && VALID_TABS.has("posts")) return "posts";
         return VALID_TABS.has(h) ? h : "summary";
       })();
       selectTab(initialTab);

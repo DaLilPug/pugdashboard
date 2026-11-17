@@ -287,3 +287,18 @@ a.cp-blue:hover { text-decoration: underline; }
   .cp-modal-sm, .cp-modal-md { margin: 10vh 12px 0; }
   .cp-fields-wide { grid-template-columns: 1fr; }
 }
+
+/* Posts-only view (account page, body.is-posts-only): the Posts tab and Sign out,
+   nothing else. Switched on in account/index.html for a posts_only login or ?view=posts. */
+body.is-posts-only #dashboard-breadcrumb,
+body.is-posts-only .header-pipe,
+body.is-posts-only #user-email,
+body.is-posts-only #guides-link,
+body.is-posts-only #team-link,
+body.is-posts-only #platform-admin-link,
+body.is-posts-only #share-wrap,
+body.is-posts-only #account-name-edit-btn,
+body.is-posts-only #account-meta,
+body.is-posts-only #sub-tabs,
+body.is-posts-only .mobile-pill-select,
+body.is-posts-only .app-footer { display: none; }

@@ -303,6 +303,13 @@
   <script>
     (async function main() {
       const session = await Auth.requireAuth();
+      // A posts-only login (the demo account for LinkedIn's reviewers) has one
+      // account and sees only its Posts tab, so it never lands here.
+      const postsOnlyClient = session?.user?.user_metadata?.posts_only_client;
+      if (session?.user?.user_metadata?.posts_only && postsOnlyClient) {
+        window.location.replace(`/account/?id=${encodeURIComponent(postsOnlyClient)}#posts`);
+        return;
+      }
       Auth.wireSignOut();
       Auth.wireUserEmail(session);
 
