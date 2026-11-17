@@ -180,7 +180,7 @@
         `<button type="button" class="cp-menu-item${danger ? " cp-danger" : ""}" data-act="${act}">${label}</button>`).join("");
       return rows ? `<div class="cp-menu-wrap"><button type="button" class="cp-btn cp-btn-quiet cp-more" data-act="menu" aria-label="More">&#8943;</button><div class="cp-menu hidden">${rows}</div></div>` : "";
     };
-    let main = "", more = "";
+    let main = "", more = "", linkBox = false;
     if (S.isShare) {
       if (p.status === "ready") main = b("approve", "Approve", "cp-btn-approve") + b("edit", "Edit", "cp-btn-ghost");
       else if (p.status === "approved") main = b("edit", "Edit", "cp-btn-ghost") + b("unapprove", "Undo approval", "cp-btn-quiet");
@@ -192,16 +192,20 @@
       main = b("approve", "Mark approved", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
       more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["todraft", "Back to draft"], ["delete", "Delete", true]]);
     } else if (p.status === "approved") {
-      main = b("schedule", "Schedule", "cp-btn-primary") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["unapprove", "Back to waiting for approval"], ["link", "Already posted? Add the link"], ["delete", "Delete", true]]);
+      main = b("schedule", "Schedule", "cp-btn-primary") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + b("copytext", "Copy text", "cp-btn-ghost");
+      more = menu([["unapprove", "Back to waiting for approval"], ["delete", "Delete", true]]);
+      linkBox = true;
     } else if (p.status === "scheduled") {
-      main = b("schedule", "Change time", "cp-btn-ghost") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost");
-      more = menu([["unschedule", "Take off the schedule"], ["link", "Already posted? Add the link"], ["delete", "Delete", true]]);
+      main = b("schedule", "Change time", "cp-btn-ghost") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + b("copytext", "Copy text", "cp-btn-ghost");
+      more = menu([["unschedule", "Take off the schedule"], ["delete", "Delete", true]]);
+      linkBox = true;
     } else if (p.status === "publishing") {
       const stuck = Date.now() - new Date(p.updated_at).getTime() > 10 * 60 * 1000;
       more = stuck ? menu([["unstick", "Stop and set back to approved"]]) : "";
     }   // a posted post has no action row: its one option sits in the "Posted" line (postedMenuHtml)
-    return main || more ? `<div class="cp-actions">${main}<span class="cp-grow"></span>${more}</div>` : "";
+    // For a post that went out on LinkedIn directly: paste its link and it counts as posted.
+    const box = linkBox ? `<input type="url" class="cp-linkbox" placeholder="Already posted? Paste the link" aria-label="Already posted? Paste the link" autocomplete="off" />` : `<span class="cp-grow"></span>`;
+    return main || more ? `<div class="cp-actions">${main}${box}${more}</div>` : "";
   }
 
   function postedMenuHtml(p) {
@@ -801,6 +805,43 @@
     };
   }
 
+  // The start of a post, letters and digits only, for telling two posts apart.
+  const opening = (s) => String(s || "").split("\n").find((l) => l.trim()) || "";
+  const fingerprint = (s) => opening(s).toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24);
+
+  // A link pasted into the box on an approved or scheduled post.
+  async function saveLink(input) {
+    const row = input.closest(".cp-row");
+    const post = row ? postById(row.dataset.post) : null;
+    const raw = input.value.trim();
+    if (!post || !raw || input.disabled) return;
+    input.disabled = true;
+    try {
+      const info = await readLink(S.clientId, raw);
+      if (!info) { toast("That does not look like a link to a LinkedIn post.", true); return; }
+      // The easy mistake is the link to a different post. Speak up only when the openings differ.
+      const theirs = fingerprint(info.title), ours = fingerprint(post.body);
+      const n = Math.min(theirs.length, ours.length);
+      if (n >= 8 && theirs.slice(0, n) !== ours.slice(0, n)) {
+        const ok = await confirmBox("Is this the right post?",
+          `The link's post starts with "${opening(info.title).slice(0, 80)}". This one starts with "${opening(post.body).slice(0, 80)}".`, "Yes, save it");
+        if (!ok) return;
+      }
+      await patchPost(post.id, {
+        url: info.url, activity_id: info.activity_id, status: "posted", source: "external",
+        posted_on: info.posted_on || new Date().toLocaleDateString("en-CA"),
+        published_at: info.published_at || new Date().toISOString(), scheduled_at: null, publish_error: null,
+      });
+      renderAndShow(post.id);
+      toast("Marked as posted");
+      if (S.integ) refreshNumbers(true);
+    } catch (err) {
+      toast(/duplicate|unique/i.test(err.message) ? "That post is already in the list." : err.message, true);
+    } finally {
+      if (input.isConnected) { input.disabled = false; input.value = ""; }
+    }
+  }
+
   async function connectLinkedIn() {
     try {
       const r = await sb.invokeFunction("linkedin-oauth-init", { client_id: S.clientId });
@@ -888,6 +929,10 @@
       }
       else if (act === "new") openComposer(null);
       else if (act === "external") openLink(null);
+      else if (act === "copytext") {
+        await navigator.clipboard.writeText(post.body || "");
+        toast("Text copied");
+      }
       else if (act === "toposted") {
         const head = S.root.querySelector(".cp-posted-head");
         if (head) window.scrollTo({ top: head.getBoundingClientRect().top + window.scrollY - 125, behavior: "smooth" });
@@ -968,6 +1013,7 @@
     if (e.key !== "Enter" || e.shiftKey) return;
     const ta = e.target;
     if (!ta.classList) return;
+    if (ta.classList.contains("cp-linkbox")) { e.preventDefault(); saveLink(ta); return; }
     if (ta.classList.contains("cp-reply")) { e.preventDefault(); ta.parentElement.querySelector('[data-act="reply"]').click(); }
     else if (ta.classList.contains("cp-draft-input") && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ta.closest(".cp-thread").querySelector('[data-act="draftsave"]').click(); }
   }
@@ -1011,6 +1057,11 @@
     S.root.addEventListener("input", onInput);
     S.root.addEventListener("keydown", onKey);
     S.root.addEventListener("mouseover", onHover);
+    // The link box saves the moment something is pasted into it.
+    S.root.addEventListener("paste", (e) => {
+      const el = e.target;
+      if (el.classList && el.classList.contains("cp-linkbox")) setTimeout(() => saveLink(el), 0);
+    });
     S.root.addEventListener("change", (e) => {
       const el = e.target;
       if (!el.classList || !el.classList.contains("cp-sort")) return;
