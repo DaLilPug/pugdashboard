@@ -296,7 +296,7 @@
     const pr = profile();
     const posted = p.status === "posted";
     // Shown through LinkedIn's own display, the post already carries its header.
-    const viaEmbed = posted && !p.body && embedSrc(p);
+    const viaEmbed = posted && (!p.body || p.source === "external") && embedSrc(p);
     const err = p.publish_error && !S.isShare ? `<div class="cp-error">${esc(p.publish_error)}</div>` : "";
     const strip = p.status === "draft" || p.status === "ready" ? ""
       : `<div class="cp-status cp-status-${p.status}"><span>${esc(statusLine(p))}</span>${posted ? postedMenuHtml(p) : ""}</div>`;
@@ -307,8 +307,8 @@
     return `<article class="cp-row${posted ? " cp-row-posted" : ""}" data-post="${p.id}">
       <div class="cp-card">
         ${strip}${head}
-        ${p.body ? `<div class="cp-text">${bodyHtml(p)}</div>` : (viaEmbed ? `<iframe class="cp-embed-inline" src="${esc(viaEmbed)}" title="LinkedIn post" loading="lazy"></iframe>` : "")}
-        ${imagesHtml(p.images)}${statsHtml(p)}${err}${actionsHtml(p)}
+        ${viaEmbed ? `<iframe class="cp-embed-inline" src="${esc(viaEmbed)}" title="LinkedIn post" loading="lazy"></iframe>` : (p.body ? `<div class="cp-text">${bodyHtml(p)}</div>` : "")}
+        ${viaEmbed ? "" : imagesHtml(p.images)}${statsHtml(p)}${err}${actionsHtml(p)}
       </div>
       ${posted && !rail ? "" : `<aside class="cp-rail">${rail}</aside>`}
     </article>`;
@@ -831,7 +831,7 @@
       // The easy mistake is the link to a different post. Speak up only when the openings differ.
       const theirs = fingerprint(info.title), ours = fingerprint(post.body);
       const n = Math.min(theirs.length, ours.length);
-      if (n >= 8 && theirs.slice(0, n) !== ours.slice(0, n)) {
+      if (n > 0 && theirs.slice(0, n) !== ours.slice(0, n)) {
         const ok = await confirmBox("Is this the right post?",
           `The link's post starts with "${opening(info.title).slice(0, 80)}". This one starts with "${opening(post.body).slice(0, 80)}".`, "Yes, save it");
         if (!ok) return;
