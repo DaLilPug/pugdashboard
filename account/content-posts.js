@@ -376,7 +376,9 @@
     ["link_clicks", "Most link clicks"], ["rate", "Highest engagement"],
   ];
   function sortPosted(list) {
-    const newest = (a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || ""));
+    // By day, then by the moment it went live, so two posts on the same day keep their order.
+    const newest = (a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || ""))
+      || String(b.published_at || "").localeCompare(String(a.published_at || ""));
     const key = S.postedSort;
     if (key === "newest") return list.slice().sort(newest);
     const val = (p) => {
