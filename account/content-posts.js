@@ -4,10 +4,11 @@
 // from "waiting for approval" on, can approve it, edit it, and highlight any
 // words to comment on them. The team also sees drafts, writes posts in a
 // composer that looks like LinkedIn's, schedules and publishes them, and can
-// add the link of a post that went live some other way. The top of the tab
-// carries how the posts are doing (posts, impressions, engagement rate,
-// followers) and one quiet line for the LinkedIn connection; this tab replaced
-// the old internal Content tab on 11/17/26.
+// add the link of a post that went live some other way. Under the title sits
+// one quiet line for the LinkedIn connection. The Posted section carries how
+// the posts are doing: a totals panel on its right, with a timeframe that
+// also decides which posted posts are listed, and a sort by any number. This
+// tab replaced the old internal Content tab on 11/17/26.
 //
 // Data: content_posts (+ content_posts_latest for numbers) and
 // content_post_comments, both gated by has_client_access; drafts are hidden
@@ -135,7 +136,7 @@
     const body = post.body || "";
     const ranges = [];
     threadsFor(post.id).forEach((t) => {
-      if (t.root.resolved_at || !t.root.quote) return;
+      if (post.status === "posted" || t.root.resolved_at || !t.root.quote) return;
       const s = locate(body, t.root.quote, t.root.quote_start);
       if (s >= 0) ranges.push({ s, e: s + t.root.quote.length, id: t.root.id });
     });
@@ -190,10 +191,14 @@
     } else if (p.status === "publishing") {
       const stuck = Date.now() - new Date(p.updated_at).getTime() > 10 * 60 * 1000;
       more = stuck ? menu([["unstick", "Stop and set back to approved"]]) : "";
-    } else {
-      more = menu([["delete", "Remove from this list", true]]);
-    }
+    }   // a posted post has no action row: its one option sits in the "Posted" line (postedMenuHtml)
     return main || more ? `<div class="cp-actions">${main}<span class="cp-grow"></span>${more}</div>` : "";
+  }
+
+  function postedMenuHtml() {
+    if (S.isShare) return "";
+    return `<span class="cp-grow"></span><div class="cp-menu-wrap"><button type="button" class="cp-btn cp-btn-quiet cp-more cp-more-sm" data-act="menu" aria-label="More">&#8943;</button>
+      <div class="cp-menu cp-menu-down cp-menu-end hidden"><button type="button" class="cp-menu-item cp-danger" data-act="delete">Remove from this list</button></div></div>`;
   }
 
   function statsHtml(p) {
@@ -238,6 +243,13 @@
   }
   function railHtml(post) {
     const threads = threadsFor(post.id);
+    // A live post takes no new comments; the ones from before stay behind a link.
+    if (post.status === "posted") {
+      if (!threads.length) return "";
+      const n = threads.reduce((s, t) => s + 1 + t.replies.length, 0);
+      return `<button type="button" class="cp-resolved-toggle" data-act="toggleresolved">${n} ${n === 1 ? "comment" : "comments"} from before it was posted</button>`
+        + (S.showResolved.has(post.id) ? threads.map((t) => threadHtml(post, t)).join("") : "");
+    }
     // Comments on a passage first, in the order the passages appear; then the general ones.
     const where = (t) => { const i = t.root.quote ? locate(post.body || "", t.root.quote, t.root.quote_start) : -1; return i < 0 ? 1e9 : i; };
     const open = threads.filter((t) => !t.root.resolved_at).sort((x, y) => where(x) - where(y));
@@ -260,17 +272,23 @@
   // ---- one post: the card and its comments -----------------------------------
   function rowHtml(p) {
     const pr = profile();
+    const posted = p.status === "posted";
+    // Shown through LinkedIn's own display, the post already carries its header.
+    const viaEmbed = posted && !p.body && embedSrc(p);
     const err = p.publish_error && !S.isShare ? `<div class="cp-error">${esc(p.publish_error)}</div>` : "";
-    return `<article class="cp-row" data-post="${p.id}">
-      <div class="cp-card">
-        ${p.status === "draft" || p.status === "ready" ? "" : `<div class="cp-status cp-status-${p.status}">${esc(statusLine(p))}</div>`}
-        <header class="cp-head">${avatarHtml()}
+    const strip = p.status === "draft" || p.status === "ready" ? ""
+      : `<div class="cp-status cp-status-${p.status}"><span>${esc(statusLine(p))}</span>${posted ? postedMenuHtml() : ""}</div>`;
+    const head = viaEmbed ? "" : `<header class="cp-head">${avatarHtml()}
           <div class="cp-head-text"><div class="cp-name">${esc(pr.name)}</div>
-          ${pr.headline ? `<div class="cp-headline">${esc(pr.headline)}</div>` : ""}</div></header>
-        ${p.body ? `<div class="cp-text">${bodyHtml(p)}</div>` : (p.status === "posted" && embedSrc(p) ? `<iframe class="cp-embed-inline" src="${esc(embedSrc(p))}" title="LinkedIn post" loading="lazy"></iframe>` : "")}
+          ${pr.headline ? `<div class="cp-headline">${esc(pr.headline)}</div>` : ""}</div></header>`;
+    const rail = railHtml(p);
+    return `<article class="cp-row${posted ? " cp-row-posted" : ""}" data-post="${p.id}">
+      <div class="cp-card">
+        ${strip}${head}
+        ${p.body ? `<div class="cp-text">${bodyHtml(p)}</div>` : (viaEmbed ? `<iframe class="cp-embed-inline" src="${esc(viaEmbed)}" title="LinkedIn post" loading="lazy"></iframe>` : "")}
         ${imagesHtml(p.images)}${statsHtml(p)}${err}${actionsHtml(p)}
       </div>
-      <aside class="cp-rail">${railHtml(p)}</aside>
+      ${posted && !rail ? "" : `<aside class="cp-rail">${rail}</aside>`}
     </article>`;
   }
 
@@ -290,43 +308,68 @@
     if (S.tf === "yr") return `${now.getFullYear()}-01-01`;
     return null;
   }
-  function perfHtml() {
-    const posted = S.posts.filter((p) => p.status === "posted");
+  // Totals for the posted posts in the chosen timeframe, stacked, beside the list.
+  function totalsHtml(inWin) {
     const fol = S.followers;
     const latest = fol.length ? fol[fol.length - 1] : null;
-    if (!posted.length && !latest) return "";
+    if (!S.posts.some((p) => p.status === "posted") && !latest) return "";
     const cut = cutoffDay();
-    const inWin = cut ? posted.filter((p) => String(p.posted_on || "") >= cut) : posted;
-    const measured = inWin.filter((p) => p.impressions !== null && p.impressions !== undefined);
+    const has = (v) => v !== null && v !== undefined;
+    const measured = inWin.filter((p) => has(p.impressions));
     const imp = measured.reduce((s, p) => s + (p.impressions || 0), 0);
     const eng = measured.reduce((s, p) => s + (p.reactions || 0) + (p.comments || 0) + (p.reshares || 0), 0);
+    const sumOf = (col) => {
+      const rows = inWin.filter((p) => has(p[col]));
+      return rows.length ? num(rows.reduce((s, p) => s + (p[col] || 0), 0)) : "-";
+    };
     let delta = null;
     if (latest) {
       const first = cut ? fol.find((f) => f.captured_on >= cut) : fol[0];
       if (first && first.captured_on !== latest.captured_on) delta = latest.followers - first.followers;
     }
-    const sumOf = (col) => {
-      const rows = inWin.filter((p) => p[col] !== null && p[col] !== undefined);
-      return rows.length ? num(rows.reduce((s, p) => s + (p[col] || 0), 0)) : "-";
-    };
-    const tile = (label, value, sub, act, hint) =>
-      `<${act ? `button type="button" data-act="${act}"` : "div"} class="cp-tile${act ? " cp-tile-btn" : ""}"${hint ? ` title="${hint}"` : ""}>
-        <span class="cp-tile-label">${label}</span><span class="cp-tile-value">${value}</span>${sub ? `<span class="cp-tile-sub">${sub}</span>` : ""}</${act ? "button" : "div"}>`;
-    const tiles = [
-      tile("Posts", num(inWin.length)),
-      tile("Impressions", measured.length ? num(imp) : "-"),
-      tile("Engagement rate", imp ? (100 * eng / imp).toFixed(1) + "%" : "-"),
-      tile("Button clicks", sumOf("cta_clicks"), "", "", "Clicks on the profile button shown on posts, such as Visit my website"),
-      tile("Link clicks", sumOf("link_clicks"), "", "", "Clicks on links inside posts"),
-      latest ? tile("Followers", num(latest.followers),
+    const row = (label, value, sub, act, hint) =>
+      `<${act ? `button type="button" data-act="${act}"` : "div"} class="cp-total${act ? " cp-total-btn" : ""}"${hint ? ` title="${hint}"` : ""}>
+        <span class="cp-total-label">${label}</span><span class="cp-total-value">${sub ? `<em>${sub}</em>` : ""}${value}</span></${act ? "button" : "div"}>`;
+    const rows = [
+      row("Posts", num(inWin.length)),
+      row("Impressions", measured.length ? num(imp) : "-"),
+      row("Engagement rate", imp ? (100 * eng / imp).toFixed(1) + "%" : "-"),
+      row("Button clicks", sumOf("cta_clicks"), "", "", "Clicks on the profile button shown on posts, such as Visit my website"),
+      row("Link clicks", sumOf("link_clicks"), "", "", "Clicks on links inside posts"),
+      latest ? row("Followers", num(latest.followers),
         delta === null ? "" : `${delta >= 0 ? "+" : ""}${num(delta)}`, fol.length > 1 ? "chart" : "") : "",
     ].join("");
     const pills = TIMEFRAMES.map(([k, label]) =>
       `<button type="button" class="cp-pill${S.tf === k ? " cp-pill-on" : ""}" data-act="tf" data-tf="${k}">${label}</button>`).join("");
     const chart = S.showChart && fol.length > 1
       ? `<div class="cp-chart"><div class="cp-chart-note">Followers each day since ${fmtDate(fol[0].captured_on)}</div><div class="cp-chart-box"><canvas></canvas></div></div>` : "";
-    return `<div class="cp-perf"><div class="cp-tiles">${tiles}</div><div class="cp-pills">${pills}</div></div>${chart}`;
+    return `<aside class="cp-totals"><div class="cp-pills">${pills}</div><div class="cp-total-list">${rows}</div>${chart}</aside>`;
   }
+
+  // The order of the posted list: newest, or highest on any one number.
+  // Posts LinkedIn has given no number for go to the bottom.
+  const SORTS = [
+    ["newest", "Newest first"], ["impressions", "Most impressions"], ["reactions", "Most reactions"],
+    ["comments", "Most comments"], ["reshares", "Most reposts"], ["cta_clicks", "Most button clicks"],
+    ["link_clicks", "Most link clicks"], ["rate", "Highest engagement rate"],
+  ];
+  function sortPosted(list) {
+    const newest = (a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || ""));
+    const key = S.postedSort;
+    if (key === "newest") return list.slice().sort(newest);
+    const val = (p) => {
+      const v = key === "rate"
+        ? (p.impressions ? ((p.reactions || 0) + (p.comments || 0) + (p.reshares || 0)) / p.impressions : null)
+        : p[key];
+      return v === null || v === undefined ? null : Number(v);
+    };
+    return list.slice().sort((a, b) => {
+      const x = val(a), y = val(b);
+      if ((x === null) !== (y === null)) return x === null ? 1 : -1;
+      return (x === null ? 0 : y - x) || newest(a, b);
+    });
+  }
+
   function drawChart() {
     const canvas = S.root.querySelector(".cp-chart canvas");
     if (S.chart) { S.chart.destroy(); S.chart = null; }
@@ -371,25 +414,35 @@
         ${team ? "" : `<p class="cp-sub">Read each post, approve it, or highlight any words to leave a comment.</p>`}
         ${conn ? `<div class="cp-sub cp-conn-line">${conn}</div>` : ""}</div>
         ${team ? `<div class="cp-top-actions"><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write a post</button></div>` : ""}
-      </div>${perfHtml()}`;
+      </div>`;
     let any = false;
     for (const sec of SECTIONS) {
       if (sec.team && !team) continue;
-      let list = S.posts.filter(sec.has);
-      const isPosted = sec.key === "posted";
-      if (!list.length && !(isPosted && team && S.posts.length)) continue;
-      any = true;
-      if (isPosted) {
-        const newest = (a, b) => String(b.posted_on || b.published_at || "").localeCompare(String(a.posted_on || a.published_at || ""));
-        list = list.slice().sort(S.postedSort === "impressions" ? (a, b) => ((b.impressions ?? -1) - (a.impressions ?? -1)) || newest(a, b) : newest);
-      }
-      if (sec.key === "approved") list = list.slice().sort((a, b) => String(a.scheduled_at || "9").localeCompare(String(b.scheduled_at || "9")));
-      const total = list.length;
-      if (sec.key === "posted") list = list.slice(0, S.postedShown);
+      const all = S.posts.filter(sec.has);
       const title = typeof sec.title === "function" ? sec.title() : sec.title;
-      html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${total}</span>${sec.note ? `<em>${esc(sec.note)}</em>` : ""}${isPosted ? postedToolsHtml(total) : ""}</h3>
-        ${list.map(rowHtml).join("")}
-        ${total > list.length ? `<button type="button" class="cp-btn cp-btn-ghost cp-showmore" data-act="moreposted">Show ${Math.min(POSTED_PAGE, total - list.length)} more</button>` : ""}</section>`;
+      if (sec.key === "posted") {
+        if (!all.length && !(team && S.posts.length)) continue;
+        any = true;
+        // The timeframe decides both the totals and which posts are listed.
+        const cutDay = cutoffDay();
+        const inWin = cutDay ? all.filter((p) => String(p.posted_on || "") >= cutDay) : all;
+        const older = all.length - inWin.length;
+        const list = sortPosted(inWin).slice(0, S.postedShown);
+        const olderLine = older ? `<p class="cp-older">${older} older ${older === 1 ? "post is" : "posts are"} outside this timeframe. <button type="button" class="cp-conn cp-conn-link" data-act="tf" data-tf="all">Show all time</button></p>` : "";
+        html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${inWin.length}</span>${postedToolsHtml(inWin.length)}</h3>
+          <div class="cp-posted-grid"><div class="cp-posted-list">
+            ${list.map(rowHtml).join("")}
+            ${!all.length ? `<p class="cp-older">Nothing posted yet.</p>` : ""}
+            ${inWin.length > list.length ? `<button type="button" class="cp-btn cp-btn-ghost cp-showmore" data-act="moreposted">Show ${Math.min(POSTED_PAGE, inWin.length - list.length)} more</button>` : ""}
+            ${olderLine}</div>${totalsHtml(inWin)}</div></section>`;
+        continue;
+      }
+      if (!all.length) continue;
+      any = true;
+      const list = sec.key === "approved"
+        ? all.slice().sort((a, b) => String(a.scheduled_at || "9").localeCompare(String(b.scheduled_at || "9"))) : all;
+      html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${list.length}</span>${sec.note ? `<em>${esc(sec.note)}</em>` : ""}</h3>
+        ${list.map(rowHtml).join("")}</section>`;
     }
     if (!any) {
       html += `<div class="cp-empty">${team
@@ -406,9 +459,8 @@
   // Beside the Posted heading: how to order them and, for the team, the way to
   // add a post that went out some other way.
   function postedToolsHtml(total) {
-    const sort = total > 1 ? `<select class="cp-sort" aria-label="Order of posted posts">
-        <option value="newest"${S.postedSort === "newest" ? " selected" : ""}>Newest first</option>
-        <option value="impressions"${S.postedSort === "impressions" ? " selected" : ""}>Most impressions</option></select>` : "";
+    const sort = total > 1 ? `<select class="cp-sort" aria-label="Order of posted posts">${SORTS.map(([k, label]) =>
+      `<option value="${k}"${S.postedSort === k ? " selected" : ""}>${label}</option>`).join("")}</select>` : "";
     const add = S.isShare ? "" : `<button type="button" class="cp-btn cp-btn-quiet cp-addpost" data-act="external">+ Add a post</button>`;
     return `<span class="cp-grow"></span>${sort}${add}`;
   }
@@ -794,7 +846,7 @@
       else if (act === "connect") await connectLinkedIn();
       else if (act === "sync") await refreshNumbers(false);
       else if (act === "disconnect") await disconnectLinkedIn();
-      else if (act === "tf") { S.tf = actEl.dataset.tf; render(); }
+      else if (act === "tf") { S.tf = actEl.dataset.tf; S.postedShown = POSTED_PAGE; render(); }
       else if (act === "chart") { S.showChart = !S.showChart; render(); }
       else if (act === "moreposted") { S.postedShown += POSTED_PAGE; render(); }
       else if (act === "edit") openComposer(post);
@@ -882,7 +934,7 @@
       root: opts.root, selectTab: opts.selectTab || null,
       posts: [], comments: [], integ: null, urls: {}, draft: null, pending: null,
       showResolved: new Set(), postedShown: POSTED_PAGE,
-      followers: [], tf: "3m", postedSort: "newest", showChart: false, chart: null,
+      followers: [], tf: "all", postedSort: "newest", showChart: false, chart: null,
     };
     S.root.classList.add("cp");
     S.root.innerHTML = `<div class="cp-loading">Loading posts...</div>`;
