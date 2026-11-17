@@ -798,7 +798,7 @@
         published_at: info.published_at || new Date().toISOString(), scheduled_at: null, publish_error: null,
       };
       try {
-        if (post) await patchPost(post.id, fields);
+        if (post) await patchPost(post.id, { ...fields, ...liveText(info) });
         else {
           const sess = sb.getSession();
           await sb.sbFetch("/rest/v1/content_posts", {
@@ -814,6 +814,11 @@
       }
     };
   }
+
+  // Once a post is live, the saved text becomes what LinkedIn shows, so the
+  // draft never sits behind it. If LinkedIn will not show the text (a post
+  // that is not public), the draft stays.
+  const liveText = (info) => (info && info.text ? { body: info.text, title: info.title || null } : {});
 
   // The start of a post, letters and digits only, for telling two posts apart.
   const opening = (s) => String(s || "").split("\n").find((l) => l.trim()) || "";
@@ -842,6 +847,7 @@
         url: info.url, activity_id: info.activity_id, status: "posted", source: "external",
         posted_on: info.posted_on || new Date().toLocaleDateString("en-CA"),
         published_at: info.published_at || new Date().toISOString(), scheduled_at: null, publish_error: null,
+        ...liveText(info),
       });
       renderAndShow(post.id);
       toast("Marked as posted");
