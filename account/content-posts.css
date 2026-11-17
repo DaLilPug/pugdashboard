@@ -151,9 +151,10 @@ a.cp-blue:hover { text-decoration: underline; }
 
 /* "Already posted? Paste the link": quiet until it is used */
 .cp-linkbox {
-  flex: 1 1 150px; min-width: 120px; border: 1px solid transparent; border-radius: 999px; background: var(--surface-2);
-  padding: 8px 13px; font: 400 13px Inter, sans-serif; color: var(--li-text); outline: none; text-overflow: ellipsis;
+  flex: 1 1 110px; min-width: 100px; border: 1px solid transparent; border-radius: 999px; background: var(--surface-2);
+  padding: 8px 11px; font: 400 12.5px Inter, sans-serif; color: var(--li-text); outline: none; text-overflow: ellipsis;
 }
+.cp-copybtn { padding: 8px 10px; display: inline-flex; align-items: center; }
 .cp-linkbox::placeholder { color: var(--gray-400); }
 .cp-linkbox:hover { border-color: var(--gray-200); }
 .cp-linkbox:focus { border-color: var(--li-blue); background: #fff; }

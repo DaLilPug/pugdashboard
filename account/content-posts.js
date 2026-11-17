@@ -192,11 +192,11 @@
       main = b("approve", "Mark approved", "cp-btn-primary") + b("edit", "Edit", "cp-btn-ghost");
       more = menu([["schedule", "Schedule"], ["publish", "Publish now"], ["todraft", "Back to draft"], ["delete", "Delete", true]]);
     } else if (p.status === "approved") {
-      main = b("schedule", "Schedule", "cp-btn-primary") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + b("copytext", "Copy text", "cp-btn-ghost");
+      main = b("schedule", "Schedule", "cp-btn-primary") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + `<button type="button" class="cp-btn cp-btn-ghost cp-copybtn" data-act="copytext" title="Copy the post's text" aria-label="Copy the post's text"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>`;
       more = menu([["unapprove", "Back to waiting for approval"], ["delete", "Delete", true]]);
       linkBox = true;
     } else if (p.status === "scheduled") {
-      main = b("schedule", "Change time", "cp-btn-ghost") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + b("copytext", "Copy text", "cp-btn-ghost");
+      main = b("schedule", "Change time", "cp-btn-ghost") + b("publish", "Publish now", "cp-btn-ghost") + b("edit", "Edit", "cp-btn-ghost") + `<button type="button" class="cp-btn cp-btn-ghost cp-copybtn" data-act="copytext" title="Copy the post's text" aria-label="Copy the post's text"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>`;
       more = menu([["unschedule", "Take off the schedule"], ["delete", "Delete", true]]);
       linkBox = true;
     } else if (p.status === "publishing") {
@@ -204,7 +204,7 @@
       more = stuck ? menu([["unstick", "Stop and set back to approved"]]) : "";
     }   // a posted post has no action row: its one option sits in the "Posted" line (postedMenuHtml)
     // For a post that went out on LinkedIn directly: paste its link and it counts as posted.
-    const box = linkBox ? `<input type="url" class="cp-linkbox" placeholder="Already posted? Paste the link" aria-label="Already posted? Paste the link" autocomplete="off" />` : `<span class="cp-grow"></span>`;
+    const box = linkBox ? `<input type="url" class="cp-linkbox" placeholder="Already posted? Paste URL" aria-label="Already posted? Paste the link to the post" autocomplete="off" />` : `<span class="cp-grow"></span>`;
     return main || more ? `<div class="cp-actions">${main}${box}${more}</div>` : "";
   }
 
