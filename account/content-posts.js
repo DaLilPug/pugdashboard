@@ -459,7 +459,7 @@
   // Beside the Posted heading: how to order them and, for the team, the way to
   // add a post that went out some other way.
   function postedToolsHtml(total) {
-    const sort = total > 1 ? `<select class="cp-sort" aria-label="Order of posted posts">${SORTS.map(([k, label]) =>
+    const sort = true ? `<select class="cp-sort" aria-label="Order of posted posts">${SORTS.map(([k, label]) =>
       `<option value="${k}"${S.postedSort === k ? " selected" : ""}>${label}</option>`).join("")}</select>` : "";
     const when = `<select class="cp-sort cp-when" aria-label="Timeframe">${TIMEFRAMES.map(([k, label]) =>
       `<option value="${k}"${S.tf === k ? " selected" : ""}>${label}</option>`).join("")}</select>`;
