@@ -90,6 +90,8 @@
   font-family: -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--li-text);
   overflow: visible;
 }
+.cp-card { transition: box-shadow .4s; }
+.cp-card.cp-moved { box-shadow: 0 0 0 2px var(--green), 0 6px 22px var(--green-glow); }
 .cp-status { display: flex; align-items: center; min-height: 20px; padding: 9px 16px; font-size: 12.5px; font-weight: 600; border-radius: 8px 8px 0 0; border-bottom: 1px solid var(--li-line); font-family: Inter, sans-serif; }
 .cp-status-draft      { background: #f3f4f6; color: #55606b; }
 .cp-status-ready      { background: #fff6e0; color: #8a5a00; }

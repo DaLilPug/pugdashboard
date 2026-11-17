@@ -295,7 +295,8 @@
   const SECTIONS = [
     { key: "draft",     title: "Drafts",                  note: "Only the team sees these.", team: true, has: (p) => p.status === "draft" },
     { key: "ready",     title: () => (S.isShare ? "Waiting for your approval" : "Waiting for approval"), has: (p) => p.status === "ready" },
-    { key: "approved",  title: "Approved",                has: (p) => p.status === "approved" || p.status === "scheduled" || p.status === "publishing" },
+    { key: "approved",  title: "Approved",                has: (p) => p.status === "approved" },
+    { key: "scheduled", title: "Scheduled",               has: (p) => p.status === "scheduled" || p.status === "publishing" },
     { key: "posted",    title: "Posted",                  has: (p) => p.status === "posted" },
   ];
 
@@ -437,7 +438,7 @@
       }
       if (!all.length) continue;
       any = true;
-      const list = sec.key === "approved"
+      const list = sec.key === "scheduled"
         ? all.slice().sort((a, b) => String(a.scheduled_at || "9").localeCompare(String(b.scheduled_at || "9"))) : all;
       html += `<section class="cp-section"><h3 class="cp-section-title">${esc(title)}<span class="cp-count">${list.length}</span>${sec.note ? `<em>${esc(sec.note)}</em>` : ""}</h3>
         ${list.map(rowHtml).join("")}</section>`;
@@ -463,6 +464,19 @@
       `<option value="${k}"${S.tf === k ? " selected" : ""}>${label}</option>`).join("")}</select>`;
     const add = S.isShare ? "" : `<button type="button" class="cp-btn cp-btn-quiet cp-addpost" data-act="external">+ Add a post</button>`;
     return `<span class="cp-grow"></span>${sort}${when}${add}`;
+  }
+
+  // After a post moves to another section (sent, approved, scheduled...), bring
+  // it into view and mark it for a moment, so it never seems to have vanished.
+  function renderAndShow(postId) {
+    render();
+    const row = S.root.querySelector(`.cp-row[data-post="${postId}"]`);
+    if (!row) return;
+    const r = row.getBoundingClientRect();
+    if (r.top < 100 || r.top > window.innerHeight - 160) row.scrollIntoView({ block: "center", behavior: "smooth" });
+    const card = row.querySelector(".cp-card");
+    card.classList.add("cp-moved");
+    setTimeout(() => card.classList.remove("cp-moved"), 1800);
   }
 
   function refreshRow(postId) {
@@ -612,6 +626,7 @@
     });
     saveBtns.forEach((btn) => btn.addEventListener("click", async () => {
       const mode = btn.dataset.save;
+      let savedId = post ? post.id : null;
       saveBtns.forEach((b) => { b.disabled = true; });
       msg.textContent = "Saving...";
       try {
@@ -625,6 +640,7 @@
             body: JSON.stringify({ ...fields, client_id: S.clientId, source: "uptown", created_by: sess && sess.user ? sess.user.id : null }),
           });
           S.posts.push(rows[0]);
+          savedId = rows[0].id;
         } else {
           await patchPost(post.id, fields);
           const kept = new Set(images.map((im) => im.path));
@@ -632,7 +648,7 @@
           if (gone.length) sb.storageRemove(BUCKET, gone);
         }
         m.close();
-        render();
+        renderAndShow(savedId);
         toast(mode === "ready" ? "Sent for approval" : "Saved");
       } catch (err) {
         msg.textContent = err.message;
@@ -666,7 +682,7 @@
         const fields = { status: "scheduled", scheduled_at: when.toISOString(), publish_error: null };
         if (!post.approved_at) fields.approved_at = new Date().toISOString();
         await patchPost(post.id, fields);
-        m.close(); render(); toast("Scheduled");
+        m.close(); renderAndShow(post.id); toast("Scheduled");
       } catch (err) { out.textContent = err.message; }
     };
   }
@@ -850,12 +866,12 @@
       else if (act === "chart") { S.showChart = !S.showChart; render(); }
       else if (act === "moreposted") { S.postedShown += POSTED_PAGE; render(); }
       else if (act === "edit") openComposer(post);
-      else if (act === "approve") { await patchPost(post.id, { status: "approved", approved_at: new Date().toISOString() }); render(); toast("Approved"); }
-      else if (act === "unapprove") { await patchPost(post.id, { status: "ready", approved_at: null }); render(); }
-      else if (act === "send") { await patchPost(post.id, { status: "ready" }); render(); toast("Sent for approval"); }
-      else if (act === "todraft") { await patchPost(post.id, { status: "draft", approved_at: null }); render(); }
+      else if (act === "approve") { await patchPost(post.id, { status: "approved", approved_at: new Date().toISOString() }); renderAndShow(post.id); toast("Approved"); }
+      else if (act === "unapprove") { await patchPost(post.id, { status: "ready", approved_at: null }); renderAndShow(post.id); }
+      else if (act === "send") { await patchPost(post.id, { status: "ready" }); renderAndShow(post.id); toast("Sent for approval"); }
+      else if (act === "todraft") { await patchPost(post.id, { status: "draft", approved_at: null }); renderAndShow(post.id); }
       else if (act === "schedule") openSchedule(post);
-      else if (act === "unschedule") { await patchPost(post.id, { status: "approved", scheduled_at: null }); render(); }
+      else if (act === "unschedule") { await patchPost(post.id, { status: "approved", scheduled_at: null }); renderAndShow(post.id); }
       else if (act === "unstick") { await patchPost(post.id, { status: "approved", publish_error: "Publishing was stopped part way. Check LinkedIn before publishing again." }); render(); }
       else if (act === "publish") await publishNow(post);
       else if (act === "link") openLink(post);
