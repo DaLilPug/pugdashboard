@@ -47,7 +47,7 @@
 .cp-row-posted { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .cp-row-posted .cp-thread-foot, .cp-row-posted .cp-msg-del { display: none; }
 .cp-older { margin: 4px 2px 0; font-size: 13px; color: var(--gray-400); font-family: Inter, sans-serif; }
-.cp-totals { position: sticky; top: 16px; max-width: 365px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--li-line); padding: 14px 16px 8px; font-family: Inter, sans-serif; }
+.cp-totals { position: sticky; top: 88px; max-width: 365px; background: #fff; border-radius: 12px; box-shadow: 0 0 0 1px var(--li-line); padding: 14px 16px 8px; font-family: Inter, sans-serif; }
 .cp-pills { display: flex; gap: 2px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
 .cp-pill { flex: 1 1 auto; border: 0; background: none; border-radius: 999px; padding: 6px 8px; font: 600 12px Inter, sans-serif; color: var(--gray-600); cursor: pointer; white-space: nowrap; }
 .cp-pill-on { background: var(--navy); color: #fff; }
