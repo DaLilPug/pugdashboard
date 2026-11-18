@@ -811,11 +811,16 @@
           const base64 = await fileBase64(f);
           const r = await sb.invokeFunction("linkedin-content", { action: "import_export", client_id: S.clientId, filename: f.name, base64, rows, asOf });
           if (!r || r.error) throw new Error((r && r.error) || "The file could not be added.");
-          const left = [r.already ? `${r.already} already here` : "", r.before_start ? `${r.before_start} from before ${S.clientName ? S.clientName + "'s" : "their"} start left out` : "",
+          // The file's numbers go on its posts too; a post whose numbers are already as new is left as it is.
+          let said = [r.added ? `${r.added} post${r.added === 1 ? "" : "s"} added` : "",
+            r.numbers ? `numbers saved for ${r.numbers}` : ""].filter(Boolean).join(", ");
+          said = said ? said[0].toUpperCase() + said.slice(1) : "Nothing new in this file";
+          const left = [r.up_to_date ? `${r.up_to_date} already up to date` : "",
+            r.before_start ? `${r.before_start} from before ${S.clientName ? S.clientName + "'s" : "their"} start left out` : "",
             r.reposts ? `${r.reposts} repost${r.reposts === 1 ? "" : "s"} left out` : "",
             r.too_old ? `${r.too_old} older than LinkedIn keeps numbers for` : ""].filter(Boolean).join(", ");
           m.close();
-          toast(`${r.added} post${r.added === 1 ? "" : "s"} added${left ? ` (${left})` : ""}`, !!(r.brain && r.brain.error));
+          toast(`${said}${left ? ` (${left})` : ""}`, !!(r.brain && r.brain.error));
           if (r.brain && r.brain.error) setTimeout(() => toast("The numbers didn't reach Brain: " + r.brain.error, true), 2500);
           await load(); render();
         } catch (err) {
@@ -965,17 +970,22 @@
     }
   }
   async function refreshNumbers(quiet) {
+    // One at a time: each refresh spends part of LinkedIn's small daily allowance.
+    if (S.refreshing) { if (!quiet) toast("Still refreshing..."); return; }
+    S.refreshing = true;
     if (!quiet) toast("Refreshing numbers...");
     try {
       const res = await sb.invokeFunction("linkedin-content", { action: "sync", client_id: S.clientId });
       const r = (res && res.result) || {};
       await load(); render();
       if (r.error && /reconnect_required/.test(r.error)) toast("LinkedIn needs to be connected again.", true);
-      else if (!quiet) toast(`Numbers refreshed for ${r.posts_synced || 0} ${r.posts_synced === 1 ? "post" : "posts"}`);
+      else if (quiet) { /* nothing to say */ }
+      else if (r.error === "daily_limit") toast("Today's refreshes are used up. Numbers refresh again overnight.");
+      else toast(`Numbers refreshed for ${r.posts_synced || 0} ${r.posts_synced === 1 ? "post" : "posts"}`);
     } catch (err) {
       await load(); render();
       if (!quiet) toast("The numbers did not refresh. " + err.message, true);
-    }
+    } finally { S.refreshing = false; }
   }
   async function disconnectLinkedIn() {
     const ok = await confirmBox("Disconnect LinkedIn?", "Posts and their numbers stay. Publishing and the nightly numbers stop until it is connected again.", "Disconnect", true);
