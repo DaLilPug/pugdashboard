@@ -275,7 +275,13 @@
     // redirects to /dashboard/ like before.
     function finishSignIn(session) {
       if (!fromExtension) {
-        window.location.replace("/dashboard/");
+        // A posts-only login (the demo account for LinkedIn's reviewers) goes
+        // straight to its one account's Posts tab, never through the dashboard.
+        const meta = (session && session.user && session.user.user_metadata)
+          || (sb.getSession()?.user?.user_metadata) || {};
+        window.location.replace(meta.posts_only && meta.posts_only_client
+          ? `/account/?id=${encodeURIComponent(meta.posts_only_client)}#posts`
+          : "/dashboard/");
         return;
       }
       handOffToExtension(session);
