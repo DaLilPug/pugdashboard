@@ -302,3 +302,9 @@ body.is-posts-only #account-meta,
 body.is-posts-only #sub-tabs,
 body.is-posts-only .mobile-pill-select,
 body.is-posts-only .app-footer { display: none; }
+
+/* Adding many posts from LinkedIn's export, in the add-a-post box (team only) */
+.cp-export { border-top: 1px solid var(--gray-200, #e5e7eb); padding-top: 14px; margin-top: 4px; }
+.cp-drop { border: 2px dashed var(--gray-200, #e5e7eb); border-radius: 10px; padding: 14px; text-align: center; font-size: 13px; color: var(--gray-600); cursor: pointer; margin-bottom: 12px; }
+.cp-drop.over { border-color: var(--emerald, #1EB683); background: rgba(30, 182, 131, .06); color: var(--navy); }
+.cp-drop.busy { opacity: .6; pointer-events: none; }

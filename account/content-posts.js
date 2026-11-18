@@ -786,9 +786,43 @@
     const m = openModal(`<div class="cp-modal-body"><h3>${post ? "Add the link to this post" : "Add a post that is already on LinkedIn"}</h3>
         <p>On LinkedIn, click the three dots on the post and choose Copy link to post. Then paste it here.${post ? " This marks the post as posted." : ""}</p>
         <label class="cp-field-block">Link to the post<input type="url" class="cp-input" data-u placeholder="https://www.linkedin.com/posts/..." /></label>
+        ${post || S.isShare ? "" : `<div class="cp-export">
+          <p><b>Adding many at once?</b> On LinkedIn: their profile, Analytics, Post performance. Click Show more at the bottom until every post is loaded, then Export. Drop the file here.</p>
+          <div class="cp-drop" data-drop>Drop the file here or click to choose it</div>
+          <input type="file" accept=".xlsx,.xls,.csv" hidden data-file />
+        </div>`}
         <p class="cp-modal-msg"></p></div>
       <div class="cp-modal-foot"><button type="button" class="cp-btn cp-btn-ghost" data-close>Cancel</button><button type="button" class="cp-btn cp-btn-primary" data-ok>Save</button></div>`, { cls: "cp-modal-md" });
     m.el.querySelector("[data-u]").focus();
+    const drop = m.el.querySelector("[data-drop]"), fileIn = m.el.querySelector("[data-file]");
+    if (drop) {
+      const out = m.el.querySelector(".cp-modal-msg");
+      const take = async (f) => {
+        if (!f) return;
+        if (f.size > 15 * 1024 * 1024) { out.textContent = "That file is over 15 MB."; return; }
+        drop.classList.add("busy"); out.textContent = `Reading ${f.name}...`;
+        try {
+          const { rows, asOf } = await readExportFile(f);
+          out.textContent = `Adding ${rows.length} post${rows.length === 1 ? "" : "s"}... this can take a minute.`;
+          const base64 = await fileBase64(f);
+          const r = await sb.invokeFunction("linkedin-content", { action: "import_export", client_id: S.clientId, filename: f.name, base64, rows, asOf });
+          if (!r || r.error) throw new Error((r && r.error) || "The file could not be added.");
+          const left = [r.already ? `${r.already} already here` : "", r.before_start ? `${r.before_start} from before ${S.clientName ? S.clientName + "'s" : "their"} start left out` : "",
+            r.too_old ? `${r.too_old} older than LinkedIn keeps numbers for` : ""].filter(Boolean).join(", ");
+          m.close();
+          toast(`${r.added} post${r.added === 1 ? "" : "s"} added${left ? ` (${left})` : ""}`, !!(r.brain && r.brain.error));
+          if (r.brain && r.brain.error) setTimeout(() => toast("The numbers didn't reach Brain: " + r.brain.error, true), 2500);
+          await load(); render();
+        } catch (err) {
+          out.textContent = err.message;
+        } finally { drop.classList.remove("busy"); }
+      };
+      drop.onclick = () => fileIn.click();
+      fileIn.onchange = () => { take(fileIn.files[0]); fileIn.value = ""; };
+      drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+      drop.ondragleave = () => drop.classList.remove("over");
+      drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); take(e.dataTransfer.files[0]); };
+    }
     m.el.querySelector("[data-ok]").onclick = async () => {
       const out = m.el.querySelector(".cp-modal-msg");
       out.textContent = "Checking the link...";
@@ -815,6 +849,49 @@
         out.textContent = /duplicate|unique/i.test(err.message) ? "That post is already in the list." : err.message;
       }
     };
+  }
+
+  // LinkedIn's Post performance export (.xlsx): one row per post, with its link and publish date. Read here in the
+  // browser with SheetJS (loaded only when someone drops a file); the server adds the posts and passes the file on.
+  const EXPORT_COLS = {
+    "post url": "url", "post publish date": "date", "post type": "type", "impressions": "impressions",
+    "impressions (in-network)": "in_network", "impressions (out-of-network)": "out_network", "members reached": "reached",
+    "followers gained": "followers", "profile viewers": "profile_views", "reactions": "reactions", "comments": "comments",
+    "reposts": "reposts", "saves": "saves", "sends": "sends", "custom button engagements": "button",
+    "visits to links": "link_visits", "link visits": "link_visits", "views": "views",
+  };
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((ok, bad) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.integrity = "sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"; s.crossOrigin = "anonymous";
+      s.onload = () => ok(window.XLSX); s.onerror = () => bad(new Error("The file reader could not load. Try again."));
+      document.head.append(s);
+    });
+  }
+  async function readExportFile(f) {
+    const X = await loadXLSX();
+    const wb = X.read(await f.arrayBuffer(), { type: "array" });
+    const rows = [];
+    for (const name of wb.SheetNames) {
+      const grid = X.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: "" });
+      const h = grid.findIndex((r) => r.some((c) => String(c).trim().toLowerCase() === "post url"));
+      if (h < 0) continue;
+      const cols = grid[h].map((c) => EXPORT_COLS[String(c).trim().toLowerCase()] || null);
+      for (const r of grid.slice(h + 1)) {
+        const o = {};
+        cols.forEach((k, i) => { if (k && o[k] === undefined) o[k] = String(r[i] ?? "").trim(); });
+        if (o.url) rows.push(o);
+      }
+    }
+    if (!rows.length) throw new Error("This doesn't look like LinkedIn's Post performance export (no Post URL column).");
+    return { rows, asOf: (/_(\d{4}-\d{2}-\d{2})\.\w+$/.exec(f.name) || [])[1] || "" };
+  }
+  async function fileBase64(f) {
+    const b = new Uint8Array(await f.arrayBuffer()); let s = "";
+    for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000));
+    return btoa(s);
   }
 
   // Once a post is live, the saved text becomes what LinkedIn shows, so the
