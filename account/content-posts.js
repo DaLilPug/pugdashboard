@@ -808,6 +808,7 @@
           const r = await sb.invokeFunction("linkedin-content", { action: "import_export", client_id: S.clientId, filename: f.name, base64, rows, asOf });
           if (!r || r.error) throw new Error((r && r.error) || "The file could not be added.");
           const left = [r.already ? `${r.already} already here` : "", r.before_start ? `${r.before_start} from before ${S.clientName ? S.clientName + "'s" : "their"} start left out` : "",
+            r.reposts ? `${r.reposts} repost${r.reposts === 1 ? "" : "s"} left out` : "",
             r.too_old ? `${r.too_old} older than LinkedIn keeps numbers for` : ""].filter(Boolean).join(", ");
           m.close();
           toast(`${r.added} post${r.added === 1 ? "" : "s"} added${left ? ` (${left})` : ""}`, !!(r.brain && r.brain.error));
@@ -828,6 +829,7 @@
       out.textContent = "Checking the link...";
       const info = await readLink(S.clientId, m.el.querySelector("[data-u]").value);
       if (!info) { out.textContent = "That does not look like a link to a LinkedIn post."; return; }
+      if (post && !(await linkDateOk(post, info))) return;
       const fields = {
         url: info.url, activity_id: info.activity_id, status: "posted", source: "external",
         posted_on: info.posted_on || new Date().toLocaleDateString("en-CA"),
@@ -899,6 +901,16 @@
   // that is not public), the draft stays.
   const liveText = (info) => (info && info.text ? { body: info.text, title: info.title || null } : {});
 
+  // Copy gets reused (the same post run again weeks later), so a link can open just like the draft and still be the
+  // old post. A draft can't have gone live before it was written: if the link's post is older, ask.
+  async function linkDateOk(post, info) {
+    if (!post || !post.created_at || !info || !info.posted_on) return true;
+    const written = new Date(post.created_at).toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+    if (info.posted_on >= written) return true;
+    const [y, m, d] = info.posted_on.split("-");
+    return confirmBox("Is this the right post?", `That link is to a post from ${+m}/${+d}/${y.slice(2)}, before this draft was written.`, "Yes, save it");
+  }
+
   // The start of a post, letters and digits only, for telling two posts apart.
   const opening = (s) => String(s || "").split("\n").find((l) => l.trim()) || "";
   const fingerprint = (s) => opening(s).toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24);
@@ -913,6 +925,7 @@
     try {
       const info = await readLink(S.clientId, raw);
       if (!info) { toast("That does not look like a link to a LinkedIn post.", true); return; }
+      if (!(await linkDateOk(post, info))) return;
       // The easy mistake is the link to a different post. Speak up only when the openings differ.
       const linked = info.text || info.title;
       const theirs = fingerprint(linked), ours = fingerprint(post.body);
