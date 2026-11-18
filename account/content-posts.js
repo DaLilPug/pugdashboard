@@ -733,32 +733,36 @@
 
   const ACTIVITY_RE = /(activity|ugcPost|share)[-:](\d{15,25})/;
 
-  // A LinkedIn post id carries the moment it was posted (its first 41 bits
-  // are the time in milliseconds), so nobody has to type a date.
+  // When a post went live, so nobody has to type a date. LinkedIn states it on
+  // the post's public page and resolve_link passes it on. Without it, the
+  // post's own number gives the moment the post was created (its first 41
+  // bits are the time in milliseconds): the day it went live unless it was
+  // scheduled ahead.
+  function whenFromMs(ms) {
+    if (!Number.isFinite(ms) || ms < Date.UTC(2010, 0, 1) || ms > Date.now() + 86400000) return null;
+    const d = new Date(ms);
+    return { iso: d.toISOString(), day: d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }) };
+  }
   function whenFromId(id) {
-    try {
-      const ms = Number(BigInt(id) >> 22n);
-      const d = new Date(ms);
-      if (ms < Date.UTC(2010, 0, 1) || ms > Date.now() + 86400000) return null;
-      return { iso: d.toISOString(), day: d.toLocaleDateString("en-CA", { timeZone: "America/Chicago" }) };
-    } catch (_) { return null; }
+    try { return whenFromMs(Number(BigInt(id) >> 22n)); } catch (_) { return null; }
   }
 
   // Everything a pasted link tells us: the post's address, id, date and first line.
   async function readLink(clientId, raw) {
-    let url = String(raw || "").trim(), title = null, text = null;
+    let url = String(raw || "").trim(), title = null, text = null, live = null;
     if (/^https:\/\/([\w-]+\.)?(lnkd\.in|linkedin\.com)\//i.test(url)) {
       try {
         const r = await sb.invokeFunction("linkedin-content", { action: "resolve_link", client_id: clientId, url });
         if (r && r.url) url = r.url;
         if (r && r.title) title = r.title;
         if (r && r.text) text = r.text;
+        if (r && r.published_at) live = whenFromMs(Date.parse(r.published_at));
       } catch (_) {}
     }
     let hit = null;
     try { hit = decodeURIComponent(url).match(ACTIVITY_RE); } catch (_) { hit = url.match(ACTIVITY_RE); }
     if (!hit || !liUrl(url)) return null;
-    const when = whenFromId(hit[2]);
+    const when = live || whenFromId(hit[2]);
     return { url, activity_id: hit[2], title, text, posted_on: when ? when.day : null, published_at: when ? when.iso : null };
   }
 
