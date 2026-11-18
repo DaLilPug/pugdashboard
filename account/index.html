@@ -1056,8 +1056,7 @@
 
       document.getElementById("account-name").textContent = client.name;
       // Browser tab shows the account's name (regular and share links).
-      document.title = new URLSearchParams(location.search).get("view") === "posts"
-        || sb.getSession()?.user?.user_metadata?.posts_only
+      document.title = sb.getSession()?.user?.user_metadata?.posts_only
         ? `${client.name} - Uptown` : `${client.name} - Uptown Tracker`;
       const metaEl = document.getElementById("account-meta");
       metaEl.innerHTML = [
@@ -1089,13 +1088,12 @@
       // ---- Posts-only view ---------------------------------------------
       // The account page with nothing but the Posts tab and Sign out: no tab
       // strip, no header links, no Share, no footer, the plain Uptown logo.
-      // On for a login whose user_metadata has posts_only (the demo account
-      // LinkedIn's reviewers use), or for anyone who adds ?view=posts to the
-      // link (screen recordings). Presentation only, like the share view:
-      // access is still decided by has_client_access. Off by default, so no
-      // one else sees a change. CSS: body.is-posts-only in content-posts.css.
-      const postsOnly = new URLSearchParams(location.search).get("view") === "posts"
-        || !!(sb.getSession()?.user?.user_metadata?.posts_only);
+      // On only for a login whose user_metadata has posts_only (the demo
+      // account LinkedIn's reviewers use). Presentation only, like the share
+      // view: access is still decided by has_client_access. Temporary: remove
+      // with the demo login once LinkedIn decides on the Standard Tier request.
+      // CSS: body.is-posts-only in content-posts.css.
+      const postsOnly = !!(sb.getSession()?.user?.user_metadata?.posts_only);
       if (postsOnly) {
         document.body.classList.add("is-posts-only");
         const logo = document.querySelector(".header-logo img");
