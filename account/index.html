@@ -956,6 +956,13 @@
               <p class="section-blurb hubspot-blurb-sub">
                 Turn off if you have a large HubSpot where many people share names - matches can be noisy.
               </p>
+              <label class="hubspot-trigger-row">
+                <input type="checkbox" id="hubspot-use-linkedin-email" />
+                <span>Use the LinkedIn email when there is no work email</span>
+              </label>
+              <p class="section-blurb hubspot-blurb-sub">
+                LinkedIn emails are often personal addresses. A work email, when one is found later, takes its place.
+              </p>
             </div>
 
             <div class="hubspot-subsection">
@@ -11275,6 +11282,7 @@
         { key: "prospect_first_name",       label: "Prospect First Name" },
         { key: "prospect_last_name",        label: "Prospect Last Name" },
         { key: "prospect_email",            label: "Prospect Email" },
+        { key: "prospect_linkedin_email",   label: "Prospect LinkedIn Email" },
         { key: "prospect_phone",            label: "Prospect Phone" },
         { key: "profile_url",               label: "LinkedIn Profile URL" },
         { key: "sales_nav_url",             label: "Sales Navigator URL" },
@@ -11298,6 +11306,7 @@
         const portalNameEl     = document.getElementById("hubspot-portal-name");
         const sentimentSelect  = document.getElementById("hubspot-sentiment-filter");
         const nameMatchCb      = document.getElementById("hubspot-name-match");
+        const linkedinEmailCb  = document.getElementById("hubspot-use-linkedin-email");
         const mappingContainer = document.getElementById("hubspot-mapping-rows");
         const addMappingBtn    = document.getElementById("hubspot-add-mapping-btn");
         const saveBtn          = document.getElementById("hubspot-save-config-btn");
@@ -11351,7 +11360,7 @@
             "id","client_id","provider","purpose",
             "scope_metadata",
             "enabled_triggers","response_sentiment_filter",
-            "field_mapping","name_match_enabled",
+            "field_mapping","name_match_enabled","use_linkedin_email",
             "last_sync_ok_at","last_sync_error_at","last_sync_error",
             "connected_by","created_at",
           ].join(",");
@@ -11421,6 +11430,7 @@
 
           // Name match toggle
           nameMatchCb.checked = integration.name_match_enabled !== false;
+          linkedinEmailCb.checked = integration.use_linkedin_email === true;
 
           renderSyncLog();
 
@@ -11642,6 +11652,7 @@
           });
           const sentiment = sentimentSelect.value || null;
           const nameMatch = !!nameMatchCb.checked;
+          const useLinkedinEmail = !!linkedinEmailCb.checked;
 
           // Field mapping is already kept up-to-date on the integration
           // object as the operator edits — but filter out blank rows.
@@ -11661,6 +11672,7 @@
                 enabled_triggers:          enabledTriggers,
                 response_sentiment_filter: sentiment,
                 name_match_enabled:        nameMatch,
+                use_linkedin_email:        useLinkedinEmail,
                 field_mapping:             fieldMapping,
               }),
             });
