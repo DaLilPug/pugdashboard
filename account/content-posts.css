@@ -146,6 +146,12 @@ a.cp-blue:hover { text-decoration: underline; }
 .cp-stats { padding: 10px 16px; margin-top: 8px; border-top: 1px solid var(--li-line); font-size: 12px; color: var(--li-muted); }
 .cp-stats b { color: var(--li-text); font-weight: 600; }
 .cp-dot { display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: currentColor; margin: 0 6px; vertical-align: middle; opacity: .6; }
+/* One post's refresh (team, connected account): a small icon at the right end of the numbers line. */
+.cp-refresh { float: right; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin: -3px -4px 0 8px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--li-muted); cursor: pointer; }
+.cp-refresh:hover { color: var(--li-text); background: var(--li-line); }
+.cp-refresh.is-busy { pointer-events: none; }
+.cp-refresh.is-busy svg { animation: cp-refresh-spin .9s linear infinite; }
+@keyframes cp-refresh-spin { to { transform: rotate(360deg); } }
 .cp-error { margin: 10px 16px 0; padding: 9px 12px; background: var(--red-light); color: #b42318; border-radius: 8px; font-size: 13px; font-family: Inter, sans-serif; }
 .cp-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 12px 16px; margin-top: 8px; border-top: 1px solid var(--li-line); font-family: Inter, sans-serif; }
 

@@ -235,7 +235,17 @@
     const has = (v) => v !== null && v !== undefined;
     if (has(p.cta_clicks)) parts.push(`<span title="Clicks on the profile button shown on the post, such as Visit my website"><b>${num(p.cta_clicks)}</b> button clicks</span>`);
     if (has(p.link_clicks)) parts.push(`<span title="Clicks on links inside the post"><b>${num(p.link_clicks)}</b> link clicks</span>`);
-    return `<div class="cp-stats">${parts.join('<i class="cp-dot"></i>')}</div>`;
+    return `<div class="cp-stats">${refreshIcon(p)}${parts.join('<i class="cp-dot"></i>')}</div>`;
+  }
+
+  // One post's refresh, for the team on a connected account (Austin 11/19/26: refreshing many posts at once is the
+  // daily run's job only). LinkedIn gives numbers only for posts from the last 400 days, so older posts get no icon.
+  const REFRESH_HINT = "Refresh this post's numbers. Posts from the last 7 days also refresh on their own every evening, and older posts less often.";
+  function refreshIcon(p) {
+    if (S.isShare || !S.integ || !p.posted_on || Date.now() - new Date(p.posted_on).getTime() > 399 * 864e5) return "";
+    return `<button type="button" class="cp-refresh" data-act="refreshpost" title="${REFRESH_HINT}" aria-label="Refresh this post's numbers">`
+      + `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.61-3.89" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>`
+      + `<path d="M12.5 1.5v3h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
   }
 
   // ---- comments beside the post ---------------------------------------------
@@ -425,9 +435,8 @@
     const last = S.integ.last_sync_ok_at ? `Last refreshed ${fmtDate(S.integ.last_sync_ok_at)} at ${fmtTime(S.integ.last_sync_ok_at)}.` : "";
     return `<span class="cp-menu-wrap"><button type="button" class="cp-conn" data-act="menu">Connected as ${esc(profile().name)} <span class="cp-caret">&#9662;</span></button>
       <div class="cp-menu cp-menu-down hidden">
-        <button type="button" class="cp-menu-item" data-act="sync">Refresh numbers now</button>
         <button type="button" class="cp-menu-item cp-danger" data-act="disconnect">Disconnect LinkedIn</button>
-        <div class="cp-menu-note">Numbers refresh on their own every night. ${last}</div></div></span>`;
+        <div class="cp-menu-note">Numbers refresh on their own every evening. ${last}</div></div></span>`;
   }
 
   function render() {
@@ -855,7 +864,10 @@
         }
         m.close();
         toast(post ? "Saved as posted" : "Post added");
-        if (S.integ) await refreshNumbers(true); else { await load(); render(); }
+        await load(); render();
+        // Its first numbers now, for this post only.
+        const added = post || S.posts.find((x) => x.activity_id === info.activity_id);
+        if (S.integ && added) refreshPost(added.id, { quiet: true });
       } catch (err) {
         out.textContent = /duplicate|unique/i.test(err.message) ? "That post is already in the list." : err.message;
       }
@@ -952,7 +964,7 @@
       });
       renderAndShow(post.id);
       toast("Marked as posted");
-      if (S.integ) refreshNumbers(true);
+      if (S.integ) refreshPost(post.id, { quiet: true });
     } catch (err) {
       toast(/duplicate|unique/i.test(err.message) ? "That post is already in the list." : err.message, true);
     } finally {
@@ -969,26 +981,28 @@
       toast("The LinkedIn connection could not start. " + err.message, true);
     }
   }
-  async function refreshNumbers(quiet) {
+  // One post's numbers: a click on its refresh icon, or (quiet) a post just added by link or marked posted.
+  async function refreshPost(postId, { quiet = false, btn = null } = {}) {
     // One at a time: each refresh spends part of LinkedIn's small daily allowance.
-    if (S.refreshing) { if (!quiet) toast("Still refreshing..."); return; }
+    if (S.refreshing) return;
     S.refreshing = true;
-    if (!quiet) toast("Refreshing numbers...");
+    if (btn) btn.classList.add("is-busy");
     try {
-      const res = await sb.invokeFunction("linkedin-content", { action: "sync", client_id: S.clientId });
+      const res = await sb.invokeFunction("linkedin-content", { action: "sync", client_id: S.clientId, post_id: postId });
       const r = (res && res.result) || {};
       await load(); render();
       if (r.error && /reconnect_required/.test(r.error)) toast("LinkedIn needs to be connected again.", true);
       else if (quiet) { /* nothing to say */ }
-      else if (r.error === "daily_limit") toast("Today's refreshes are used up. Numbers refresh again overnight.");
-      else toast(`Numbers refreshed for ${r.posts_synced || 0} ${r.posts_synced === 1 ? "post" : "posts"}`);
+      else if (r.error === "daily_limit") toast("Today's refreshes are used up.");
+      else if (r.posts_synced) toast("Numbers refreshed");
+      else toast("The numbers did not refresh.", true);
     } catch (err) {
       await load(); render();
       if (!quiet) toast("The numbers did not refresh. " + err.message, true);
     } finally { S.refreshing = false; }
   }
   async function disconnectLinkedIn() {
-    const ok = await confirmBox("Disconnect LinkedIn?", "Posts and their numbers stay. Publishing and the nightly numbers stop until it is connected again.", "Disconnect", true);
+    const ok = await confirmBox("Disconnect LinkedIn?", "Posts and their numbers stay. Publishing and the daily numbers stop until it is connected again.", "Disconnect", true);
     if (!ok) return;
     await sb.invokeFunction("linkedin-content", { action: "disconnect", client_id: S.clientId });
     await load(); render();
@@ -1061,7 +1075,7 @@
         if (head) window.scrollTo({ top: head.getBoundingClientRect().top + window.scrollY - 125, behavior: "smooth" });
       }
       else if (act === "connect") await connectLinkedIn();
-      else if (act === "sync") await refreshNumbers(false);
+      else if (act === "refreshpost") { if (post) await refreshPost(post.id, { btn: actEl }); }
       else if (act === "disconnect") await disconnectLinkedIn();
       else if (act === "tf") { S.tf = actEl.dataset.tf; S.postedShown = POSTED_PAGE; render(); }
       else if (act === "chart") { S.showChart = !S.showChart; render(); }
@@ -1197,8 +1211,8 @@
       render();
     });
 
-    // Back from LinkedIn's approval screen: say how it went, tidy the address,
-    // and on success pull the first numbers.
+    // Back from LinkedIn's approval screen: say how it went and tidy the address.
+    // The first numbers come with the daily run, or a click on a post's refresh icon.
     let justConnected = false;
     const params = new URLSearchParams(location.search);
     if (params.get("integration_purpose") === "content_analytics") {
@@ -1221,7 +1235,7 @@
     try {
       await load();
       render();
-      if (justConnected && S.integ) { toast("LinkedIn connected"); refreshNumbers(true); }
+      if (justConnected && S.integ) toast("LinkedIn connected");
     } catch (err) {
       S.root.innerHTML = `<div class="cp-empty"><p>The posts did not load. ${esc(err.message)}</p></div>`;
     }
