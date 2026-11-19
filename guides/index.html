@@ -2458,10 +2458,12 @@
             bookings made through that one link are logged.</li>
       </ol>
       <p>
-        If the row can't find a link with that address, it shows a list of your
-        HubSpot meeting links to pick from. Changing the address on the row
-        later moves the connection to the new link. A brand new link works
-        right away; there is nothing to change on the link itself.
+        If the row can't find a link with that address (for example a page on
+        your own site with the scheduler embedded), it shows a list of your
+        HubSpot meeting links to pick from, and keeps the one you pick.
+        Otherwise, changing the address on the row later moves the connection
+        to the new link. A brand new link works right away; there is nothing
+        to change on the link itself.
       </p>
 
       <div class="callout note">
@@ -3389,7 +3391,8 @@
             <em>last outreach type</em> reads "Handed off".</li>
         <li>
           <strong>Email address changed</strong> - the prospect's email went
-          from missing to known (or got corrected to a different valid one).
+          from missing to known. It fills in a contact that has no email yet;
+          it does not replace an email the contact already has in HubSpot.
           Especially useful if you have Apollo enrichment turned on: an
           accepted CR triggers enrichment, and once the email lands a few
           seconds later, this trigger pushes the email to HubSpot without

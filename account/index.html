@@ -989,7 +989,7 @@
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script src="/auth.js"></script>
-  <script src="/meeting-link-status.js?v=1"></script>
+  <script src="/meeting-link-status.js?v=2"></script>
   <script src="/account/content-posts.js?v=33"></script>
   <script>
     (async function main() {
@@ -10566,9 +10566,16 @@
           return ts ? `Last booking: ${new Date(ts).toLocaleString()}` : "No bookings received yet";
         }
 
-        function calendlyBand(integ) {
+        // Whether a method is set up and receiving comes from
+        // /meeting-link-status.js, the same answer the dashboard shows.
+        function isLive(link, integ, method) {
+          const m = window.meetingLinkStatus.linkMethods(link, integ).find(x => x.method === method);
+          return !!(m && m.live);
+        }
+
+        function calendlyBand(link, integ) {
           const name = (integ.selected_resource || {}).event_type_name || "";
-          if (!name) {
+          if (!isLive(link, integ, "Calendly")) {
             return `
               <div class="ml-status ml-status-pending">
                 <span class="ml-status-label">Calendly connected. Pick an event type to start receiving bookings.</span>
@@ -10578,7 +10585,7 @@
           }
           return `
             <div class="ml-status ml-status-listening">
-              <span class="ml-status-badge">✓ Listening on Calendly: ${esc(name)}</span>
+              <span class="ml-status-badge">✓ Listening on Calendly${name ? `: ${esc(name)}` : ""}</span>
               <span class="ml-status-meta">${esc(lastBookingText(integ.last_event_at))}</span>
               <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change event type</button>
               <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
@@ -10590,7 +10597,7 @@
         // doesn't lead to a link in the connected HubSpot account.
         function hubspotBand(link, integ) {
           const sr = integ.selected_resource || {};
-          if (sr.link_id) {
+          if (isLive(link, integ, "HubSpot")) {
             const name = sr.name || sr.slug || "";
             return `
               <div class="ml-status ml-status-listening">
@@ -10616,7 +10623,7 @@
         }
 
         function zapierBand(link) {
-          if (link.zapier_last_booking_at) {
+          if (isLive(link, null, "Zapier")) {
             return `
               <div class="ml-status ml-status-listening">
                 <span class="ml-status-badge">✓ Zapier</span>
@@ -10636,7 +10643,7 @@
         function renderRow(link) {
           const integ = link.integration_id ? integrations[link.integration_id] : null;
           const bands = [];
-          if (integ) bands.push(integ.provider === "calendly" ? calendlyBand(integ) : hubspotBand(link, integ));
+          if (integ) bands.push(integ.provider === "calendly" ? calendlyBand(link, integ) : hubspotBand(link, integ));
           if (link.method === "zapier") bands.push(zapierBand(link));
           if (bands.length === 0) {
             bands.push(`
@@ -10719,7 +10726,7 @@
           }
           await load();
           if (res && res.matched) {
-            showFeedback(`Listening for bookings${res.link && res.link.name ? ` on ${res.link.name}` : ""}`);
+            if (!res.kept) showFeedback(`Listening for bookings${res.link && res.link.name ? ` on ${res.link.name}` : ""}`);
             return;
           }
           if (res && res.reason === "no_url") return; // the band already says to paste the address
@@ -11446,19 +11453,20 @@
         };
         async function renderSyncLog() {
           const el = document.getElementById("hubspot-sync-log");
-          if (!el) return;
+          if (!el || !integration) return;
           let rows = [];
           try {
             rows = await sb.sbFetch(
               "/rest/v1/hubspot_sync_log?select=prospect_name,trigger,result,detail,created_at" +
-              `&client_id=eq.${encodeURIComponent(clientId)}&order=created_at.desc&limit=15`
+              `&client_id=eq.${encodeURIComponent(clientId)}` +
+              `&integration_id=eq.${encodeURIComponent(integration.id)}&order=created_at.desc&limit=15`
             );
           } catch (err) {
             el.innerHTML = `<p class="section-blurb hubspot-blurb-sub">Couldn't load recent syncs.</p>`;
             return;
           }
           if (!Array.isArray(rows) || rows.length === 0) {
-            el.innerHTML = `<p class="section-blurb hubspot-blurb-sub">Nothing has synced yet.</p>`;
+            el.innerHTML = `<p class="section-blurb hubspot-blurb-sub">No recent syncs.</p>`;
             return;
           }
           el.innerHTML = rows.map(r => {
