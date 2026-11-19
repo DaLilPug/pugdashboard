@@ -989,7 +989,7 @@
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script src="/auth.js"></script>
-  <script src="/meeting-link-status.js?v=2"></script>
+  <script src="/meeting-link-status.js?v=3"></script>
   <script src="/account/content-posts.js?v=33"></script>
   <script>
     (async function main() {
@@ -10561,7 +10561,7 @@
           addBtn.title    = links.length >= 10 ? "Max 10 meeting links per account" : "";
         }
 
-        // ---- One band per way the link is tracked -------------------
+        // ---- The band that says how the link is tracked --------------
         function lastBookingText(ts) {
           return ts ? `Last booking: ${new Date(ts).toLocaleString()}` : "No bookings received yet";
         }
@@ -10642,9 +10642,10 @@
 
         function renderRow(link) {
           const integ = link.integration_id ? integrations[link.integration_id] : null;
+          // One method per link: a connection wins over Zapier.
           const bands = [];
           if (integ) bands.push(integ.provider === "calendly" ? calendlyBand(link, integ) : hubspotBand(link, integ));
-          if (link.method === "zapier") bands.push(zapierBand(link));
+          else if (link.method === "zapier") bands.push(zapierBand(link));
           if (bands.length === 0) {
             bands.push(`
               <div class="ml-status ml-status-unconfigured">

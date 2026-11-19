@@ -5,7 +5,8 @@
 // disagree. Nothing here is typed in by hand: it is read off the
 // account's meeting links.
 //
-// A meeting link gets its bookings one of three ways:
+// A meeting link gets its bookings ONE of three ways (never two: a
+// HubSpot or Calendly connection on the link wins over Zapier):
 //   - a HubSpot connection listening on one HubSpot meeting link
 //   - a Calendly connection listening on one event type
 //   - Zapier: the account's own Zap posts each booking with its API key
@@ -16,22 +17,22 @@
 (function () {
   "use strict";
 
-  // The ways ONE meeting link is tracked. `integ` is the integrations
-  // row the link is bound to, or null.
+  // The way ONE meeting link is tracked: an array with one entry, or
+  // none. `integ` is the integrations row the link is bound to, or null.
   function linkMethods(link, integ) {
-    const out = [];
     if (integ) {
       const sr = integ.selected_resource || {};
       if (integ.provider === "calendly") {
-        out.push({ method: "Calendly", live: !!sr.event_type_uri, waiting: "not set up" });
-      } else if (integ.provider === "hubspot") {
-        out.push({ method: "HubSpot", live: !!sr.link_id, waiting: "not set up" });
+        return [{ method: "Calendly", live: !!sr.event_type_uri, waiting: "not set up" }];
+      }
+      if (integ.provider === "hubspot") {
+        return [{ method: "HubSpot", live: !!sr.link_id, waiting: "not set up" }];
       }
     }
     if (link && link.method === "zapier") {
-      out.push({ method: "Zapier", live: !!link.zapier_last_booking_at, waiting: "waiting for first booking" });
+      return [{ method: "Zapier", live: !!link.zapier_last_booking_at, waiting: "waiting for first booking" }];
     }
-    return out;
+    return [];
   }
 
   // The account-level summary: every method that is live ("HubSpot,
