@@ -963,6 +963,13 @@
               <p class="section-blurb hubspot-blurb-sub">
                 LinkedIn emails are often personal addresses. A work email, when one is found later, takes its place.
               </p>
+              <label class="hubspot-trigger-row">
+                <input type="checkbox" id="hubspot-create-if-no-match" />
+                <span>Create a new contact when no match is found</span>
+              </label>
+              <p class="section-blurb hubspot-blurb-sub">
+                Turn off to only update people who are already in your HubSpot.
+              </p>
             </div>
 
             <div class="hubspot-subsection">
@@ -11307,6 +11314,7 @@
         const sentimentSelect  = document.getElementById("hubspot-sentiment-filter");
         const nameMatchCb      = document.getElementById("hubspot-name-match");
         const linkedinEmailCb  = document.getElementById("hubspot-use-linkedin-email");
+        const createNewCb      = document.getElementById("hubspot-create-if-no-match");
         const mappingContainer = document.getElementById("hubspot-mapping-rows");
         const addMappingBtn    = document.getElementById("hubspot-add-mapping-btn");
         const saveBtn          = document.getElementById("hubspot-save-config-btn");
@@ -11360,7 +11368,7 @@
             "id","client_id","provider","purpose",
             "scope_metadata",
             "enabled_triggers","response_sentiment_filter",
-            "field_mapping","name_match_enabled","use_linkedin_email",
+            "field_mapping","name_match_enabled","use_linkedin_email","create_if_no_match",
             "last_sync_ok_at","last_sync_error_at","last_sync_error",
             "connected_by","created_at",
           ].join(",");
@@ -11431,6 +11439,7 @@
           // Name match toggle
           nameMatchCb.checked = integration.name_match_enabled !== false;
           linkedinEmailCb.checked = integration.use_linkedin_email === true;
+          createNewCb.checked = integration.create_if_no_match !== false;
 
           renderSyncLog();
 
@@ -11461,6 +11470,7 @@
         };
         const SYNC_RESULT_LABELS = {
           created: "Added to HubSpot", updated: "Updated in HubSpot", unchanged: "No change needed",
+          no_match: "No match, not added",
         };
         async function renderSyncLog() {
           const el = document.getElementById("hubspot-sync-log");
@@ -11653,6 +11663,7 @@
           const sentiment = sentimentSelect.value || null;
           const nameMatch = !!nameMatchCb.checked;
           const useLinkedinEmail = !!linkedinEmailCb.checked;
+          const createIfNoMatch = !!createNewCb.checked;
 
           // Field mapping is already kept up-to-date on the integration
           // object as the operator edits — but filter out blank rows.
@@ -11673,6 +11684,7 @@
                 response_sentiment_filter: sentiment,
                 name_match_enabled:        nameMatch,
                 use_linkedin_email:        useLinkedinEmail,
+                create_if_no_match:        createIfNoMatch,
                 field_mapping:             fieldMapping,
               }),
             });
