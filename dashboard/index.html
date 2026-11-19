@@ -299,6 +299,7 @@
   <script src="/supabase-client.js"></script>
   <script src="/auth.js"></script>
   <script src="/billing.js"></script>
+  <script src="/meeting-link-status.js?v=1"></script>
   <script src="/mobile-nav.js" defer></script>
   <script>
     (async function main() {
@@ -1084,7 +1085,7 @@
           : "";
         try {
           clientsCache = await sb.sbFetch(
-            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at,services,integration" +
+            "/rest/v1/clients?select=id,name,company,start_date,end_date,org_id,archived_at,services" +
             orgFilter +
             archivedFilter +
             "&order=name.asc"
@@ -1092,6 +1093,28 @@
         } catch (err) {
           tbodyEl.innerHTML = `<tr><td colspan="${colspan}" class="loading">Couldn't load accounts: ${esc(err.message)}</td></tr>`;
           return;
+        }
+
+        // Integration column: worked out from each account's meeting
+        // links (see /meeting-link-status.js), never typed in. Two small
+        // reads; RLS scopes both to the accounts this viewer can see.
+        try {
+          const [mlRows, intRows] = await Promise.all([
+            sb.sbFetchAll("/rest/v1/meeting_links?select=client_id,integration_id,method,zapier_last_booking_at"),
+            sb.sbFetchAll("/rest/v1/integrations?select=id,provider,selected_resource&purpose=eq.meeting_booking"),
+          ]);
+          const intById = {};
+          for (const i of (intRows || [])) intById[i.id] = i;
+          const linksByClient = {};
+          for (const l of (mlRows || [])) (linksByClient[l.client_id] = linksByClient[l.client_id] || []).push(l);
+          for (const c of clientsCache) {
+            const st = window.meetingLinkStatus.accountStatus(linksByClient[c.id] || [], intById);
+            c.integration      = st.text;
+            c.integration_live = st.live;
+          }
+        } catch (err) {
+          console.warn("integration status load failed:", err);
+          for (const c of clientsCache) { c.integration = ""; c.integration_live = false; }
         }
 
         renderMultiselects();
@@ -1614,7 +1637,7 @@
               <span class="editable-value">${c.endDate ? esc(fmtDate(c.endDate)) : `<span class="editable-empty">— set —</span>`}</span>
             </td>
             <td class="status-cell">${statusHtml}</td>
-            <td class="integration-cell" title="Click to set integration">${intChipHtml(c.integration)}</td>
+            <td class="integration-cell" title="Set on this account's Meeting Links tab">${intChipHtml(c)}</td>
             <td class="service-cell" title="Click to edit services">${serviceChipsHtml(c.services)}</td>
             <td class="num drill">${fmtInt(c.meetings)}</td>
             <td class="num drill rate-cell ${rateClass(c.posBookRate)}">${fmtPct(c.posBookRate)}</td>
@@ -1641,69 +1664,16 @@
       }
 
       // ---- Integration column ----------------------------------------------
-      // Manual single-select: how meetings reach the tracker for this seat.
-      // The four named values all mean "bookings flow in automatically" and
-      // render green; 'Not Integrated' is the grey default.
-      const INTEGRATION_OPTIONS = ["Not Integrated", "HubSpot", "Calendly", "Zapier", "Bandaid"];
-      function intChipHtml(v) {
-        const val = INTEGRATION_OPTIONS.includes(v) ? v : "Not Integrated";
-        const yes = val !== "Not Integrated";
-        return `<span class="status-dot ${yes ? "status-active" : "status-inactive"}"></span><span class="status-text">${esc(val)}</span>`;
+      // How meetings reach the Tracker for this seat. Read-only here: it
+      // is worked out from the account's Meeting Links tab (HubSpot or
+      // Calendly connection, or the account's own Zap). Green = bookings
+      // are arriving that way; grey = not integrated, or still being set
+      // up. Clicking the cell opens that tab.
+      function intChipHtml(c) {
+        const text = c && c.integration;
+        if (!text) return "";
+        return `<span class="status-dot ${c.integration_live ? "status-active" : "status-inactive"}"></span><span class="status-text">${esc(text)}</span>`;
       }
-      let intPop = null, intPopClientId = null;
-      function closeIntPop() { if (intPop) { intPop.remove(); intPop = null; intPopClientId = null; } }
-      function openIntPop(td, clientId) {
-        closeSvcPop();
-        if (intPop && intPopClientId === clientId) { closeIntPop(); return; }
-        closeIntPop();
-        const row = enrichedCache.find(x => x.id === clientId);
-        const current = INTEGRATION_OPTIONS.includes(row?.integration) ? row.integration : "Not Integrated";
-        intPop = document.createElement("div");
-        intPop.className = "svc-pop int-pop";
-        intPopClientId = clientId;
-        intPop.innerHTML = INTEGRATION_OPTIONS.map(v => `
-          <label class="svc-pop-opt">
-            <input type="radio" name="int-pick" value="${esc(v)}" ${v === current ? "checked" : ""}/>
-            <span>${esc(v)}</span>
-          </label>
-        `).join("");
-        document.body.appendChild(intPop);
-        const b = td.getBoundingClientRect();
-        const pRect = intPop.getBoundingClientRect();
-        let top = b.bottom + 4;
-        if (top + pRect.height > window.innerHeight - 8) top = b.top - pRect.height - 4;
-        intPop.style.top  = `${Math.max(8, top)}px`;
-        intPop.style.left = `${Math.max(8, Math.min(b.left, window.innerWidth - pRect.width - 8))}px`;
-
-        intPop.addEventListener("click", (e) => e.stopPropagation());
-        intPop.addEventListener("change", async () => {
-          const next = intPop.querySelector("input:checked")?.value;
-          if (!row) { closeIntPop(); return; }
-          if (!next || next === row.integration) { closeIntPop(); return; }
-          const prev = row.integration;
-          row.integration = next;
-          const cc = clientsCache.find(x => x.id === clientId);
-          if (cc) cc.integration = next;
-          td.innerHTML = intChipHtml(next);
-          closeIntPop();
-          try {
-            await sb.sbFetch(`/rest/v1/clients?id=eq.${encodeURIComponent(clientId)}`, {
-              method: "PATCH",
-              headers: { Prefer: "return=minimal" },
-              body: JSON.stringify({ integration: next }),
-            });
-          } catch (err) {
-            row.integration = prev;
-            if (cc) cc.integration = prev;
-            td.innerHTML = intChipHtml(prev);
-            alert("Couldn't save the integration: " + (err.message || err));
-          }
-        });
-      }
-      document.addEventListener("click", (e) => {
-        if (intPop && !e.target.closest(".int-pop") && !e.target.closest(".integration-cell")) closeIntPop();
-      });
-      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeIntPop(); });
 
       // ---- Master meetings view --------------------------------------------
       // "Meetings" tab in the section head: every meeting booked across the
@@ -2092,7 +2062,6 @@
       let svcPop = null, svcPopClientId = null;
       function closeSvcPop() { if (svcPop) { svcPop.remove(); svcPop = null; svcPopClientId = null; } }
       function openSvcPop(td, clientId) {
-        closeIntPop();
         if (svcPop && svcPopClientId === clientId) { closeSvcPop(); return; }
         closeSvcPop();
         const row = enrichedCache.find(x => x.id === clientId);
@@ -2166,7 +2135,7 @@
         tbodyEl.querySelectorAll(".integration-cell").forEach(td => {
           td.addEventListener("click", (e) => {
             e.stopPropagation();
-            openIntPop(td, td.closest("tr").dataset.clientId);
+            window.location.href = `/account/?id=${encodeURIComponent(td.closest("tr").dataset.clientId)}#meeting-links`;
           });
         });
         tbodyEl.querySelectorAll(".btn-row-action").forEach(wireRowAction);

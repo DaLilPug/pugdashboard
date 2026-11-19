@@ -2057,11 +2057,12 @@
             DWY, DFY, Content). Click the cell to edit; the header's Service
             dropdown filters on the same tags.</li>
         <li><strong>Integration</strong> - how meetings reach the Tracker for
-            this account, shown like the Status column: a green dot for
-            HubSpot, Calendly, Zapier or Bandaid (bookings flow in
-            automatically), grey for Not Integrated. Click to change. It's a
-            hand-maintained flag for at-a-glance coverage, not a live health
-            check.</li>
+            this account, shown like the Status column: a green dot when
+            bookings are arriving through HubSpot, Calendly or Zapier, grey
+            for Not Integrated or for a method that is still being set up
+            (for example "Zapier - waiting for first booking"). It is read
+            from the account's <a href="#dash-meeting">Meeting Links</a> tab,
+            so it can't be set here. Click the cell to open that tab.</li>
         <li>The metric columns run outcome-first, from Meetings back to
             Connections, each count followed by its rate. The four rate headers
             are abbreviated to keep the columns narrow; hover a header for the
@@ -2418,55 +2419,87 @@
       <p>
         Per-account meeting links you can copy into LinkedIn DMs, up to 10 per
         account. They also show up in the extension popup's Meeting Links drawer
-        for copying, each with an <em>integrated</em> badge so you know whether a
-        booking will auto-log. Connecting Calendly or HubSpot has to be done here
-        on the dashboard, though, since the OAuth round-trip needs a page that
-        stays open and the popup closes the moment you click away. Two flavors:
+        for copying. Each link starts as <strong>Not integrated</strong>:
+        bookings on it won't log by themselves. Three buttons on the row change
+        that, and whichever you choose is what the dashboard's Integration
+        column shows for the account:
       </p>
 
       <ul>
-        <li><strong>Plain link</strong> - paste-ready URL with a display name. No
-            integration; bookings won't auto-log.</li>
-        <li><strong>Integrated link</strong> - connect Calendly or HubSpot via OAuth.
-            Bookings on the linked event type / matching meeting title auto-log
-            as <code>meeting_booked</code> outreach events, attached to the right
-            prospect by name match.</li>
+        <li><strong>Connect Calendly</strong> - bookings on one Calendly event
+            type log automatically.</li>
+        <li><strong>Connect HubSpot</strong> - bookings on one HubSpot meeting
+            link log automatically.</li>
+        <li><strong>Zapier</strong> - your own Zap sends each booking in. Use it
+            when you'd rather not connect your calendar tool or CRM to Uptown.</li>
       </ul>
+      <p>
+        Calendly and HubSpot have to be connected here on the dashboard, since
+        the sign-in round-trip needs a page that stays open and the popup closes
+        the moment you click away. Every booking that arrives logs as a
+        <code>meeting_booked</code> event and is attached to the right prospect
+        by the email they booked with, then by their name.
+      </p>
 
       <h4>Connecting Calendly</h4>
       <ol class="steps">
         <li>Click <strong>Connect Calendly</strong> on a meeting link row.</li>
-        <li>OAuth into Calendly. Pick which event type this link should listen on.</li>
-        <li>Save. Future bookings on that event type fire a webhook into Uptown Tracker
-            and create a <code>meeting_booked</code> event for the matching prospect.</li>
+        <li>Sign in to Calendly. Pick which event type this link should listen on.</li>
+        <li>Save. Future bookings on that event type log to this account.</li>
       </ol>
 
       <h4>Connecting HubSpot</h4>
       <ol class="steps">
-        <li>Click <strong>Connect HubSpot</strong> and OAuth in.</li>
-        <li>Type a unique substring that matches the meeting title for this
-            account (e.g. <code>Acme Corp intro call</code>). One HubSpot org can
-            route to multiple Uptown Tracker accounts via different match
-            strings.</li>
-        <li>Save. Uptown then shows you a webhook URL and the exact HubSpot
-            steps, because you have to build the Workflow yourself:
-            <strong>Automation → Workflows → Create workflow → From scratch →
-            Contact-based</strong>, trigger <em>"When a meeting is booked"</em>,
-            action <strong>Send a webhook</strong> (POST to the URL shown), and
-            include the contact's <code>firstname</code>, <code>lastname</code>,
-            <code>email</code> and <code>phone</code> in the body.</li>
-        <li>Activate the workflow. Bookings whose titles contain your match text
-            land in this account's funnel within about 10 seconds. Test it by
-            booking a meeting on yourself.</li>
+        <li>Paste the meeting link's address into the row (for example
+            <code>https://meetings.hubspot.com/jane-doe/intro</code>).</li>
+        <li>Click <strong>Connect HubSpot</strong> and sign in.</li>
+        <li>That's it. The row finds that link in your HubSpot account and
+            shows <em>Listening on HubSpot</em> with the link's name. Only
+            bookings made through that one link are logged.</li>
       </ol>
+      <p>
+        If the row can't find a link with that address, it shows a list of your
+        HubSpot meeting links to pick from. Changing the address on the row
+        later moves the connection to the new link. A brand new link works
+        right away; there is nothing to change on the link itself.
+      </p>
 
-      <div class="callout warn">
-        <div class="callout-title">HubSpot plan requirement</div>
+      <div class="callout note">
+        <div class="callout-title">What the HubSpot connection can see</div>
         <p>
-          HubSpot Workflows require Marketing Hub Professional or higher. If the
-          client is on a lower tier, use Calendly or a plain link instead.
+          HubSpot grants this connection read access to contacts and meetings.
+          Uptown uses it for one thing: when a meeting is booked through the
+          link on this row, it reads the name, email and phone of the person
+          who booked. For a booking on any other link it only checks which
+          link it came through, then stops; it never reads who booked. It
+          never writes to HubSpot. If your IT team would rather not grant
+          that, use <strong>Zapier</strong> instead.
         </p>
       </div>
+
+      <h4>Using Zapier</h4>
+      <ol class="steps">
+        <li>Click <strong>Zapier</strong> on the meeting link row. The row shows
+            the steps and a button to create this account's API key.</li>
+        <li>In your own Zapier account, create a Zap. Trigger: a new booking on
+            this link, from the tool the link belongs to. Action:
+            <strong>Uptown Tracker</strong>, <strong>Create Activity</strong>,
+            with Activity Type set to Meeting Booked, plus the person's name
+            and email.</li>
+        <li>Turn the Zap on and book a test meeting. The row turns green when
+            it arrives; until then it reads <em>waiting for the first
+            booking</em>.</li>
+      </ol>
+
+      <h4>Disconnecting</h4>
+      <p>
+        <strong>Disconnect</strong> on a Calendly or HubSpot row stops bookings
+        from logging and deletes the connection. For HubSpot, when that was the
+        account's last connection to that HubSpot account, Uptown is also
+        removed from its connected apps, and HubSpot emails its admins to say
+        so. Disconnect on a Zapier row only changes what the row shows; turn
+        the Zap off in Zapier to stop it sending.
+      </p>
 
       <h3 id="dash-followups">8.8 - Per-account: Follow-ups</h3>
       <p>
@@ -3365,9 +3398,10 @@
         </li>
       </ul>
       <p>
-        Each event upserts the same HubSpot contact (matched by email, then
-        name, else created). A prospect who progresses through all four stages
-        results in one contact updated four times, not four separate contacts.
+        Each event updates the same HubSpot contact (matched by email, then by
+        name if you turn that on, else created). A prospect who progresses
+        through all four stages results in one contact updated four times, not
+        four separate contacts.
       </p>
       <p>
         The trigger checkboxes, the sentiment filter, the name-match toggle and
@@ -3387,9 +3421,10 @@
         <li>If no match is found, we create a new contact.</li>
       </ol>
       <p>
-        Turn the name-match toggle off if your HubSpot has many people with
-        identical names - the email-only path will create new contacts when
-        no email match is found, which is safer than risking false matches.
+        Name matching starts <strong>off</strong>. With it off, a prospect with
+        no email match becomes a new contact, which is safer than attaching
+        them to someone else who happens to share their name. Turn it on if
+        your HubSpot is small and you'd rather avoid duplicates.
       </p>
 
       <h4>Field mapping</h4>
@@ -3425,6 +3460,13 @@
         event populates it. The contact accumulates context as you progress
         through the funnel.
       </p>
+      <p>
+        <strong>Contact details only fill blanks.</strong> When the contact is
+        already in HubSpot, the Identity fields (name, email, phone, company,
+        job title, LinkedIn links) are written only where HubSpot has nothing.
+        Your own email, phone or job title for that person is never replaced.
+        Event metadata, conversation context and static values always update.
+      </p>
 
       <h4>Want a "synced from Uptown" list in HubSpot?</h4>
       <p>
@@ -3434,6 +3476,15 @@
         this) or <em>"Last Outreach Type equals Response received"</em>.
         Active Lists rebuild membership automatically, so you don't have to
         worry about lists going stale.
+      </p>
+
+      <h4>Recent syncs</h4>
+      <p>
+        The bottom of the card lists the last 15 syncs for the account: when,
+        who, what set it off, and what happened (<em>Added to HubSpot</em>,
+        <em>Updated in HubSpot</em>, <em>No change needed</em>, or
+        <em>Failed</em> with the reason). A sync that fails is not retried by
+        itself; the next event for that prospect tries again.
       </p>
 
       <h4>Status pill</h4>
@@ -4374,11 +4425,13 @@
         <summary>Calendly bookings aren't auto-logging.</summary>
         <div class="details-body">
           <ul>
-            <li>Check that the Meeting Links row has a green <em>Integrated</em> badge.</li>
-            <li>Check that the booking was on the event type you selected during OAuth.</li>
-            <li>Auto-attachment is by name match. If your prospect booked under a
-                different name (e.g. nickname, married name) you may need to log
-                the meeting manually from the <a href="#dash-prospects">Prospects tab</a>.</li>
+            <li>Check that the Meeting Links row shows a green <em>Listening on Calendly</em> line.</li>
+            <li>Check that the booking was on the event type shown on that line.</li>
+            <li>A booking is attached by the email it was booked with, then by
+                name. If your prospect booked with an email and a name the
+                Tracker doesn't have for them (e.g. nickname, married name),
+                the meeting lands on a new prospect; merge the two from the
+                <a href="#dash-prospects">Prospects tab</a>.</li>
           </ul>
         </div>
       </details>
@@ -4387,12 +4440,13 @@
         <summary>HubSpot bookings aren't auto-logging.</summary>
         <div class="details-body">
           <ul>
-            <li>Check the meeting title actually contains the substring you
-                set during connect.</li>
-            <li>Verify HubSpot's webhook subscription is active in the Meeting Links
-                row (it'll show a connected indicator).</li>
-            <li>HubSpot's webhook fires on Meeting Created, not on Meeting Updated.
-                Edits to a meeting after creation don't re-fire.</li>
+            <li>Check that the Meeting Links row shows a green <em>Listening on
+                HubSpot</em> line, and that the link named on it is the one the
+                booking was made through.</li>
+            <li>If the row says the link isn't being tracked yet, click
+                <strong>Find link</strong>, or check the address on the row.</li>
+            <li>Only bookings made through the meeting link's own page are
+                logged. A meeting created by hand in HubSpot is not.</li>
           </ul>
         </div>
       </details>

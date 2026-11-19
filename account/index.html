@@ -797,9 +797,9 @@
         <div class="cad-head">
           <h2>Meeting Links</h2>
           <p class="page-sub">
-            Store the meeting links you share in LinkedIn DMs. Optionally connect Calendly or HubSpot
-            so bookings on those links automatically log as meeting activity in this account's funnel.
-            Up to 10 per account.
+            Store the meeting links you share in LinkedIn DMs. Connect Calendly or HubSpot, or use
+            Zapier, so bookings on those links automatically log as meeting activity in this account's
+            funnel. Up to 10 per account.
           </p>
         </div>
         <div id="ml-list" class="ml-list">
@@ -962,10 +962,17 @@
               <h4>Field mapping</h4>
               <p class="section-blurb">
                 Map Uptown data onto HubSpot contact properties. Empty values do not overwrite existing data,
-                so earlier event data persists on the contact.
+                so earlier event data persists on the contact. On a contact that is already in HubSpot, contact
+                details (name, email, phone, company, title, LinkedIn links) only fill blanks; what happened and
+                when always updates.
               </p>
               <div id="hubspot-mapping-rows" class="hubspot-mapping-rows"></div>
               <button id="hubspot-add-mapping-btn" type="button" class="cad-add">+ Add mapping</button>
+            </div>
+
+            <div class="hubspot-subsection">
+              <h4>Recent syncs</h4>
+              <div id="hubspot-sync-log" class="hubspot-sync-log"></div>
             </div>
 
             <div class="hubspot-actions">
@@ -982,6 +989,7 @@
   <script src="/config.js"></script>
   <script src="/supabase-client.js"></script>
   <script src="/auth.js"></script>
+  <script src="/meeting-link-status.js?v=1"></script>
   <script src="/account/content-posts.js?v=33"></script>
   <script>
     (async function main() {
@@ -10494,9 +10502,13 @@
       // ================= MEETING LINKS ================================
       //
       // Per-account list of up to 10 meeting links. Each row stores a
-      // display name + URL; optionally bound to an integrations row
-      // (Calendly or HubSpot) that auto-logs meeting_booked outreach
-      // events when bookings come in.
+      // display name + URL, and says how its bookings reach the Tracker:
+      //   - a Calendly or HubSpot connection (integration_id) that
+      //     auto-logs meeting_booked outreach events, or
+      //   - Zapier (method = 'zapier'): the account's own Zap posts each
+      //     booking with the account's API key.
+      // The dashboard's Integration column is worked out from these rows
+      // (see /meeting-link-status.js) - nothing is typed in by hand.
       //
       // OAuth + webhook lifecycle live in Edge Functions:
       //   mlink-oauth-init   — POST {provider, client_id, meeting_link_id} → {authorize_url}
@@ -10549,69 +10561,91 @@
           addBtn.title    = links.length >= 10 ? "Max 10 meeting links per account" : "";
         }
 
+        // ---- One band per way the link is tracked -------------------
+        function lastBookingText(ts) {
+          return ts ? `Last booking: ${new Date(ts).toLocaleString()}` : "No bookings received yet";
+        }
+
+        function calendlyBand(integ) {
+          const name = (integ.selected_resource || {}).event_type_name || "";
+          if (!name) {
+            return `
+              <div class="ml-status ml-status-pending">
+                <span class="ml-status-label">Calendly connected. Pick an event type to start receiving bookings.</span>
+                <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Pick event type</button>
+                <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
+              </div>`;
+          }
+          return `
+            <div class="ml-status ml-status-listening">
+              <span class="ml-status-badge">✓ Listening on Calendly: ${esc(name)}</span>
+              <span class="ml-status-meta">${esc(lastBookingText(integ.last_event_at))}</span>
+              <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change event type</button>
+              <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+            </div>`;
+        }
+
+        // HubSpot listens on ONE meeting link. It is found from the
+        // address on this row; the picker only appears when the address
+        // doesn't lead to a link in the connected HubSpot account.
+        function hubspotBand(link, integ) {
+          const sr = integ.selected_resource || {};
+          if (sr.link_id) {
+            const name = sr.name || sr.slug || "";
+            return `
+              <div class="ml-status ml-status-listening">
+                <span class="ml-status-badge">✓ Listening on HubSpot${name ? `: ${esc(name)}` : ""}</span>
+                <span class="ml-status-meta">${esc(lastBookingText(integ.last_event_at))}</span>
+                <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change link</button>
+                <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+              </div>`;
+          }
+          if (!link.url) {
+            return `
+              <div class="ml-status ml-status-pending">
+                <span class="ml-status-label">HubSpot connected. Paste this meeting link's address above to start receiving bookings.</span>
+                <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
+              </div>`;
+          }
+          return `
+            <div class="ml-status ml-status-pending">
+              <span class="ml-status-label">HubSpot connected, but this link isn't being tracked yet.</span>
+              <button class="ml-btn ml-btn-primary" data-action="find-link"  type="button">Find link</button>
+              <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
+            </div>`;
+        }
+
+        function zapierBand(link) {
+          if (link.zapier_last_booking_at) {
+            return `
+              <div class="ml-status ml-status-listening">
+                <span class="ml-status-badge">✓ Zapier</span>
+                <span class="ml-status-meta">${esc(lastBookingText(link.zapier_last_booking_at))}</span>
+                <button class="ml-btn ml-btn-link" data-action="zapier-steps" type="button">Setup steps</button>
+                <button class="ml-btn ml-btn-link" data-action="zapier-off"   type="button">Disconnect</button>
+              </div>`;
+          }
+          return `
+            <div class="ml-status ml-status-pending">
+              <span class="ml-status-label">Zapier: waiting for the first booking.</span>
+              <button class="ml-btn ml-btn-primary" data-action="zapier-steps" type="button">Setup steps</button>
+              <button class="ml-btn ml-btn-link"    data-action="zapier-off"   type="button">Disconnect</button>
+            </div>`;
+        }
+
         function renderRow(link) {
           const integ = link.integration_id ? integrations[link.integration_id] : null;
-          let statusHtml = "";
-          if (!integ) {
-            statusHtml = `
+          const bands = [];
+          if (integ) bands.push(integ.provider === "calendly" ? calendlyBand(integ) : hubspotBand(link, integ));
+          if (link.method === "zapier") bands.push(zapierBand(link));
+          if (bands.length === 0) {
+            bands.push(`
               <div class="ml-status ml-status-unconfigured">
-                <span class="ml-status-label">Not connected to a meeting tool</span>
+                <span class="ml-status-label">Not integrated</span>
                 <button class="ml-btn ml-btn-connect" data-action="connect-calendly" type="button">Connect Calendly</button>
                 <button class="ml-btn ml-btn-connect" data-action="connect-hubspot"  type="button">Connect HubSpot</button>
-              </div>`;
-          } else {
-            const sr   = integ.selected_resource || {};
-            const provLabel = integ.provider === "calendly" ? "Calendly" : "HubSpot";
-            const lastEvText = integ.last_event_at
-              ? `Last booking: ${new Date(integ.last_event_at).toLocaleString()}`
-              : "No bookings received yet";
-
-            if (integ.provider === "calendly") {
-              // Calendly path — pick a specific event type (Calendly's
-              // webhook subscription model scopes to one event type).
-              const name = sr.event_type_name || "";
-              if (!name) {
-                statusHtml = `
-                  <div class="ml-status ml-status-pending">
-                    <span class="ml-status-label">Calendly connected — pick an event type to start receiving bookings.</span>
-                    <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Pick event type</button>
-                    <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
-                  </div>`;
-              } else {
-                statusHtml = `
-                  <div class="ml-status ml-status-listening">
-                    <span class="ml-status-badge">✓ Listening on Calendly: ${esc(name)}</span>
-                    <span class="ml-status-meta">${esc(lastEvText)}</span>
-                    <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change event type</button>
-                    <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
-                  </div>`;
-              }
-            } else {
-              // HubSpot path — instead of picking from a dropdown, the
-              // operator types a unique identifier word/phrase that
-              // they've added to the meeting link's event title in
-              // HubSpot. We filter incoming meeting-creation webhooks
-              // by hs_meeting_title.toLowerCase().includes(match_text).
-              // Lets agencies running multiple clients on one HubSpot
-              // account route bookings cleanly per Uptown account.
-              const matchText = sr.match_text || "";
-              if (!matchText) {
-                statusHtml = `
-                  <div class="ml-status ml-status-pending">
-                    <span class="ml-status-label">HubSpot connected — set a meeting title filter to start receiving bookings.</span>
-                    <button class="ml-btn ml-btn-primary" data-action="configure"  type="button">Set filter</button>
-                    <button class="ml-btn ml-btn-link"    data-action="disconnect" type="button">Disconnect</button>
-                  </div>`;
-              } else {
-                statusHtml = `
-                  <div class="ml-status ml-status-listening">
-                    <span class="ml-status-badge">✓ Listening on HubSpot</span>
-                    <span class="ml-status-meta">Filter: meetings whose title contains <code>${esc(matchText)}</code> · ${esc(lastEvText)}</span>
-                    <button class="ml-btn ml-btn-link" data-action="configure"  type="button">Change filter</button>
-                    <button class="ml-btn ml-btn-link" data-action="disconnect" type="button">Disconnect</button>
-                  </div>`;
-              }
-            }
+                <button class="ml-btn ml-btn-connect" data-action="use-zapier"       type="button">Zapier</button>
+              </div>`);
           }
           return `
             <div class="ml-card" data-id="${esc(link.id)}">
@@ -10623,8 +10657,12 @@
                 <input class="ml-input ml-url" data-field="url" value="${esc(link.url || "")}" placeholder="https://…" />
                 <button class="ml-btn ml-btn-copy" data-action="copy" type="button" ${link.url ? "" : "disabled"}>Copy</button>
               </div>
-              ${statusHtml}
+              ${bands.join("")}
             </div>`;
+        }
+
+        function cardFor(linkId) {
+          return listEl.querySelector(`.ml-card[data-id="${CSS.escape(linkId)}"]`);
         }
 
         function wireRow(card) {
@@ -10648,6 +10686,10 @@
                 if (field === "url") {
                   const copyBtn = card.querySelector('[data-action="copy"]');
                   if (copyBtn) copyBtn.disabled = !newVal;
+                  // A HubSpot connection follows the address on its row:
+                  // a new address means a different link to listen on.
+                  const integ = link.integration_id ? integrations[link.integration_id] : null;
+                  if (integ && integ.provider === "hubspot") await findHubspotLink(link, integ);
                 }
               } catch (err) {
                 showFeedback(err.message || "Save failed", "err");
@@ -10659,6 +10701,169 @@
           card.querySelectorAll("[data-action]").forEach(btn => {
             btn.addEventListener("click", () => onAction(card, link, btn.dataset.action));
           });
+        }
+
+        // Find the HubSpot meeting link this row's address belongs to and
+        // start listening on it. When the address leads nowhere, show the
+        // picker so the operator can choose the link.
+        async function findHubspotLink(link, integ) {
+          let res;
+          try {
+            res = await sb.sbFetch("/functions/v1/mlink-admin", {
+              method: "POST",
+              body: JSON.stringify({ action: "configure", integration_id: integ.id }),
+            });
+          } catch (err) {
+            showFeedback(err.message || "Couldn't check HubSpot", "err");
+            return;
+          }
+          await load();
+          if (res && res.matched) {
+            showFeedback(`Listening for bookings${res.link && res.link.name ? ` on ${res.link.name}` : ""}`);
+            return;
+          }
+          if (res && res.reason === "no_url") return; // the band already says to paste the address
+          const card = cardFor(link.id);
+          if (card) renderHubspotPicker(card, integrations[integ.id] || integ, (res && res.links) || [], (res && res.recent) || [], true);
+        }
+
+        function pickerEl(card) {
+          let picker = card.querySelector(".ml-picker");
+          if (!picker) {
+            picker = document.createElement("div");
+            picker.className = "ml-picker";
+            card.appendChild(picker);
+          }
+          return picker;
+        }
+
+        // links  = the HubSpot account's meeting links (id, slug, name)
+        // recent = when HubSpot won't list its links: the links recent
+        //          bookings came through (link_id, bookings, latest_title, latest_at)
+        function renderHubspotPicker(card, integration, hsLinks, recent, missed) {
+          const picker = pickerEl(card);
+          const current = String((integration.selected_resource || {}).link_id || "");
+          let options = "", hint = "";
+          if (hsLinks.length) {
+            options = hsLinks.map(l =>
+              `<option value="${esc(l.id)}" data-name="${esc(l.name || "")}"${l.id === current ? " selected" : ""}>${esc(l.name || l.slug || l.id)}${l.slug ? ` (${esc(l.slug)})` : ""}</option>`
+            ).join("");
+            hint = missed
+              ? "No HubSpot meeting link has the address on this row. Pick the link this row is for."
+              : "Pick the HubSpot meeting link this row is for.";
+          } else if (recent.length) {
+            options = recent.map(r => {
+              const when = r.latest_at ? new Date(r.latest_at).toLocaleDateString() : "";
+              const n = r.bookings === 1 ? "1 booking" : `${r.bookings} bookings`;
+              return `<option value="${esc(r.link_id)}" data-name=""${r.link_id === current ? " selected" : ""}>${esc(r.latest_title || "Meeting")} (${esc(n)}${when ? `, latest ${esc(when)}` : ""})</option>`;
+            }).join("");
+            hint = "Pick the link by a recent booking made through it.";
+          } else {
+            picker.innerHTML = `
+              <div class="placeholder">No meeting links were found in the connected HubSpot account. Book one test meeting on this link, then click Find link again.</div>
+              <div class="ml-picker-actions">
+                <button class="ml-btn ml-btn-link" data-action="cancel" type="button">Close</button>
+              </div>`;
+            picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
+            return;
+          }
+          picker.innerHTML = `
+            <div class="ml-picker-row">
+              <label class="ml-label">Meeting link</label>
+              <select class="ml-select" data-field="hs-link">${options}</select>
+            </div>
+            <div class="ml-picker-actions">
+              <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
+              <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
+            </div>
+            <p class="ml-picker-hint">${esc(hint)}</p>`;
+          picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
+            const sel = picker.querySelector('[data-field="hs-link"]');
+            const linkId = sel.value;
+            const linkName = sel.options[sel.selectedIndex]?.dataset.name || "";
+            if (!linkId) return;
+            try {
+              await sb.sbFetch("/functions/v1/mlink-admin", {
+                method: "POST",
+                body: JSON.stringify({
+                  action: "configure", integration_id: integration.id,
+                  link_id: linkId, link_name: linkName,
+                }),
+              });
+              showFeedback("Listening for bookings");
+              await load();
+            } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
+          });
+          picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
+        }
+
+        // Zapier: the account's own Zap posts each booking with the
+        // account's API key. Nothing to connect - the panel shows the
+        // steps and hands over a key.
+        async function renderZapierSteps(card) {
+          const picker = pickerEl(card);
+          picker.innerHTML = `<div class="loading">Loading…</div>`;
+          let keys = [];
+          try {
+            const rows = await sb.sbFetch(
+              `/rest/v1/account_api_keys?client_id=eq.${encodeURIComponent(clientId)}&revoked_at=is.null&select=id,name,key_prefix&order=created_at.desc`
+            );
+            keys = Array.isArray(rows) ? rows : [];
+          } catch (_) { /* the steps still render; the key line falls back to "create" */ }
+
+          const keyLine = keys.length
+            ? `This account already has a key: <strong>${esc(keys[0].name)}</strong> (<code>${esc(keys[0].key_prefix)}...</code>). Use that one if you saved it, or create a new one.`
+            : `Create this account's key and copy it.`;
+          picker.innerHTML = `
+            <ol class="ml-postsave-steps">
+              <li>In your own Zapier account, create a Zap. For the trigger, pick the tool this meeting link belongs to (HubSpot, Calendly or another) and its new booking event for this link.</li>
+              <li>For the action, pick <strong>Uptown Tracker</strong>, then <strong>Create Activity</strong>. <a href="https://zapier.com/developer/public-invite/241594/e38f1df0151df5fb802c44175832ff94/" target="_blank" rel="noopener">Add Uptown Tracker to Zapier</a> if it isn't there yet.</li>
+              <li>When Zapier asks for an API key, paste this account's key. ${keyLine}
+                <div class="ml-postsave-url-row" data-role="key-row">
+                  <button class="ml-btn ml-btn-primary" type="button" data-action="zapier-new-key">Create a key</button>
+                </div>
+              </li>
+              <li>Set <strong>Activity Type</strong> to Meeting Booked, <strong>Prospect Name</strong> to the person's name and <strong>Email</strong> to their email. Turn the Zap on.</li>
+              <li>Book a test meeting on this link. This row turns green when it arrives.</li>
+            </ol>
+            <div class="ml-picker-actions">
+              <button class="ml-btn ml-btn-link" data-action="cancel" type="button">Close</button>
+            </div>`;
+          picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
+          picker.querySelector('[data-action="zapier-new-key"]').addEventListener("click", async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            try {
+              const rawKey = await sb.sbFetch("/rest/v1/rpc/create_account_api_key", {
+                method: "POST",
+                body:   JSON.stringify({ p_client_id: clientId, p_name: "Zapier" }),
+              });
+              const row = picker.querySelector('[data-role="key-row"]');
+              row.innerHTML = `
+                <input class="ml-postsave-url" readonly value="${esc(rawKey)}" />
+                <button class="ml-btn ml-btn-primary" type="button" data-action="zapier-copy-key">Copy key</button>
+                <span class="ml-picker-hint">Copy it now. It is shown only once.</span>`;
+              row.querySelector('[data-action="zapier-copy-key"]').addEventListener("click", async (ev) => {
+                try {
+                  await navigator.clipboard.writeText(rawKey);
+                  const b = ev.currentTarget, orig = b.textContent;
+                  b.textContent = "Copied";
+                  setTimeout(() => { b.textContent = orig; }, 1400);
+                } catch { showFeedback("Couldn't copy. Select the key and copy it by hand.", "err"); }
+              });
+            } catch (err) {
+              btn.disabled = false;
+              showFeedback(err.message || "Couldn't create a key", "err");
+            }
+          });
+        }
+
+        async function setMethod(link, method) {
+          await sb.sbFetch(
+            `/rest/v1/meeting_links?id=eq.${encodeURIComponent(link.id)}`,
+            { method: "PATCH", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ method }) }
+          );
         }
 
         async function onAction(card, link, action) {
@@ -10706,6 +10911,35 @@
             } catch (err) { showFeedback(err.message || "Couldn't start OAuth", "err"); }
             return;
           }
+          if (action === "use-zapier") {
+            try {
+              await setMethod(link, "zapier");
+              await load();
+              const fresh = cardFor(link.id);
+              if (fresh) await renderZapierSteps(fresh);
+            } catch (err) { showFeedback(err.message || "Couldn't save", "err"); }
+            return;
+          }
+          if (action === "zapier-steps") {
+            const open = card.querySelector(".ml-picker");
+            if (open) { open.remove(); return; }
+            await renderZapierSteps(card);
+            return;
+          }
+          if (action === "zapier-off") {
+            if (!confirm("Stop tracking this link through Zapier?\n\nThis only changes what this row shows. Your Zap keeps posting bookings until you turn it off in Zapier.")) return;
+            try {
+              await setMethod(link, null);
+              showFeedback("Disconnected");
+              await load();
+            } catch (err) { showFeedback(err.message || "Couldn't save", "err"); }
+            return;
+          }
+          if (action === "find-link") {
+            const integ = integrations[link.integration_id];
+            if (integ) await findHubspotLink(link, integ);
+            return;
+          }
           if (action === "configure") {
             await openPicker(card, link, integrations[link.integration_id]);
             return;
@@ -10713,11 +10947,13 @@
           if (action === "disconnect") {
             if (!confirm("Disconnect this integration? Bookings will stop flowing in.")) return;
             try {
-              await sb.sbFetch("/functions/v1/mlink-admin", {
+              const res = await sb.sbFetch("/functions/v1/mlink-admin", {
                 method: "POST",
                 body: JSON.stringify({ action: "disconnect", integration_id: link.integration_id }),
               });
-              showFeedback("Disconnected");
+              showFeedback(res && res.app_uninstalled
+                ? "Disconnected. Uptown was also removed from that HubSpot account's connected apps."
+                : "Disconnected");
               await load();
             } catch (err) { showFeedback(err.message || "Disconnect failed", "err"); }
             return;
@@ -10726,170 +10962,68 @@
 
         async function openPicker(card, link, integration) {
           if (!integration) return;
-          let picker = card.querySelector(".ml-picker");
-          if (!picker) {
-            picker = document.createElement("div");
-            picker.className = "ml-picker";
-            card.appendChild(picker);
-          }
-
-          // HubSpot uses a text-match filter, not a picker — short-circuit
-          // the list_resources call entirely. Operator types a unique
-          // identifier word/phrase they've added to the meeting link's
-          // event title in HubSpot; we filter incoming Meeting → Created
-          // webhooks by that text.
-          if (integration.provider === "hubspot") {
-            const existing = integration.selected_resource?.match_text || "";
-            picker.innerHTML = `
-              <div class="ml-picker-row">
-                <label class="ml-label">Meeting title contains</label>
-                <input class="ml-input" data-field="match" placeholder="e.g. Discovery Call" value="${esc(existing)}" />
-              </div>
-              <div class="ml-picker-actions">
-                <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
-                <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
-              </div>
-              <p class="ml-picker-hint">In HubSpot, edit your meeting link's <strong>Event title</strong> to include a unique identifier (e.g. add <code>- Discovery Call</code> after the contact name). We'll only log meetings whose title contains the text above. Each Uptown account should use a different identifier so bookings route to the right account.</p>`;
-            picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
-              const matchText = picker.querySelector('[data-field="match"]').value.trim();
-              if (!matchText) { showFeedback("Pick a unique phrase first", "err"); return; }
-              try {
-                await sb.sbFetch("/functions/v1/mlink-admin", {
-                  method: "POST",
-                  body: JSON.stringify({
-                    action: "configure", integration_id: integration.id,
-                    match_text: matchText,
-                  }),
-                });
-                showFeedback("Listening for bookings");
-                await load();
-              } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
-            });
-            picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
-            return;
-          }
-
-          // Calendly path — needs a list_resources call to populate
-          // the event-type dropdown.
+          const picker = pickerEl(card);
           picker.innerHTML = `<div class="loading">Loading options…</div>`;
 
-          let items = [];
+          let items = [], recent = [];
           try {
             const res = await sb.sbFetch("/functions/v1/mlink-admin", {
               method: "POST",
               body: JSON.stringify({ action: "list_resources", integration_id: integration.id }),
             });
-            items = res.items || [];
+            items  = res.items  || [];
+            recent = res.recent || [];
           } catch (err) {
             picker.innerHTML = `<div class="placeholder"><strong>Couldn't load:</strong> ${esc(err.message || "")}</div>`;
             return;
           }
+
+          if (integration.provider === "hubspot") {
+            renderHubspotPicker(card, integration, items, recent, false);
+            return;
+          }
+
+          // Calendly: pick the event type to listen on.
           if (items.length === 0) {
             picker.innerHTML = `<div class="placeholder">No event types found in the connected Calendly account.</div>`;
             return;
           }
-
-          if (integration.provider === "calendly") {
-            picker.innerHTML = `
-              <div class="ml-picker-row">
-                <label class="ml-label">Scope</label>
-                <select class="ml-select" data-field="scope">
-                  <option value="user">My account</option>
-                  <option value="organization">Organization</option>
-                </select>
-              </div>
-              <div class="ml-picker-row">
-                <label class="ml-label">Event type</label>
-                <select class="ml-select" data-field="event">
-                  ${items.map(it => `<option value="${esc(it.uri)}" data-name="${esc(it.name)}">${esc(it.name)}${it.active ? "" : " (inactive)"}</option>`).join("")}
-                </select>
-              </div>
-              <div class="ml-picker-actions">
-                <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
-                <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
-              </div>`;
-            picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
-              const scope     = picker.querySelector('[data-field="scope"]').value;
-              const eSel      = picker.querySelector('[data-field="event"]');
-              const eUri      = eSel.value;
-              const eName     = eSel.options[eSel.selectedIndex]?.dataset.name || "";
-              try {
-                await sb.sbFetch("/functions/v1/mlink-admin", {
-                  method: "POST",
-                  body: JSON.stringify({
-                    action: "configure", integration_id: integration.id,
-                    scope, event_type_uri: eUri, event_type_name: eName,
-                  }),
-                });
-                showFeedback("Listening for bookings");
-                await load();
-              } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
-            });
-          } else {
-            // HubSpot — operator picks a form (meeting links surface
-            // here as forms too, since each meeting link has an
-            // HubSpot picker is handled separately above (text input
-            // for match_text, no list_resources call needed). This
-            // branch is now Calendly-only — once we add a third
-            // provider it'll need its own block here.
-          }
-          picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
-        }
-
-        // Post-save panel for HubSpot — explains the next step (set up a
-        // Workflow) inline rather than via an alert(). The webhook URL is
-        // shown in a readonly input with a Copy button so the operator
-        // can paste it into HubSpot's Workflow builder. Step list is the
-        // shortest reliable path through HubSpot's UI; the trigger
-        // wording matches what HubSpot calls it as of 2026.
-        function renderHubspotPostSave(webhookUrl) {
-          return `
-            <div class="ml-postsave">
-              <div class="ml-postsave-header">✓ Meeting link saved.</div>
-              <p class="ml-postsave-intro">
-                Last step — to auto-log bookings, set up a HubSpot Workflow that fires when a meeting is booked on this link:
-              </p>
-              <ol class="ml-postsave-steps">
-                <li>In HubSpot, go to <strong>Automation → Workflows</strong>.</li>
-                <li>Click <strong>+ Create workflow → From scratch → Contact-based</strong>.</li>
-                <li>Set the trigger to <strong>"When a meeting is booked"</strong> (or "Re-enroll when contact creates a meeting"), filtered to the meeting link you just picked.</li>
-                <li>Add an action: <strong>Send a webhook</strong> (HTTP request).</li>
-                <li>Method: <strong>POST</strong>. Paste this URL as the target:</li>
-              </ol>
-              <div class="ml-postsave-url-row">
-                <input class="ml-postsave-url" readonly value="${esc(webhookUrl)}" />
-                <button class="ml-btn ml-btn-primary" type="button" data-action="copy-postsave">Copy URL</button>
-              </div>
-              <ol class="ml-postsave-steps" start="6">
-                <li>In the webhook body / properties, include the contact's <code>firstname</code>, <code>lastname</code>, <code>email</code>, and <code>phone</code>.</li>
-                <li>Save and <strong>activate</strong> the workflow.</li>
-              </ol>
-              <p class="ml-postsave-hint">
-                HubSpot Workflows require Marketing Hub Professional or higher. Once active, bookings appear in this account's funnel within ~10 seconds. Test by booking a meeting on yourself.
-              </p>
-              <div class="ml-postsave-actions">
-                <button class="ml-btn ml-btn-link" type="button" data-action="postsave-done">Close</button>
-              </div>
+          picker.innerHTML = `
+            <div class="ml-picker-row">
+              <label class="ml-label">Scope</label>
+              <select class="ml-select" data-field="scope">
+                <option value="user">My account</option>
+                <option value="organization">Organization</option>
+              </select>
             </div>
-          `;
-        }
-
-        function wireHubspotPostSave(panel) {
-          panel.querySelector('[data-action="copy-postsave"]')?.addEventListener("click", async () => {
-            const input = panel.querySelector(".ml-postsave-url");
+            <div class="ml-picker-row">
+              <label class="ml-label">Event type</label>
+              <select class="ml-select" data-field="event">
+                ${items.map(it => `<option value="${esc(it.uri)}" data-name="${esc(it.name)}">${esc(it.name)}${it.active ? "" : " (inactive)"}</option>`).join("")}
+              </select>
+            </div>
+            <div class="ml-picker-actions">
+              <button class="ml-btn ml-btn-primary" data-action="save"   type="button">Save & start listening</button>
+              <button class="ml-btn ml-btn-link"    data-action="cancel" type="button">Cancel</button>
+            </div>`;
+          picker.querySelector('[data-action="save"]').addEventListener("click", async () => {
+            const scope     = picker.querySelector('[data-field="scope"]').value;
+            const eSel      = picker.querySelector('[data-field="event"]');
+            const eUri      = eSel.value;
+            const eName     = eSel.options[eSel.selectedIndex]?.dataset.name || "";
             try {
-              await navigator.clipboard.writeText(input.value);
-              const btn = panel.querySelector('[data-action="copy-postsave"]');
-              if (btn) {
-                const orig = btn.textContent;
-                btn.textContent = "Copied";
-                setTimeout(() => { btn.textContent = orig; }, 1400);
-              }
-            } catch { showFeedback("Couldn't copy — select the URL manually", "err"); }
+              await sb.sbFetch("/functions/v1/mlink-admin", {
+                method: "POST",
+                body: JSON.stringify({
+                  action: "configure", integration_id: integration.id,
+                  scope, event_type_uri: eUri, event_type_name: eName,
+                }),
+              });
+              showFeedback("Listening for bookings");
+              await load();
+            } catch (err) { showFeedback(err.message || "Configure failed", "err"); }
           });
-          panel.querySelector('[data-action="postsave-done"]')?.addEventListener("click", () => {
-            panel.closest(".ml-picker")?.remove();
-          });
+          picker.querySelector('[data-action="cancel"]').addEventListener("click", () => picker.remove());
         }
 
         addBtn.addEventListener("click", async () => {
@@ -10924,10 +11058,13 @@
         const intStatus   = params.get("integration_status");
         const intProvider = params.get("integration_provider") || "";
         const intReason   = params.get("integration_reason")   || "";
-        if (intStatus) {
+        // Only the meeting-link callback: the outreach-sync callback
+        // (integration_purpose=outreach_sync) is the HubSpot card's.
+        const mine = !!intStatus && params.get("integration_purpose") !== "outreach_sync";
+        if (mine) {
           if (intStatus === "success") {
-            const provLabel = intProvider === "calendly" ? "Calendly" : intProvider === "hubspot" ? "HubSpot" : "Integration";
-            showFeedback(`${provLabel} connected — pick what to listen to next.`);
+            if (intProvider === "calendly") showFeedback("Calendly connected. Pick an event type next.");
+            else if (intProvider !== "hubspot") showFeedback("Connected.");
           } else {
             showFeedback(`Connection failed: ${intReason || "unknown error"}`, "err");
           }
@@ -10935,7 +11072,21 @@
           history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params.toString() : "") + "#meeting-links");
         }
 
-        load();
+        load().then(async () => {
+          // Straight back from connecting HubSpot: find each new
+          // connection's link from the address already on its row, so
+          // the operator lands on "Listening" with nothing to pick.
+          if (!(mine && intStatus === "success" && intProvider === "hubspot")) return;
+          const todo = links.filter(l => {
+            const integ = l.integration_id ? integrations[l.integration_id] : null;
+            return integ && integ.provider === "hubspot" && !(integ.selected_resource || {}).link_id;
+          });
+          if (todo.length === 0) { showFeedback("HubSpot connected."); return; }
+          for (const l of todo) {
+            if (!l.url) { showFeedback("HubSpot connected. Paste the meeting link's address to start receiving bookings."); continue; }
+            await findHubspotLink(l, integrations[l.integration_id]);
+          }
+        });
       }
 
       // ================= CONTENT (LinkedIn post analytics) =============
@@ -11263,6 +11414,8 @@
           // Name match toggle
           nameMatchCb.checked = integration.name_match_enabled !== false;
 
+          renderSyncLog();
+
           // Load HubSpot properties once, then build mapping rows.
           if (hubspotProperties.length === 0) {
             try {
@@ -11278,6 +11431,52 @@
             }
           }
           renderMappingRows();
+        }
+
+        // --- Recent syncs: the last 15 sync attempts for this account ---
+        // Every attempt is recorded (hubspot_sync_log), so a contact that
+        // didn't make it is visible here with the reason.
+        const SYNC_TRIGGER_LABELS = {
+          connection: "Connection request sent", message: "First message sent",
+          response: "Response received", meeting_booked: "Meeting booked",
+          handed_off: "Handed off", email_changed: "Email address changed",
+        };
+        const SYNC_RESULT_LABELS = {
+          created: "Added to HubSpot", updated: "Updated in HubSpot", unchanged: "No change needed",
+        };
+        async function renderSyncLog() {
+          const el = document.getElementById("hubspot-sync-log");
+          if (!el) return;
+          let rows = [];
+          try {
+            rows = await sb.sbFetch(
+              "/rest/v1/hubspot_sync_log?select=prospect_name,trigger,result,detail,created_at" +
+              `&client_id=eq.${encodeURIComponent(clientId)}&order=created_at.desc&limit=15`
+            );
+          } catch (err) {
+            el.innerHTML = `<p class="section-blurb hubspot-blurb-sub">Couldn't load recent syncs.</p>`;
+            return;
+          }
+          if (!Array.isArray(rows) || rows.length === 0) {
+            el.innerHTML = `<p class="section-blurb hubspot-blurb-sub">Nothing has synced yet.</p>`;
+            return;
+          }
+          el.innerHTML = rows.map(r => {
+            const d = new Date(r.created_at);
+            const when = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(2)} ` +
+              d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+            const failed = r.result === "error";
+            const what = failed
+              ? `Failed${r.detail ? `: ${r.detail}` : ""}`
+              : (SYNC_RESULT_LABELS[r.result] || r.result);
+            return `
+              <div class="hubspot-sync-row${failed ? " hubspot-sync-row-err" : ""}">
+                <span class="hubspot-sync-when">${esc(when)}</span>
+                <span class="hubspot-sync-who">${esc(r.prospect_name || "")}</span>
+                <span class="hubspot-sync-why">${esc(SYNC_TRIGGER_LABELS[r.trigger] || r.trigger || "")}</span>
+                <span class="hubspot-sync-what"${!failed && r.detail ? ` title="${esc(r.detail)}"` : ""}>${esc(what)}</span>
+              </div>`;
+          }).join("");
         }
 
         // --- Sentiment dropdown enable/disable mirrors Response checkbox ---
@@ -11479,14 +11678,16 @@
           const prev = disconnectBtn.textContent;
           disconnectBtn.textContent = "Disconnecting...";
           try {
-            await sb.sbFetch("/functions/v1/hubspot-admin", {
+            const res = await sb.sbFetch("/functions/v1/hubspot-admin", {
               method: "POST",
               body:   JSON.stringify({ action: "disconnect", integration_id: integration.id }),
             });
             integration = null;
             hubspotProperties = []; // force refetch on next connect
             render();
-            showFeedback("Disconnected.");
+            showFeedback(res && res.app_uninstalled
+              ? "Disconnected. Uptown was also removed from that HubSpot account's connected apps."
+              : "Disconnected.");
           } catch (err) {
             showFeedback(`Couldn't disconnect: ${err.message || err}`, "err");
             disconnectBtn.disabled = false;

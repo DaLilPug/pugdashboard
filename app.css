@@ -7449,9 +7449,10 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .client-table tbody tr.an-hl-row-red:hover    { background: #f4cccc; }
 
 /* Integration column (Accounts view): same look as the Status column -
-   green dot = bookings flow in automatically (HubSpot / Calendly /
-   Zapier / Bandaid), grey dot = Not Integrated. Text stays navy; the
-   dot does the talking. Reuses .status-dot / .status-text. */
+   green dot = bookings are arriving (HubSpot / Calendly / Zapier),
+   grey dot = Not Integrated or still being set up. Worked out from the
+   account's Meeting Links tab; clicking opens that tab. Text stays
+   navy; the dot does the talking. Reuses .status-dot / .status-text. */
 .integration-cell { cursor: pointer; white-space: nowrap; }
 /* Meetings tab: dot column now sits on the far right */
 .meetings-table .mm-hl-cell { padding-left: 0; padding-right: 10px; text-align: right; }
@@ -7589,3 +7590,20 @@ body.is-share-view .sub-tab[data-internal] { display: none; }
 .an-stage-select.an-stage-meeting    { background: rgba(30,182,131,.16); color: #107a3e; }
 .an-stage-select option:disabled { color: #9aa3ad; }
 .an-stage-date { font-size: 11px; color: var(--gray-400); }
+
+/* HubSpot card: Recent syncs. One line per sync attempt, newest first. */
+.hubspot-sync-log { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.hubspot-sync-row {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(1, 58, 82, 0.06);
+  color: var(--text, #1d2b36);
+}
+.hubspot-sync-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hubspot-sync-when, .hubspot-sync-why { color: var(--text-soft, #5b6673); }
+.hubspot-sync-row-err .hubspot-sync-what { color: #b42318; white-space: normal; }
+@media (max-width: 700px) {
+  .hubspot-sync-row { grid-template-columns: 1fr 1fr; }
+}
