@@ -213,7 +213,7 @@
         <span id="seat-usage" class="seat-usage" hidden></span>
         <!-- Content view only: narrows the table to everyone with a post in the last 14 days,
              the accounts whose LinkedIn numbers get uploaded each week. -->
-        <button id="upload-list-btn" class="upload-list-btn" type="button" hidden>Upload list</button>
+        <button id="upload-list-btn" class="upload-list-btn" type="button" hidden>Upload numbers</button>
         <div class="section-head-spacer"></div>
         <!-- "Show archived" toggle: when on, load() drops the
              archived_at=is.null filter so archived seats reappear in
@@ -305,7 +305,32 @@
         .upload-list-btn { margin-left: 12px; border: 1px solid var(--gray-300, #d6dee5); background: #fff; border-radius: 8px;
           padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--navy, #163a52); cursor: pointer; }
         .upload-list-btn:hover { background: #f2f6f9; }
-        .upload-list-btn.active { background: var(--navy, #163a52); color: #fff; border-color: var(--navy, #163a52); }
+        .up-dialog { margin: auto; border: 0; border-radius: 12px; padding: 0; width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+          box-shadow: 0 18px 60px rgba(1, 58, 82, .28); color: var(--navy, #163a52); font: inherit; }
+        .up-dialog::backdrop { background: rgba(1, 58, 82, .35); }
+        .up-body { padding: 20px 22px 22px; overflow-y: auto; max-height: calc(100vh - 48px); box-sizing: border-box; }
+        .up-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .up-head h3 { margin: 0; font-size: 17px; }
+        .up-x { border: 0; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--gray-400, #9aa7b2); padding: 0 4px; }
+        .up-how { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #4a6272; }
+        .up-drop { border: 2px dashed #b9c8d3; border-radius: 10px; padding: 26px 16px; text-align: center; font-size: 14px; font-weight: 600;
+          cursor: pointer; background: #f7fafc; }
+        .up-drop:hover, .up-drop.over { border-color: var(--navy, #163a52); background: #eef4f8; }
+        .up-files:not(:empty) { margin-top: 12px; }
+        .up-file { font-size: 13px; padding: 8px 10px; border-radius: 8px; background: #f2f6f9; margin-bottom: 6px; line-height: 1.45; }
+        .up-file b { font-weight: 600; }
+        .up-file .up-fname { color: #6b8291; font-size: 12px; word-break: break-all; }
+        .up-file.up-ok  { background: #e4f6ee; }
+        .up-file.up-bad { background: #fde3e3; color: #a01212; }
+        .up-file select, .up-file button { font: inherit; font-size: 13px; margin: 6px 6px 0 0; padding: 4px 8px; border-radius: 6px;
+          border: 1px solid #b9c8d3; background: #fff; color: inherit; cursor: pointer; }
+        .up-sub { margin: 18px 0 6px; font-size: 13px; font-weight: 700; }
+        .up-person { display: flex; gap: 10px; align-items: baseline; font-size: 13px; padding: 6px 2px; border-bottom: 1px solid #edf1f4; }
+        .up-person .up-name { font-weight: 600; flex: 0 0 170px; }
+        .up-person .up-co { flex: 1 1 auto; color: #6b8291; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .up-person .up-state { flex: 0 0 auto; color: #6b8291; }
+        .up-person.up-done .up-state { color: #12805c; font-weight: 600; }
+        .up-none { font-size: 13px; color: #6b8291; margin: 6px 0 0; }
         .kpi-strip.content-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
         @media (max-width: 700px) { .kpi-strip.content-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         /* Long column names wrap onto two lines so the last column stays on screen. */
@@ -330,6 +355,7 @@
               <th class="num sortable" data-csort="waiting">Waiting for approval<span class="sort-caret"></span></th>
               <th class="num sortable" data-csort="approved">Approved<span class="sort-caret"></span></th>
               <th class="num sortable" data-csort="scheduled">Scheduled<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="commented" title="Posts not yet posted that have a comment nobody has resolved">Comments<span class="sort-caret"></span></th>
               <th class="num sortable" data-csort="posted">Posted<span class="sort-caret"></span></th>
               <th class="num sortable" data-csort="impressions">Impressions<span class="sort-caret"></span></th>
               <th class="num sortable rate-cell" data-csort="engRate" title="Engagement rate (reactions, comments and reposts / impressions)">Eng. %<span class="sort-caret"></span></th>
@@ -340,7 +366,7 @@
             </tr>
           </thead>
           <tbody id="content-tbody">
-            <tr><td colspan="13" class="loading">Loading…</td></tr>
+            <tr><td colspan="14" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -2056,10 +2082,10 @@
       const contentTabBtn  = document.getElementById("content-view-tab");
       const uploadListBtn  = document.getElementById("upload-list-btn");
       const contentFetchCache = new Map();   // "from|to|org" -> promise of rows
-      const CONTENT_COLS = 13;
+      const CONTENT_COLS = 14;
       let contentPaintSeq = 0;               // drops stale async paints
       let contentShown = [];                 // the rows on screen (the cards read them)
-      let contentUploadOnly = false;         // the "Upload list" filter
+      let contentAll = [];                   // every row in view, before sorting (the upload box lists from it)
       let contentSortKey = "impressions", contentSortDir = "desc";
 
       sb.sbFetch("/rest/v1/rpc/content_tab_allowed", { method: "POST", body: "{}" })
@@ -2106,6 +2132,8 @@
           waitingLate:  (r.waiting_overdue || 0)  + (r.doc_waiting_overdue || 0),
           approvedLate: (r.approved_overdue || 0) + (r.doc_approved_overdue || 0),
           scheduledLate: r.scheduled_overdue || 0,
+          // Posts not yet posted with a comment nobody has resolved (Posts tab posts only).
+          commented: r.commented || 0,
           impressions: r.measured ? Number(r.impressions) : null,
           engagements: r.measured ? Number(r.engagements) : null,
           engRate: Number(r.impressions) ? Number(r.engagements) / Number(r.impressions) : null,
@@ -2154,15 +2182,156 @@
           renderContentView();
         });
       });
-      uploadListBtn.addEventListener("click", () => {
-        contentUploadOnly = !contentUploadOnly;
-        uploadListBtn.classList.toggle("active", contentUploadOnly);
-        // The list reads oldest upload first, so what still needs doing is on top.
-        if (contentUploadOnly) { contentSortKey = "numbersAsOf"; contentSortDir = "asc"; }
-        else                   { contentSortKey = "impressions"; contentSortDir = "desc"; }
-        updateContentCarets();
-        renderContentView();
-      });
+      // ---- Upload numbers ------------------------------------------------------
+      // LinkedIn's Post performance export, any number of files at once. A file does
+      // not say whose it is, so each one goes to the account that already holds its
+      // posts, matched on the posts' LinkedIn ids. A file that matches no account (a
+      // person's first upload) asks who it is for. The upload itself is the Posts
+      // tab's own (same file reader, same server call), so nothing is done twice.
+      const POST_ID_RE = /(?:activity|ugcPost|share)[-:](\d{15,25})/g;
+      function postIds(v) {
+        let t = String(v || "");
+        try { t = decodeURIComponent(t); } catch (_) {}
+        return [...t.matchAll(POST_ID_RE)].map(m => m[1]);
+      }
+      let postOwnersPromise = null;          // LinkedIn post id -> account id
+      function postOwners() {
+        if (!postOwnersPromise) {
+          postOwnersPromise = sb.sbFetchAll("/rest/v1/content_posts?select=client_id,activity_id,url&status=eq.posted&order=id")
+            .then(rows => {
+              const owners = new Map();
+              for (const p of rows || []) {
+                const ids = postIds(p.url);
+                if (p.activity_id) ids.push(String(p.activity_id));
+                for (const id of ids) owners.set(id, p.client_id);
+              }
+              return owners;
+            })
+            .catch(err => { postOwnersPromise = null; throw err; });
+        }
+        return postOwnersPromise;
+      }
+      function loadExportReader() {
+        if (window.ContentPosts && window.ContentPosts.readExportFile) return Promise.resolve(window.ContentPosts);
+        return new Promise((ok, bad) => {
+          const el = document.createElement("script");
+          el.src = "/account/content-posts.js?v=34";
+          el.onload = () => (window.ContentPosts && window.ContentPosts.readExportFile
+            ? ok(window.ContentPosts) : bad(new Error("The file reader could not load. Reload the page and try again.")));
+          el.onerror = () => bad(new Error("The file reader could not load. Reload the page and try again."));
+          document.head.append(el);
+        });
+      }
+
+      function openUploadBox() {
+        postOwnersPromise = null;   // read who owns which post afresh each time the box opens
+        const due = contentAll.filter(x => x.onUploadList).sort(contentCompare("numbersAsOf", "asc"));
+        const nameOf = (id) => { const c = clientsCache.find(k => k.id === id); return c ? (c.name || "this account") : "this account"; };
+        const dlg = document.createElement("dialog");
+        dlg.className = "up-dialog";
+        dlg.innerHTML = `<div class="up-body">
+          <div class="up-head"><h3>Upload LinkedIn numbers</h3><button type="button" class="up-x" aria-label="Close">×</button></div>
+          <p class="up-how">For each person: on LinkedIn, open their profile, then Analytics, then Post performance. Click Show more at the bottom until every post is loaded, then Export. Drop the files here, as many at once as you like. Each file goes to the right person on its own.</p>
+          <div class="up-drop" tabindex="0">Drop the files here or click to choose them</div>
+          <input type="file" accept=".xlsx,.xls,.csv" multiple hidden />
+          <div class="up-files"></div>
+          <h4 class="up-sub">Who needs it: everyone with a post in the last 14 days (${due.length})</h4>
+          <div class="up-people">${due.map(x => `
+            <div class="up-person" data-cid="${esc(x.c.id)}">
+              <span class="up-name">${esc(x.c.name || "")}</span>
+              <span class="up-co">${esc(x.c.company || "")}</span>
+              <span class="up-state">${x.numbersAsOf ? `Numbers as of ${esc(fmtDate(x.numbersAsOf))}` : "Never uploaded"}</span>
+            </div>`).join("") || `<p class="up-none">Nobody in view has posted in the last 14 days.</p>`}</div>
+        </div>`;
+        document.body.append(dlg);
+        const drop = dlg.querySelector(".up-drop"), fileIn = dlg.querySelector("input[type=file]"), filesEl = dlg.querySelector(".up-files");
+        let changed = false, queue = Promise.resolve();
+
+        function fileLine(f) {
+          const el = document.createElement("div");
+          el.className = "up-file";
+          el.innerHTML = `<div class="up-msg">Waiting...</div><div class="up-fname">${esc(f.name)}</div>`;
+          filesEl.append(el);
+          return el;
+        }
+        const say = (el, html, cls) => { el.className = "up-file" + (cls ? " " + cls : ""); el.querySelector(".up-msg").innerHTML = html; };
+
+        async function send(f, rows, asOf, clientId, el, reader) {
+          const who = nameOf(clientId);
+          say(el, `<b>${esc(who)}</b>: adding ${rows.length} post${rows.length === 1 ? "" : "s"}... this can take a minute.`);
+          const base64 = await reader.fileBase64(f);
+          const r = await sb.invokeFunction("linkedin-content", { action: "import_export", client_id: clientId, filename: f.name, base64, rows, asOf });
+          if (!r || r.error) throw new Error((r && r.error) || "The file could not be added.");
+          let said = [r.added ? `${r.added} post${r.added === 1 ? "" : "s"} added` : "",
+            r.numbers ? `numbers saved for ${r.numbers}` : ""].filter(Boolean).join(", ");
+          said = said || "nothing new in this file";
+          const left = [r.up_to_date ? `${r.up_to_date} already up to date` : "",
+            r.before_start ? `${r.before_start} from before their start left out` : "",
+            r.reposts ? `${r.reposts} repost${r.reposts === 1 ? "" : "s"} left out` : "",
+            r.too_old ? `${r.too_old} older than LinkedIn keeps numbers for` : ""].filter(Boolean).join(", ");
+          const brainBad = r.brain && r.brain.error ? ` The numbers didn't reach Brain: ${esc(r.brain.error)}` : "";
+          say(el, `<b>${esc(who)}</b>: ${esc(said)}${left ? ` (${esc(left)})` : ""}.${brainBad}`, brainBad ? "up-bad" : "up-ok");
+          changed = true;
+          contentFetchCache.clear();
+          const row = [...dlg.querySelectorAll(".up-person")].find(p => p.dataset.cid === clientId);
+          if (row) { row.classList.add("up-done"); row.querySelector(".up-state").textContent = "Uploaded just now"; }
+        }
+
+        // A file whose posts match no account, or more than one: the person picks.
+        function askWhose(f, rows, asOf, el, reader, several) {
+          const options = [...clientsCache].filter(c => !c.archived_at)
+            .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+            .map(c => `<option value="${esc(c.id)}">${esc(c.name || "")}${c.company ? ` (${esc(c.company)})` : ""}</option>`).join("");
+          say(el, `${several ? "The posts in this file match more than one account." : `None of the ${rows.length} post${rows.length === 1 ? "" : "s"} in this file ${rows.length === 1 ? "is" : "are"} on anyone's Posts tab yet.`} Whose file is it?<br>
+            <select><option value="">Choose the account</option>${options}</select><button type="button" data-add>Add</button><button type="button" data-skip>Leave it out</button>`);
+          el.querySelector("[data-skip]").onclick = () => say(el, "Left out.");
+          el.querySelector("[data-add]").onclick = () => {
+            const id = el.querySelector("select").value;
+            if (!id) return;
+            queue = queue.then(() => send(f, rows, asOf, id, el, reader).catch(err => say(el, esc(err.message), "up-bad")));
+          };
+        }
+
+        async function handle(f, el) {
+          try {
+            if (f.size > 15 * 1024 * 1024) throw new Error("That file is over 15 MB.");
+            say(el, "Reading...");
+            const reader = await loadExportReader();
+            const { rows, asOf } = await reader.readExportFile(f);
+            const owners = await postOwners();
+            const tally = new Map();
+            for (const r of rows) for (const id of postIds(r.url)) {
+              const owner = owners.get(id);
+              if (owner) tally.set(owner, (tally.get(owner) || 0) + 1);
+            }
+            if (tally.size === 1) await send(f, rows, asOf, [...tally.keys()][0], el, reader);
+            else askWhose(f, rows, asOf, el, reader, tally.size > 1);
+          } catch (err) { say(el, esc(err.message), "up-bad"); }
+        }
+        const take = (files) => { for (const f of files) { const el = fileLine(f); queue = queue.then(() => handle(f, el)); } };
+
+        drop.onclick = () => fileIn.click();
+        drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileIn.click(); } };
+        fileIn.onchange = () => { take([...fileIn.files]); fileIn.value = ""; };
+        drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+        drop.ondragleave = () => drop.classList.remove("over");
+        drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); take([...e.dataTransfer.files]); };
+        // Closing is done here, not left to the dialog's own close event, so the table always refreshes.
+        let shutDone = false;
+        const shut = () => {
+          if (shutDone) return;
+          shutDone = true;
+          if (dlg.open) dlg.close();
+          dlg.remove();
+          if (changed && dashView === "content") renderContentView();
+        };
+        dlg.querySelector(".up-x").onclick = shut;
+        dlg.addEventListener("click", (e) => { if (e.target === dlg) shut(); });
+        dlg.addEventListener("cancel", (e) => { e.preventDefault(); shut(); });   // the Esc key
+        dlg.addEventListener("close", shut);
+        dlg.showModal();
+      }
+      uploadListBtn.addEventListener("click", openUploadBox);
 
       function renderContentKpis(rows) {
         const sum = (k) => rows.reduce((s, x) => s + (x[k] || 0), 0);
@@ -2218,10 +2387,8 @@
         const byId = new Map((Array.isArray(rows) ? rows : []).map(r => [r.client_id, r]));
         const day14 = localDayAgo(14);
         const all = filteredEnriched().map(c => contentModel(c, byId.get(c.id), day14)).filter(Boolean);
-        const onList = all.filter(x => x.onUploadList);
-        uploadListBtn.textContent = `Upload list (${onList.length})`;
-        uploadListBtn.title = "Everyone with a post in the last 14 days. Their LinkedIn numbers are uploaded each week from the account's Posts tab.";
-        const shown = contentUploadOnly ? onList : all;
+        contentAll = all;
+        const shown = all;
         contentShown = shown;
         renderContentKpis(shown);
 
@@ -2233,7 +2400,7 @@
 
         if (!shown.length) {
           contentBodyEl.innerHTML = `<tr><td colspan="${CONTENT_COLS}" class="loading">${
-            contentUploadOnly ? "Nobody in view has posted in the last 14 days." : "No accounts with posts match the current filters."}</td></tr>`;
+            "No accounts with posts match the current filters."}</td></tr>`;
           return;
         }
         const num = (v) => v == null ? `<td class="num ct-zero">—</td>` : `<td class="num">${fmtInt(v)}</td>`;
@@ -2253,6 +2420,9 @@
               ${contentStageCell(x, x.waiting, x.r.waiting || 0, x.waitingLate, "ct-warn", "past the date planned for it", x.docWaiting)}
               ${contentStageCell(x, x.approved, x.r.approved || 0, x.approvedLate, "ct-bad", "approved but not posted", x.docApproved)}
               ${contentStageCell(x, x.scheduled, x.scheduled, x.scheduledLate, "ct-bad", "did not go out when scheduled", 0)}
+              ${x.commented
+                ? `<td class="num" title="${x.commented} post${x.commented === 1 ? "" : "s"} with a comment nobody has resolved"><a href="${href}"><span class="ct-flag ct-warn">${fmtInt(x.commented)}</span></a></td>`
+                : `<td class="num ct-zero">—</td>`}
               ${posted}
               ${num(x.impressions)}
               <td class="num rate-cell${x.engRate == null ? " ct-zero" : ""}">${x.engRate == null ? "—" : fmtPct(x.engRate)}</td>
