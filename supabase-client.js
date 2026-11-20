@@ -333,10 +333,13 @@
   async function signOut() {
     const s = getSession();
     if (s?.access_token) {
-      // Best-effort: tell Supabase to invalidate the refresh token.
+      // Best-effort: tell Supabase to end THIS sign-in. scope=local matters:
+      // without it Supabase ends every sign-in of the login, and several
+      // people share coach@ - one person's Sign out left the others getting
+      // "unauthorized" from uploads and refreshes (2026-11-20).
       // Ignore network errors — we're signing out either way.
       try {
-        await fetch(`${URL_BASE}/auth/v1/logout`, {
+        await fetch(`${URL_BASE}/auth/v1/logout?scope=local`, {
           method: "POST",
           headers: {
             apikey:        ANON_KEY,
@@ -562,17 +565,29 @@
   // called through here - visitors have no session yet, so the /share/
   // page calls it directly with just the anon key.
   async function invokeFunction(name, body) {
-    const s = await ensureFreshSession();
+    let s = await ensureFreshSession();
     if (!s) throw new Error("Not signed in");
-    const res = await fetch(`${URL_BASE}/functions/v1/${name}`, {
+    const call = (session) => fetch(`${URL_BASE}/functions/v1/${name}`, {
       method: "POST",
       headers: {
         apikey:         ANON_KEY,
-        Authorization:  `Bearer ${s.access_token}`,
+        Authorization:  `Bearer ${session.access_token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body || {}),
     });
+    let res = await call(s);
+    // 401 = the server no longer accepts this sign-in, though the token has
+    // not run out yet (it was ended from somewhere else). Try once with a
+    // fresh token; if that is refused too, say what to do in plain words
+    // (refreshSession has already cleared the stored sign-in, so a reload
+    // lands on the sign-in page).
+    if (res.status === 401) {
+      const ended = new Error("Your sign-in ended. Reload the page and sign in again.");
+      try { s = await refreshSession(); } catch (_) { throw ended; }
+      res = await call(s);
+      if (res.status === 401) throw ended;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
     return data;
