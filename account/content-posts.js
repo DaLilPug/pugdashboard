@@ -1241,6 +1241,5 @@
     }
   }
 
-  // readExportFile and fileBase64 are also used by the dashboard's Content tab (its Upload numbers box).
-  window.ContentPosts = { init, readLink, showPost, readExportFile, fileBase64 };
+  window.ContentPosts = { init, readLink, showPost };
 })();
