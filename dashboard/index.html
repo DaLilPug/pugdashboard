@@ -2225,11 +2225,10 @@
         contentShown = shown;
         renderContentKpis(shown);
 
-        // REMOVE AT THE DOCS SWITCH: the "Google Doc counts as of" note.
-        const docAt = (Array.isArray(rows) ? rows : []).reduce((m, r) => (r.doc_updated_at && r.doc_updated_at > m ? r.doc_updated_at : m), "");
-        const docNote = docAt
-          ? ` · Google Doc counts as of ${new Date(docAt).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}`
-          : "";
+        // REMOVE AT THE DOCS SWITCH: the Google Doc note. Those counts come from Brain's copy of each doc,
+        // taken once a day, so they run a day behind (the Posts tab's own counts are live).
+        const hasDocCounts = (Array.isArray(rows) ? rows : []).some(r => r.doc_updated_at);
+        const docNote = hasDocCounts ? " · Google Doc counts update once a day" : "";
         countEl.textContent = `— ${shown.length} account${shown.length === 1 ? "" : "s"}${docNote}`;
 
         if (!shown.length) {
