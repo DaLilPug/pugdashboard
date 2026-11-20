@@ -2215,7 +2215,7 @@
         if (window.ContentPosts && window.ContentPosts.readExportFile) return Promise.resolve(window.ContentPosts);
         return new Promise((ok, bad) => {
           const el = document.createElement("script");
-          el.src = "/account/content-posts.js?v=34";
+          el.src = "/account/content-posts.js?v=35";
           el.onload = () => (window.ContentPosts && window.ContentPosts.readExportFile
             ? ok(window.ContentPosts) : bad(new Error("The file reader could not load. Reload the page and try again.")));
           el.onerror = () => bad(new Error("The file reader could not load. Reload the page and try again."));
