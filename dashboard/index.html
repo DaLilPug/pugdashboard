@@ -201,6 +201,8 @@
         <div class="view-switch" id="view-switch" role="tablist" aria-label="Dashboard view">
           <button class="view-tab active" data-dview="accounts" type="button">Accounts</button>
           <button class="view-tab" data-dview="meetings" type="button">Meetings</button>
+          <!-- Uptown's team only for now: shown when content_tab_allowed() says so. -->
+          <button class="view-tab" data-dview="content" id="content-view-tab" type="button" hidden>Content</button>
         </div>
         <h2 id="section-title">Account performance</h2>
         <span id="client-count" class="section-meta"></span>
@@ -209,6 +211,9 @@
              the user isn't an admin of any org we can resolve. The
              .at-cap modifier flips it red once active === seats_paid. -->
         <span id="seat-usage" class="seat-usage" hidden></span>
+        <!-- Content view only: narrows the table to everyone with a post in the last 14 days,
+             the accounts whose LinkedIn numbers get uploaded each week. -->
+        <button id="upload-list-btn" class="upload-list-btn" type="button" hidden>Upload list</button>
         <div class="section-head-spacer"></div>
         <!-- "Show archived" toggle: when on, load() drops the
              archived_at=is.null filter so archived seats reappear in
@@ -289,6 +294,53 @@
           </thead>
           <tbody id="meetings-tbody">
             <tr><td colspan="9" class="loading">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Content view: the Posts tab seen across every account. One row per account; the stage
+           columns are the Posts tab's own sections in its own order, then the results of what was
+           posted in the timeframe. Hidden by default, loaded on first switch. Styles live here
+           (not in app.css) so the page and its styles always arrive together. -->
+      <style>
+        .upload-list-btn { margin-left: 12px; border: 1px solid var(--gray-300, #d6dee5); background: #fff; border-radius: 8px;
+          padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--navy, #163a52); cursor: pointer; }
+        .upload-list-btn:hover { background: #f2f6f9; }
+        .upload-list-btn.active { background: var(--navy, #163a52); color: #fff; border-color: var(--navy, #163a52); }
+        .kpi-strip.content-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        @media (max-width: 700px) { .kpi-strip.content-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        /* Long column names wrap onto two lines so the last column stays on screen. */
+        .client-table.content-table thead th { white-space: normal; line-height: 1.3; vertical-align: bottom; padding-left: 8px; padding-right: 8px; }
+        .client-table.content-table tbody td { white-space: nowrap; padding-left: 8px; padding-right: 8px; }
+        .client-table.content-table tbody td.ct-co { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+        .content-table td.ct-zero { color: var(--gray-400, #9aa7b2); }
+        .content-table .ct-flag { display: inline-block; border-radius: 6px; padding: 1px 7px; font-weight: 600; }
+        .content-table .ct-warn { background: #fff3d6; color: #8a5a00; }
+        .content-table .ct-bad  { background: #fde3e3; color: #a01212; }
+        .content-table td a { color: inherit; text-decoration: none; }
+        .content-table td a:hover { text-decoration: underline; }
+        .content-table td.ct-acct a { font-weight: 600; color: var(--navy, #163a52); }
+      </style>
+      <div class="table-wrap" id="content-wrap" hidden>
+        <table class="client-table content-table" id="content-table">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Company</th>
+              <th class="num sortable" data-csort="drafts">Drafts<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="waiting">Waiting for approval<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="approved">Approved<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="scheduled">Scheduled<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="posted">Posted<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="impressions">Impressions<span class="sort-caret"></span></th>
+              <th class="num sortable rate-cell" data-csort="engRate" title="Engagement rate (reactions, comments and reposts / impressions)">Eng. %<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="ctaClicks" title="Clicks on the profile button shown on posts">Button clicks<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="linkClicks" title="Clicks on links inside posts">Link clicks<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="lastPost">Last post<span class="sort-caret"></span></th>
+              <th class="num sortable" data-csort="numbersAsOf" title="The last day this account's LinkedIn numbers were uploaded">Numbers as of<span class="sort-caret"></span></th>
+            </tr>
+          </thead>
+          <tbody id="content-tbody">
+            <tr><td colspan="13" class="loading">Loading…</td></tr>
           </tbody>
         </table>
       </div>
@@ -1141,7 +1193,7 @@
         const active = clientsCache.filter(
           c => c.org_id === org.id && !c.archived_at
         ).length;
-        seatUsageEl.hidden = (dashView === "meetings");
+        seatUsageEl.hidden = (dashView !== "accounts");
         seatUsageEl.textContent = `— ${active} of ${org.seats_paid} seats used`;
         seatUsageEl.classList.toggle("at-cap",   active >= org.seats_paid);
         seatUsageEl.classList.toggle("near-cap", active < org.seats_paid && active >= org.seats_paid * 0.9);
@@ -1367,6 +1419,7 @@
 
       function renderTable() {
         if (dashView === "meetings") { renderMeetingsView(); return; }
+        if (dashView === "content")  { renderContentView();  return; }
         const filtered = filteredEnriched();
         countEl.textContent = `— ${filtered.length} account${filtered.length === 1 ? '' : 's'}`;
 
@@ -1988,22 +2041,254 @@
         });
       });
 
+      // ---- Content view -----------------------------------------------------
+      // "Content" tab in the section head (Uptown's team only for now): the
+      // Posts tab seen across every account. One row per account with how many
+      // posts sit in each stage and the results of what was posted in the
+      // timeframe. One RPC (content_dashboard_summary), fetched on the first
+      // switch and cached per timeframe for the session. The account, company,
+      // status and service filters and the search box apply exactly as they do
+      // on Accounts. Stage counts are as of now, like Open Tasks; only Posted
+      // and the results follow the timeframe.
+      const contentWrapEl  = document.getElementById("content-wrap");
+      const contentBodyEl  = document.getElementById("content-tbody");
+      const contentTableEl = document.getElementById("content-table");
+      const contentTabBtn  = document.getElementById("content-view-tab");
+      const uploadListBtn  = document.getElementById("upload-list-btn");
+      const contentFetchCache = new Map();   // "from|to|org" -> promise of rows
+      const CONTENT_COLS = 13;
+      let contentPaintSeq = 0;               // drops stale async paints
+      let contentShown = [];                 // the rows on screen (the cards read them)
+      let contentUploadOnly = false;         // the "Upload list" filter
+      let contentSortKey = "impressions", contentSortDir = "desc";
+
+      sb.sbFetch("/rest/v1/rpc/content_tab_allowed", { method: "POST", body: "{}" })
+        .then(ok => { if (ok === true) contentTabBtn.hidden = false; })
+        .catch(err => console.warn("content tab check failed:", err));
+
+      // The viewer's own calendar day for an instant (the RPC takes plain dates).
+      function localDay(d) {
+        if (!d) return null;
+        const x = d instanceof Date ? d : new Date(d);
+        return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+      }
+      function localDayAgo(n) { const x = new Date(); x.setDate(x.getDate() - n); return localDay(x); }
+
+      async function fetchContentWindow() {
+        const [since, until] = effectiveRange();
+        const org = drillInOrg || await getUserOrg();
+        const from = localDay(since), to = localDay(until);
+        const key = `${from || ""}|${to || ""}|${org ? org.id : ""}`;
+        if (contentFetchCache.has(key)) return contentFetchCache.get(key);
+        const promise = sb.sbFetch("/rest/v1/rpc/content_dashboard_summary", {
+          method: "POST",
+          body: JSON.stringify({ p_org_id: org ? org.id : null, p_from: from, p_to: to }),
+        }).catch(err => { contentFetchCache.delete(key); throw err; });
+        contentFetchCache.set(key, promise);
+        return promise;
+      }
+
+      // One table row's worth of facts, or null when the account has no posts
+      // anywhere (most outreach-only accounts): those stay off this tab.
+      function contentModel(c, r, day14) {
+        if (!r) return null;
+        // REMOVE AT THE DOCS SWITCH: the doc_* values are what sits in the person's
+        // content Google Doc (Brain counts it). When posts live in the Posts tab,
+        // docWaiting / docApproved go and the stage counts are the Tracker's alone.
+        const docWaiting = r.doc_waiting || 0, docApproved = r.doc_approved || 0;
+        const waiting = (r.waiting || 0) + docWaiting, approved = (r.approved || 0) + docApproved;
+        const any = (r.drafts || 0) + waiting + approved + (r.scheduled || 0) + (r.posted || 0);
+        if (!any && !r.last_post_on) return null;
+        const active = c._status === "active" && !c.archived_at;
+        return {
+          c, r, docWaiting, docApproved,
+          drafts: r.drafts || 0, waiting, approved, scheduled: r.scheduled || 0, posted: r.posted || 0,
+          waitingLate:  (r.waiting_overdue || 0)  + (r.doc_waiting_overdue || 0),
+          approvedLate: (r.approved_overdue || 0) + (r.doc_approved_overdue || 0),
+          scheduledLate: r.scheduled_overdue || 0,
+          impressions: r.measured ? Number(r.impressions) : null,
+          engagements: r.measured ? Number(r.engagements) : null,
+          engRate: Number(r.impressions) ? Number(r.engagements) / Number(r.impressions) : null,
+          ctaClicks: r.measured ? Number(r.cta_clicks) : null,
+          linkClicks: r.measured ? Number(r.link_clicks) : null,
+          lastPost: r.last_post_on || null,
+          numbersAsOf: r.numbers_as_of || null,
+          quiet: !!r.last_post_on && r.last_post_on < day14,
+          // The weekly upload list: anyone with a post in the last 14 days (Austin, 11/20/26).
+          onUploadList: active && !!r.last_post_on && r.last_post_on >= day14,
+        };
+      }
+
+      function contentCompare(key, dir) {
+        const sign = dir === "asc" ? 1 : -1;
+        const isDate = key === "lastPost" || key === "numbersAsOf";
+        return (a, b) => {
+          const av = a[key], bv = b[key];
+          // Missing values sort as the smallest: last when highest-first, and first
+          // when lowest-first (an account never uploaded leads the upload list).
+          if (av == null && bv == null) return (a.c.name || "").localeCompare(b.c.name || "");
+          if (av == null) return -1 * sign;
+          if (bv == null) return 1 * sign;
+          const d = isDate ? String(av).localeCompare(String(bv)) : av - bv;
+          return d ? sign * d : (a.c.name || "").localeCompare(b.c.name || "");
+        };
+      }
+
+      function updateContentCarets() {
+        contentTableEl.querySelectorAll("th.sortable").forEach(th => {
+          const caret = th.querySelector(".sort-caret");
+          th.classList.remove("sorted-asc", "sorted-desc");
+          if (caret) caret.textContent = "";
+          if (th.dataset.csort === contentSortKey) {
+            th.classList.add(contentSortDir === "asc" ? "sorted-asc" : "sorted-desc");
+            if (caret) caret.textContent = contentSortDir === "asc" ? "▲" : "▼";
+          }
+        });
+      }
+      contentTableEl.querySelectorAll("th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.dataset.csort;
+          if (contentSortKey === key) contentSortDir = contentSortDir === "desc" ? "asc" : "desc";
+          else { contentSortKey = key; contentSortDir = "desc"; }
+          updateContentCarets();
+          renderContentView();
+        });
+      });
+      uploadListBtn.addEventListener("click", () => {
+        contentUploadOnly = !contentUploadOnly;
+        uploadListBtn.classList.toggle("active", contentUploadOnly);
+        // The list reads oldest upload first, so what still needs doing is on top.
+        if (contentUploadOnly) { contentSortKey = "numbersAsOf"; contentSortDir = "asc"; }
+        else                   { contentSortKey = "impressions"; contentSortDir = "desc"; }
+        updateContentCarets();
+        renderContentView();
+      });
+
+      function renderContentKpis(rows) {
+        const sum = (k) => rows.reduce((s, x) => s + (x[k] || 0), 0);
+        const imp = sum("impressions"), eng = sum("engagements");
+        const cards = [
+          ["Accounts",             String(rows.length)],
+          ["Drafts",               fmtInt(sum("drafts"))],
+          ["Waiting for approval", fmtInt(sum("waiting"))],
+          ["Approved",             fmtInt(sum("approved"))],
+          ["Scheduled",            fmtInt(sum("scheduled"))],
+          ["Posted",               fmtInt(sum("posted"))],
+          ["Impressions",          fmtInt(imp)],
+          ["Engagement rate",      imp ? fmtPct(eng / imp) : "—"],
+          ["Button clicks",        fmtInt(sum("ctaClicks"))],
+          ["Link clicks",          fmtInt(sum("linkClicks"))],
+        ];
+        // Two even rows: the stages on top, the results under them.
+        kpiEl.classList.add("content-kpis");
+        kpiEl.innerHTML = cards.map(([label, value]) => `
+          <div class="kpi-card">
+            <div class="kpi-label">${esc(label)}</div>
+            <div class="kpi-value">${esc(value)}</div>
+          </div>
+        `).join("");
+      }
+
+      // A stage count. A number that is in the Tracker links to that account's
+      // Posts tab; one that only sits in a Google Doc has nothing to open.
+      function contentStageCell(x, total, inTracker, late, lateClass, lateTitle, docPart) {
+        if (!total) return `<td class="num ct-zero">—</td>`;
+        let title = late ? `${late} ${lateTitle}` : "";
+        // REMOVE AT THE DOCS SWITCH: the "in the Google Doc" part of the hover text.
+        if (docPart) title += `${title ? ". " : ""}${inTracker ? `${inTracker} on the Posts tab, ` : ""}${docPart} in the Google Doc`;
+        const inner = late ? `<span class="ct-flag ${lateClass}">${fmtInt(total)}</span>` : fmtInt(total);
+        const body = inTracker ? `<a href="/account/?id=${encodeURIComponent(x.c.id)}#posts">${inner}</a>` : inner;
+        return `<td class="num"${title ? ` title="${esc(title)}"` : ""}>${body}</td>`;
+      }
+
+      async function renderContentView() {
+        const seq = ++contentPaintSeq;
+        updateContentCarets();
+        let rows;
+        try { rows = await fetchContentWindow(); }
+        catch (err) {
+          if (seq !== contentPaintSeq || dashView !== "content") return;
+          contentShown = [];
+          renderContentKpis([]);
+          countEl.textContent = "";
+          contentBodyEl.innerHTML = `<tr><td colspan="${CONTENT_COLS}" class="loading">Couldn't load content: ${esc(err.message)}</td></tr>`;
+          return;
+        }
+        if (seq !== contentPaintSeq || dashView !== "content") return;
+        const byId = new Map((Array.isArray(rows) ? rows : []).map(r => [r.client_id, r]));
+        const day14 = localDayAgo(14);
+        const all = filteredEnriched().map(c => contentModel(c, byId.get(c.id), day14)).filter(Boolean);
+        const onList = all.filter(x => x.onUploadList);
+        uploadListBtn.textContent = `Upload list (${onList.length})`;
+        uploadListBtn.title = "Everyone with a post in the last 14 days. Their LinkedIn numbers are uploaded each week from the account's Posts tab.";
+        const shown = contentUploadOnly ? onList : all;
+        contentShown = shown;
+        renderContentKpis(shown);
+
+        // REMOVE AT THE DOCS SWITCH: the "Google Doc counts as of" note.
+        const docAt = (Array.isArray(rows) ? rows : []).reduce((m, r) => (r.doc_updated_at && r.doc_updated_at > m ? r.doc_updated_at : m), "");
+        const docNote = docAt
+          ? ` · Google Doc counts as of ${new Date(docAt).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+          : "";
+        countEl.textContent = `— ${shown.length} account${shown.length === 1 ? "" : "s"}${docNote}`;
+
+        if (!shown.length) {
+          contentBodyEl.innerHTML = `<tr><td colspan="${CONTENT_COLS}" class="loading">${
+            contentUploadOnly ? "Nobody in view has posted in the last 14 days." : "No accounts with posts match the current filters."}</td></tr>`;
+          return;
+        }
+        const num = (v) => v == null ? `<td class="num ct-zero">—</td>` : `<td class="num">${fmtInt(v)}</td>`;
+        contentBodyEl.innerHTML = [...shown].sort(contentCompare(contentSortKey, contentSortDir)).map(x => {
+          const href = `/account/?id=${encodeURIComponent(x.c.id)}#posts`;
+          const posted = x.posted
+            ? `<td class="num"><a href="${href}">${fmtInt(x.posted)}</a></td>`
+            : (x.quiet ? `<td class="num" title="Nothing posted in this timeframe"><span class="ct-flag ct-bad">0</span></td>` : `<td class="num ct-zero">—</td>`);
+          const lastPost = !x.lastPost ? `<td class="num ct-zero">—</td>`
+            : `<td class="num"${x.quiet ? ` title="No post in the last 14 days"` : ""}>${x.quiet ? `<span class="ct-flag ct-bad">${esc(fmtDate(x.lastPost))}</span>` : esc(fmtDate(x.lastPost))}</td>`;
+          const asOf = `<td class="num${x.numbersAsOf ? "" : " ct-zero"}" title="Open this account's Posts tab to upload its numbers"><a href="${href}">${x.numbersAsOf ? esc(fmtDate(x.numbersAsOf)) : "—"}</a></td>`;
+          return `
+            <tr data-client-id="${esc(x.c.id)}">
+              <td class="ct-acct"><a href="${href}">${esc(x.c.name || "—")}</a></td>
+              <td class="ct-co" title="${esc(x.c.company || "")}">${esc(x.c.company || "—")}</td>
+              ${contentStageCell(x, x.drafts, x.drafts, 0, "", "", 0)}
+              ${contentStageCell(x, x.waiting, x.r.waiting || 0, x.waitingLate, "ct-warn", "past the date planned for it", x.docWaiting)}
+              ${contentStageCell(x, x.approved, x.r.approved || 0, x.approvedLate, "ct-bad", "approved but not posted", x.docApproved)}
+              ${contentStageCell(x, x.scheduled, x.scheduled, x.scheduledLate, "ct-bad", "did not go out when scheduled", 0)}
+              ${posted}
+              ${num(x.impressions)}
+              <td class="num rate-cell${x.engRate == null ? " ct-zero" : ""}">${x.engRate == null ? "—" : fmtPct(x.engRate)}</td>
+              ${num(x.ctaClicks)}
+              ${num(x.linkClicks)}
+              ${lastPost}
+              ${asOf}
+            </tr>`;
+        }).join("");
+      }
+
       function setDashView(view) {
         if (view === dashView) return;
+        const wasContent = dashView === "content";
         dashView = view;
-        const meetings = view === "meetings";
+        const meetings = view === "meetings", content = view === "content";
         viewSwitchEl.querySelectorAll(".view-tab").forEach(b =>
           b.classList.toggle("active", b.dataset.dview === view));
-        accountsWrapEl.hidden = meetings;
+        accountsWrapEl.hidden = view !== "accounts";
         meetingsWrapEl.hidden = !meetings;
-        sectionTitleEl.textContent = meetings ? "All meetings" : "Account performance";
+        contentWrapEl.hidden  = !content;
+        uploadListBtn.hidden  = !content;
+        sectionTitleEl.textContent = meetings ? "All meetings" : content ? "Content" : "Account performance";
         quickSearchEl.placeholder = meetings ? "Search meetings…" : defaultSearchPlaceholder;
-        // Accounts-only chrome has no meaning on the meetings view.
-        document.getElementById("add-account-btn").hidden = meetings;
-        document.querySelector(".show-archived").hidden = meetings;
+        // Accounts-only chrome has no meaning on the other two views.
+        document.getElementById("add-account-btn").hidden = view !== "accounts";
+        document.querySelector(".show-archived").hidden = view !== "accounts";
+        // Leaving Content: the cards go back to the outreach numbers.
+        if (wasContent) renderKpiStrip(kpiEl, filteredEnriched().length, aggregateForKpis(filteredEnriched()));
         if (meetings) {
           seatUsageEl.hidden = true;
           renderMeetingsView();
+        } else if (content) {
+          seatUsageEl.hidden = true;
+          renderContentView();
         } else {
           seatUsageEl.hidden = seatUsageEl.textContent === "";
           renderTable();
@@ -2369,6 +2654,9 @@
       function rate(num, den) { return den ? num / den : null; }
 
       function renderKpiStrip(root, nClients, t) {
+        // The Content view has its own cards (content numbers, not outreach).
+        if (dashView === "content") { renderContentKpis(contentShown); return; }
+        kpiEl.classList.remove("content-kpis");
         // Order (9/14/26): the three roll-ups first (Accounts, Opportunity
         // value, Revenue closed), then the funnel outcome-first, matching
         // the table's metric columns left to right:
