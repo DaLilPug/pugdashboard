@@ -1062,7 +1062,7 @@
       let client;
       try {
         const rows = await sb.sbFetch(
-          `/rest/v1/clients?select=id,name,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,team_notes,team_notes_updated_at,team_notes_updated_by,auto_enrich_on_acceptance,auto_enrich_mode&id=eq.${encodeURIComponent(clientId)}&limit=1`
+          `/rest/v1/clients?select=id,name,company,slug,linkedin_account_url,org_id,archived_at,cadence_days,cadence_templates,cadence_enabled,positive_cadence_days,positive_cadence_templates,positive_cadence_enabled,skip_weekends_in_cadence,templates,initial_messages,links,attachments,reply_instructions,team_notes,team_notes_updated_at,team_notes_updated_by,auto_enrich_on_acceptance,auto_enrich_mode&id=eq.${encodeURIComponent(clientId)}&limit=1`
         );
         client = rows[0];
       } catch (err) {
