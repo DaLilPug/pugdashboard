@@ -101,17 +101,17 @@
     <button class="sub-tab"        data-tab="responses"     type="button">Responses</button>
     <button class="sub-tab"        data-tab="prospects"     type="button">Prospects</button>
     <button class="sub-tab"        data-tab="meeting-links" type="button">Meeting Links</button>
+    <!-- Integrations and Posts are open to share-link visitors (Austin, 11/23/26), so they sit
+         with the other open tabs, ahead of the team-only (data-internal) ones. Integrations: the
+         client signs in to their own HubSpot. Posts: the client reviews, approves, comments and
+         connects LinkedIn; only a signed-in person writes, schedules, publishes or deletes. -->
+    <button class="sub-tab"        data-tab="integrations"  type="button">Integrations</button>
+    <button class="sub-tab"        data-tab="posts"         type="button">Posts</button>
     <button class="sub-tab"        data-tab="followups"     type="button" data-internal>Follow-ups</button>
     <button class="sub-tab"        data-tab="cadence"       type="button" data-internal>Cadence</button>
     <button class="sub-tab"        data-tab="replyinst"     type="button" data-internal>Reply Instructions</button>
     <button class="sub-tab"        data-tab="assets"        type="button" data-internal>Assets</button>
-    <!-- Integrations is open to share-link visitors (Austin, 11/23/26): the client is the one
-         who signs in to their own HubSpot to connect it, same as on Meeting Links. -->
-    <button class="sub-tab"        data-tab="integrations"  type="button">Integrations</button>
     <button class="sub-tab"        data-tab="analysis"      type="button" data-internal>Analysis</button>
-    <!-- Posts is internal for now (11/17/26): not ready for clients. To open it to share-link
-         visitors again, drop data-internal; the tab itself already handles a client session. -->
-    <button class="sub-tab"        data-tab="posts"         type="button" data-internal>Posts</button>
   </div>
 
   <main class="main main-wide">
@@ -1006,7 +1006,7 @@
   <script src="/supabase-client.js"></script>
   <script src="/auth.js"></script>
   <script src="/meeting-link-status.js?v=3"></script>
-  <script src="/account/content-posts.js?v=35"></script>
+  <script src="/account/content-posts.js?v=36"></script>
   <script>
     (async function main() {
       const session = await Auth.requireAuth();
@@ -1348,21 +1348,8 @@
       initDangerZone(client);
 
 
-      // A share-link visitor only gets the Posts tab once there is a post for
-      // them to see (drafts are hidden from them by the table's own rules).
-      if (document.body.classList.contains("is-share-view")) {
-        let visiblePosts = [];
-        try { visiblePosts = await sb.sbFetch(`/rest/v1/content_posts?select=id&client_id=eq.${encodeURIComponent(clientId)}&limit=1`) || []; } catch (_) {}
-        if (!visiblePosts.length) {
-          const strip = document.getElementById("sub-tabs");
-          strip.querySelector('.sub-tab[data-tab="posts"]')?.remove();
-          const mobSel = strip.nextElementSibling;
-          if (mobSel && mobSel.classList.contains("mobile-pill-select")) {
-            [...mobSel.options].forEach(o => { if (o.value === "posts") o.remove(); });
-          }
-          shareHiddenTabs.push("posts");
-        }
-      }
+      // A share-link visitor always gets the Posts tab, with or without posts
+      // (Austin, 11/23/26): Connect LinkedIn lives there.
 
       // ---- tab switching ---------------------------------------------
       const tabs   = document.getElementById("sub-tabs");
@@ -1425,7 +1412,7 @@
           else if (name === "cadence")   initCadence();
           else if (name === "meeting-links") initMeetingLinks();
           else if (name === "posts")         ContentPosts.init({
-            clientId, clientName: client.name, root: document.getElementById("posts-root"),
+            clientId, clientName: client.name, clientCompany: client.company, root: document.getElementById("posts-root"),
             isShare: document.body.classList.contains("is-share-view"), selectTab,
           });
           else if (name === "integrations")  initIntegrations();

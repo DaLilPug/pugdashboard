@@ -249,15 +249,18 @@
   }
 
   // ---- comments beside the post ---------------------------------------------
-  function who(side) {
-    const mine = (side === "client") === S.isShare;
-    if (mine) return "You";
-    return side === "client" ? "Client" : "Uptown";
+  // Who a comment is from, the same for everyone reading it (Austin, 11/23/26). The team signs with the first
+  // name of the login that wrote it (stamped on the comment by the database). A share-link visitor's comment
+  // shows the account's company, since several people at the company can use one link; nothing when the
+  // account has no company.
+  function who(c) {
+    return c.side === "client" ? (S.clientCompany || "") : (c.author_name || "");
   }
   function msgHtml(c) {
     const mine = (c.side === "client") === S.isShare;
+    const name = who(c);
     return `<div class="cp-msg${mine ? " cp-msg-mine" : ""}" data-comment="${c.id}">
-      <div class="cp-msg-meta">${mine ? "" : `<b>${who(c.side)}</b>`}<span>${fmtDate(c.created_at)}</span>${mine ? `<button type="button" class="cp-msg-del" data-act="delcomment" title="Delete">Delete</button>` : ""}</div>
+      <div class="cp-msg-meta">${name ? `<b>${esc(name)}</b>` : ""}<span>${fmtDate(c.created_at)}</span>${mine ? `<button type="button" class="cp-msg-del" data-act="delcomment" title="Delete">Delete</button>` : ""}</div>
       <div class="cp-msg-body">${esc(c.body)}</div></div>`;
   }
   function threadHtml(post, t) {
@@ -431,7 +434,7 @@
     if (err.startsWith("reconnect_required") || !canPublish()) {
       return `<span class="cp-conn-warn">LinkedIn needs to be connected again.</span> ${link("Reconnect")}`;
     }
-    if (S.isShare) return "";
+    // A share-link visitor gets the same menu: it is their LinkedIn to disconnect (Austin, 11/23/26).
     const last = S.integ.last_sync_ok_at ? `Last refreshed ${fmtDate(S.integ.last_sync_ok_at)} at ${fmtTime(S.integ.last_sync_ok_at)}.` : "";
     return `<span class="cp-menu-wrap"><button type="button" class="cp-conn" data-act="menu">Connected as ${esc(profile().name)} <span class="cp-caret">&#9662;</span></button>
       <div class="cp-menu cp-menu-down hidden">
@@ -484,7 +487,8 @@
       html += `<div class="cp-empty">${team
         ? `<p>No posts here yet.</p><button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="new">Write the first post</button>
            <div><button type="button" class="cp-btn cp-btn-quiet cp-empty-alt" data-act="external">or add a post that is already on LinkedIn</button></div>`
-        : `<p>Nothing to review right now. New posts show up here when they are ready for you.</p>`}</div>`;
+        : `<p>Nothing to review right now. New posts show up here when they are ready for you.</p>${S.integ ? ""
+          : `<button type="button" class="cp-btn cp-btn-primary cp-btn-lg" data-act="connect">Connect LinkedIn</button>`}`}</div>`;
     }
     root.innerHTML = html;
     hydrateImages(root);
@@ -1169,7 +1173,7 @@
   // ---- start ---------------------------------------------------------------------
   async function init(opts) {
     S = {
-      clientId: opts.clientId, clientName: opts.clientName || "", isShare: !!opts.isShare,
+      clientId: opts.clientId, clientName: opts.clientName || "", clientCompany: (opts.clientCompany || "").trim(), isShare: !!opts.isShare,
       root: opts.root, selectTab: opts.selectTab || null,
       posts: [], comments: [], integ: null, urls: {}, draft: null, pending: null,
       showResolved: new Set(), postedShown: POSTED_PAGE,
