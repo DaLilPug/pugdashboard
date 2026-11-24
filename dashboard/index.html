@@ -2091,8 +2091,11 @@
 
       // One table row's worth of facts, or null when the account has no posts
       // anywhere (most outreach-only accounts): those stay off this tab.
+      // The sample client "Tony Stark" (Stark Industries) has made-up posts for sales demos.
+      // It stays off this tab so its numbers never mix with real clients' (Austin, 11/23/26).
+      const CONTENT_SAMPLE_CLIENT = "5741524b-0000-4000-8000-494e44555354";
       function contentModel(c, r, day14) {
-        if (!r) return null;
+        if (!r || c.id === CONTENT_SAMPLE_CLIENT) return null;
         // REMOVE AT THE DOCS SWITCH: the doc_* values are what sits in the person's
         // content Google Doc (Brain counts it). When posts live in the Posts tab,
         // docWaiting / docApproved go and the stage counts are the Tracker's alone.
